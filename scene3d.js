@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=23';
+import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=24';
 
 // Net profile drawn with singles sticks in place (matches the physics for singles play):
 // 0.914 m at the centre rising to 1.07 m at the sticks, then level out to the posts.

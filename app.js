@@ -14,15 +14,15 @@ import {
   samplePointAtTime,
   airDensityFromConditions,
   chainRallyTurns
-} from './physics.js?v=23';
+} from './physics.js?v=24';
 import {
   SHOT_PRESETS,
   INCOMING_PRESETS,
   EXAMPLE_RALLIES,
   TACTICAL_LESSONS,
   evaluateTacticalAttempt
-} from './presets.js?v=23';
-import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=23';
+} from './presets.js?v=24';
+import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=24';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;
@@ -30,13 +30,13 @@ const KG_TO_LBS = 2.20462262;
 const I18N = {
   zh: {
     loadKicker: '交互式物理教学模拟',
-    loadModeSoloTag: 'DEFAULT',
+    loadModeSoloTag: '默认',
     loadModeSoloTitle: '单人球速实验室',
     loadModeSoloDesc: '主动发力 vs 来球借力，四种击球动作',
-    loadModeRallyTag: 'RALLY',
+    loadModeRallyTag: '回合',
     loadModeRallyTitle: '双人多拍回合',
     loadModeRallyDesc: '两人轮流击球，落点自动接力',
-    loadModeTacticsTag: 'TACTICS',
+    loadModeTacticsTag: '战术',
     loadModeTacticsTitle: '战术教学',
     loadModeTacticsDesc: '看示范，再自己调参打进靶区',
     btnEnterLab: '进入实验室 →',
@@ -155,8 +155,8 @@ const I18N = {
     btnApplyImport: '解析生成',
     tabTactics: '战术',
     lblTacticalSelect: '选择战术课',
-    btnTacticDemo: '▶ 演示',
-    btnTacticChallenge: '◎ 挑战',
+    btnTacticDemo: '演示',
+    btnTacticChallenge: '挑战',
     btnExitTactics: '退出',
     tacticalTheoryTitle: '战术要点',
     tacticalMissionTitle: '挑战目标 · 命中金色靶区',
@@ -167,26 +167,26 @@ const I18N = {
   },
   en: {
     loadKicker: 'Interactive physics teaching sim',
-    loadModeSoloTag: 'DEFAULT',
+    loadModeSoloTag: 'Default',
     loadModeSoloTitle: 'Solo Ball Speed Lab',
     loadModeSoloDesc: 'Own swing vs borrowed pace, four strokes',
-    loadModeRallyTag: 'RALLY',
+    loadModeRallyTag: 'Rally',
     loadModeRallyTitle: '2-Player Rally',
     loadModeRallyDesc: 'Two players take turns; bounces chain automatically',
-    loadModeTacticsTag: 'TACTICS',
+    loadModeTacticsTag: 'Tactics',
     loadModeTacticsTitle: 'Tactics Lessons',
     loadModeTacticsDesc: 'Watch the demo, then tune your shot into the target',
     btnEnterLab: 'Enter the lab →',
     brandSub: 'Tennis ball-flight teaching simulator',
     grpPosition: 'Hitting position',
     grpEnvironment: 'Environment',
-    btnWelcomePage: 'WELCOME',
-    btnValidation: 'VALIDATION',
+    btnWelcomePage: 'Welcome',
+    btnValidation: 'Validation',
     linkValidation: 'Model notes & validation →',
     loadHeadline: '3D Tennis<span>Ball-Flight Teaching Simulator</span>',
     loadSubtext:
       'Change the swing and the incoming ball and watch speed, spin and landing point respond. Aerodynamics use the Štěpánek (1988) fits; racket and court impacts use Cross-style rigid-body models. Player presets are hand-tuned examples, not measured data.',
-    soloSectionTitle: 'MODE & PLAYER PRESET',
+    soloSectionTitle: 'Stroke and preset',
     modeBtnSolo: 'Solo Lab',
     modeBtnRally: '2P Rally',
     modeBtnTactics: 'Tactics',
@@ -195,17 +195,17 @@ const I18N = {
     strokeBH2: '2H-BH',
     strokeBH1: '1H-BH',
     strokeServe: 'Serve',
-    sscTitle: 'SPEED SYNTHESIS',
+    sscTitle: 'Ball speed breakdown',
     sscActiveLbl: 'Active Power',
     sscBorrowLbl: 'Borrowed Pace',
     sscCorLbl: 'e_A',
     sscDwellLbl: 'Dwell/Defl (est.)',
     sscSecondBounceLbl: '2nd Bounce',
-    unitSpeedLabel: 'SPEED',
-    unitTensionLabel: 'TENSION',
-    rallySectionTitle: 'RALLY & PRESET',
-    btnReset: 'RESET',
-    btnImportAtp: 'IMPORT',
+    unitSpeedLabel: 'Speed',
+    unitTensionLabel: 'Tension',
+    rallySectionTitle: 'Rally',
+    btnReset: 'Reset',
+    btnImportAtp: 'Import',
     lblRallyPreset: 'Example Rally',
     shotPresetLabel: 'Style Preset (hand-tuned)',
     btnNextTurn: '+ Next Shot',
@@ -251,12 +251,12 @@ const I18N = {
     lblCrossWind: 'Cross Wind (+ to left)',
     lblTemperature: 'Temperature',
     lblAltitude: 'Altitude',
-    hudTitleCall: 'LINE CALL // BOUNCE',
-    hudTitleSpeed: 'VELOCITY',
-    hudTitleSpin: 'SPIN RPM',
-    hudTitleNet: 'NET CLEARANCE',
-    btnJumpBounce: 'FOCUS',
-    btnJumpNet: 'FOCUS',
+    hudTitleCall: 'Line call',
+    hudTitleSpeed: 'Launch speed',
+    hudTitleSpin: 'Spin',
+    hudTitleNet: 'Net clearance',
+    btnJumpBounce: 'Focus',
+    btnJumpNet: 'Focus',
     camCloseup: 'Close-Up',
     camBroadcast: 'Broadcast',
     camSide: 'Side',
@@ -292,11 +292,11 @@ const I18N = {
     btnApplyImport: 'Build Rally',
     tabTactics: 'Tactics',
     lblTacticalSelect: 'Select lesson',
-    btnTacticDemo: '▶ Demo',
-    btnTacticChallenge: '◎ Challenge',
+    btnTacticDemo: 'Demo',
+    btnTacticChallenge: 'Challenge',
     btnExitTactics: 'Exit',
-    tacticalTheoryTitle: 'TACTICAL KEY',
-    tacticalMissionTitle: 'TARGET · HIT GOLD ZONE',
+    tacticalTheoryTitle: 'Tactical key',
+    tacticalMissionTitle: 'Target: hit the gold zone',
     btnGoTuneShot: 'Tune Swing Sliders →',
     btnShortDemo: 'Demo',
     btnShortChallenge: 'Challenge',
@@ -728,9 +728,6 @@ class TennisSimApp {
    */
   _initLoadingScreen() {
     const overlay = document.getElementById('aeroLoadingOverlay');
-    const barFill = document.getElementById('loadingBarFill');
-    const pctText = document.getElementById('loadingPercentText');
-    const statusText = document.getElementById('loadingStatusText');
     const enterBtn = document.getElementById('btnEnterLab');
     const reopenBtn = document.getElementById('btnReopenWelcome');
 
@@ -743,7 +740,7 @@ class TennisSimApp {
           const isAct = c === card;
           c.classList.toggle('active', isAct);
           const chk = c.querySelector('.lmc-check');
-          if (chk) chk.textContent = isAct ? '●' : '○';
+          if (chk) chk.textContent = '';
         });
       });
     });
@@ -767,27 +764,6 @@ class TennisSimApp {
       }
     });
 
-    // Smooth animated telemetry progress on startup
-    if (barFill && pctText && statusText) {
-      barFill.style.width = '38%';
-      pctText.textContent = '38%';
-      setTimeout(() => {
-        barFill.style.width = '76%';
-        pctText.textContent = '76%';
-        statusText.textContent =
-          this.lang === 'zh'
-            ? '校准 3D 正反手 IK 与 16x19 穿线刚度...'
-            : 'CALIBRATING 3D IK & 16x19 STRINGBED...';
-      }, 180);
-      setTimeout(() => {
-        barFill.style.width = '100%';
-        pctText.textContent = '100%';
-        statusText.textContent =
-          this.lang === 'zh'
-            ? 'READY // 单人球速与正反手实验室'
-            : 'READY // SOLO BALL SPEED & BIOMECHANICS LAB';
-      }, 420);
-    }
   }
 
   /**
@@ -877,7 +853,7 @@ class TennisSimApp {
       if (fullRallyBtn) fullRallyBtn.style.display = 'inline-flex';
       if (sectionTitle) {
         sectionTitle.textContent =
-          this.lang === 'zh' ? '战术教学' : 'TACTICS LESSONS';
+          this.lang === 'zh' ? '战术教学' : 'Tactics lessons';
       }
 
       document.querySelectorAll('#sidebarNavTabs .nav-tab').forEach((b) =>
@@ -1941,7 +1917,7 @@ class TennisSimApp {
 
     // 1. Launch Velocity Cell
     document.getElementById('hudSpeedBig').textContent = this.formatSpeed(speedKmh, 1);
-    document.getElementById('hudApexBadge').textContent = `APEX ${res.maxHeightM.toFixed(2)}m`;
+    document.getElementById('hudApexBadge').textContent = `apex ${res.maxHeightM.toFixed(2)} m`;
     const hudSpeedSlider = document.getElementById('hudSpeedSlider');
     if (hudSpeedSlider && document.activeElement !== hudSpeedSlider) {
       hudSpeedSlider.value = speedKmh;
@@ -1959,8 +1935,8 @@ class TennisSimApp {
           ? '上旋'
           : '切削'
         : isTop
-        ? 'TOPSPIN'
-        : 'SLICE';
+        ? 'Topspin'
+        : 'Backspin';
 
     const sideSign = sidespinRpm >= 0 ? '+' : '';
     document.getElementById('hudMagnusInfo').textContent =
@@ -1980,7 +1956,7 @@ class TennisSimApp {
       netEl.textContent = `${cm >= 0 ? '+' : ''}${cm.toFixed(1)} cm`;
       netEl.className = `tel-big-mono ${cm >= 0 && !res.hitNet ? 'text-ok' : 'text-err'}`;
     } else {
-      netEl.textContent = this.lang === 'zh' ? '未过网' : 'SHORT';
+      netEl.textContent = this.lang === 'zh' ? '未过网' : 'Short';
       netEl.className = 'tel-big-mono text-err';
     }
 
@@ -2196,7 +2172,7 @@ class TennisSimApp {
     if (this.lang === 'zh') {
       btn.textContent = this.isPlaying ? '暂停' : '播放动画';
     } else {
-      btn.textContent = this.isPlaying ? 'PAUSE' : 'PLAY';
+      btn.textContent = this.isPlaying ? 'Pause' : 'Play';
     }
   }
 

@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=23" />
+  <link rel="stylesheet" href="./styles.css?v=24" />
   <script type="importmap">
     {
       "imports": {
@@ -27,14 +27,14 @@
         <div class="loading-brand">
           <span class="brand-mark" aria-hidden="true"></span>
           <span class="loading-brand-name">AERO-LAB</span>
-          <span class="loading-author-pill">by Jason Zeng</span>
+          <span class="loading-author-pill">Jason Zeng</span>
         </div>
         <span class="loading-spec-code">RK4 · Δt 2 ms · Štěpánek aero</span>
       </div>
 
       <div class="loading-hero-grid">
         <div class="loading-hero-left">
-          <div class="loading-kicker" data-i18n="loadKicker">BIOMECHANICS & BALLISTICS LAB</div>
+          <div class="loading-kicker" data-i18n="loadKicker">交互式物理教学模拟</div>
           <h1 class="loading-headline" data-i18n-html="loadHeadline">
             3D 网球<span>弹道与击球教学模拟器</span>
           </h1>
@@ -45,24 +45,24 @@
           <div class="loading-mode-cards">
             <div class="loading-mode-card active" data-launch-mode="solo" role="button" tabindex="0">
               <div class="lmc-top">
-                <span class="lmc-badge lmc-badge-primary" data-i18n="loadModeSoloTag">DEFAULT</span>
-                <span class="lmc-check">●</span>
+                <span class="lmc-badge lmc-badge-primary" data-i18n="loadModeSoloTag">默认</span>
+                <span class="lmc-check" aria-hidden="true"></span>
               </div>
               <div class="lmc-title" data-i18n="loadModeSoloTitle">单人球速实验室</div>
               <div class="lmc-desc" data-i18n="loadModeSoloDesc">正反手挥拍 · 球速合成分解</div>
             </div>
             <div class="loading-mode-card" data-launch-mode="rally" role="button" tabindex="0">
               <div class="lmc-top">
-                <span class="lmc-badge" data-i18n="loadModeRallyTag">RALLY</span>
-                <span class="lmc-check">○</span>
+                <span class="lmc-badge" data-i18n="loadModeRallyTag">回合</span>
+                <span class="lmc-check" aria-hidden="true"></span>
               </div>
               <div class="lmc-title" data-i18n="loadModeRallyTitle">双人多拍回合</div>
               <div class="lmc-desc" data-i18n="loadModeRallyDesc">跑动截击 · 连续对拉回放</div>
             </div>
             <div class="loading-mode-card" data-launch-mode="tactics" role="button" tabindex="0">
               <div class="lmc-top">
-                <span class="lmc-badge lmc-badge-gold" data-i18n="loadModeTacticsTag">TACTICS</span>
-                <span class="lmc-check">○</span>
+                <span class="lmc-badge lmc-badge-gold" data-i18n="loadModeTacticsTag">战术</span>
+                <span class="lmc-check" aria-hidden="true"></span>
               </div>
               <div class="lmc-title" data-i18n="loadModeTacticsTitle">战术教学</div>
               <div class="lmc-desc" data-i18n="loadModeTacticsDesc">战术示例 · 靶区挑战</div>
@@ -72,21 +72,21 @@
 
         <div class="loading-blueprint-card" aria-hidden="true">
           <div class="lbp-header">
-            <span>BALL SPEED SYNTHESIS</span>
+            <span>Ball speed synthesis</span>
             <span>v_out = (1+e_A)·v_r + e_A·v_in</span>
           </div>
           <svg class="lbp-svg" viewBox="0 0 360 175" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <line x1="20" y1="145" x2="340" y2="145" stroke="#d9d2c3" stroke-width="1.5"/>
-            <line x1="180" y1="112" x2="180" y2="145" stroke="#1b1a17" stroke-width="2.5"/>
-            <path d="M 36 108 Q 148 24 275 144" stroke="#1f5b3f" stroke-width="3" stroke-linecap="round"/>
-            <path d="M 275 144 Q 308 102 336 132" stroke="#2a78d6" stroke-width="2.4" stroke-linecap="round"/>
+            <line x1="20" y1="145" x2="340" y2="145" stroke="#7d7b72" stroke-width="1.5"/>
+            <line x1="180" y1="112" x2="180" y2="145" stroke="#141413" stroke-width="2.5"/>
+            <path d="M 36 108 Q 148 24 275 144" stroke="#141413" stroke-width="3" stroke-linecap="round"/>
+            <path d="M 275 144 Q 308 102 336 132" stroke="#1f5fbf" stroke-width="2.4" stroke-linecap="round"/>
             <path d="M 36 108 Q 165 48 310 144" stroke="#a39b8b" stroke-width="1.3" stroke-dasharray="4 4"/>
-            <circle cx="36" cy="108" r="5" fill="#d9662b"/>
-            <circle cx="275" cy="144" r="4.5" fill="#1f5b3f"/>
-            <circle cx="180" cy="74" r="3.5" fill="#2a78d6"/>
-            <text x="28" y="94" fill="#d9662b" font-family="JetBrains Mono" font-size="9" font-weight="700">IMPACT</text>
-            <text x="154" y="62" fill="#2a78d6" font-family="JetBrains Mono" font-size="9" font-weight="700">NET +68cm</text>
-            <text x="252" y="162" fill="#1f5b3f" font-family="JetBrains Mono" font-size="9" font-weight="700">BOUNCE IN</text>
+            <circle cx="36" cy="108" r="5" fill="#ff4f00"/>
+            <circle cx="275" cy="144" r="4.5" fill="#141413"/>
+            <circle cx="180" cy="74" r="3.5" fill="#1f5fbf"/>
+            <text x="28" y="94" fill="#ff4f00" font-family="JetBrains Mono" font-size="9" font-weight="700">IMPACT</text>
+            <text x="154" y="62" fill="#1f5fbf" font-family="JetBrains Mono" font-size="9" font-weight="700">NET +68cm</text>
+            <text x="252" y="162" fill="#141413" font-family="JetBrains Mono" font-size="9" font-weight="700">BOUNCE IN</text>
           </svg>
           <div class="lbp-formula-grid">
             <div class="lbp-item">
@@ -102,15 +102,7 @@
       </div>
 
       <div class="loading-footer-bar">
-        <div class="loading-progress-wrap">
-          <div class="loading-progress-meta">
-            <span id="loadingStatusText">READY // SOLO BALL SPEED LAB</span>
-            <strong id="loadingPercentText">100%</strong>
-          </div>
-          <div class="loading-bar-track">
-            <div class="loading-bar-fill" id="loadingBarFill" style="width: 100%;"></div>
-          </div>
-        </div>
+        <span class="loading-spacer"></span>
         <a class="loading-doc-link" href="./validation.html" data-i18n="linkValidation">模型说明与验证 →</a>
         <button class="loading-enter-btn" id="btnEnterLab" data-i18n="btnEnterLab">进入实验室 →</button>
       </div>
@@ -403,8 +395,8 @@
             </div>
             <select id="tacticalLessonSelect" aria-label="Lesson"></select>
             <div class="tactical-mode-row">
-              <button class="tactical-mode-btn active" id="btnTacticDemo" data-i18n="btnTacticDemo">▶ 演示</button>
-              <button class="tactical-mode-btn challenge-accent" id="btnTacticChallenge" data-i18n="btnTacticChallenge">◎ 挑战</button>
+              <button class="tactical-mode-btn active" id="btnTacticDemo" data-i18n="btnTacticDemo">演示</button>
+              <button class="tactical-mode-btn challenge-accent" id="btnTacticChallenge" data-i18n="btnTacticChallenge">挑战</button>
             </div>
             <div class="tactical-theory-box">
               <div class="tactical-box-title" data-i18n="tacticalTheoryTitle">战术要点</div>
@@ -481,119 +473,122 @@
 
     <!-- ===================== 3D viewport ===================== -->
     <main class="main-area">
+      <!-- Live telemetry (docked panel) -->
+      <section class="telemetry-module" id="interactiveHudLeft" aria-label="Telemetry">
+        <div class="tel-cell tel-cell-call" id="hudCardBounce">
+          <div class="tel-cell-top">
+            <span class="tel-label" id="hudTurnBadge" data-i18n="hudTitleCall">落点判罚</span>
+            <button class="tel-action-btn" id="btnJumpBounce" data-i18n="btnJumpBounce">定位</button>
+          </div>
+          <div class="tel-verdict-row">
+            <span class="call-tag call-in" id="hawkeyeCallBadge">IN</span>
+            <span class="tel-sub-mono" id="statLandingCoord">X 8.72 / Y 0.79m</span>
+          </div>
+          <div class="tel-meta" id="hawkeyeCallDetail">余量 79 cm</div>
+          <div class="tel-meta-mono" id="statBounceSpeed">92 → 68 km/h</div>
+        </div>
+
+        <div class="tel-cell">
+          <div class="tel-cell-top">
+            <span class="tel-label" data-i18n="hudTitleSpeed">出球速度</span>
+            <button class="tel-action-btn" id="btnCycleSpeedUnit">km/h</button>
+          </div>
+          <div class="tel-main-row">
+            <span class="tel-big-mono" id="hudSpeedBig">138.2 km/h</span>
+            <span class="tel-badge-mono" id="hudApexBadge">apex 2.15 m</span>
+          </div>
+          <input type="range" class="tel-inline-slider" id="hudSpeedSlider" min="40" max="230" step="0.5" value="138.2" aria-label="Launch speed" />
+        </div>
+
+        <div class="tel-cell">
+          <div class="tel-cell-top">
+            <span class="tel-label" data-i18n="hudTitleSpin">旋转转速</span>
+            <span class="tel-badge-mono" id="hudSpinTypePill">上旋</span>
+          </div>
+          <div class="tel-media-row">
+            <canvas id="hudSpinBallCanvas" width="68" height="68"></canvas>
+            <div class="tel-media-col">
+              <span class="tel-big-mono" id="hudSpinBig">+3420 RPM</span>
+              <span class="tel-meta" id="hudMagnusInfo">侧旋 +280</span>
+            </div>
+          </div>
+          <input type="range" class="tel-inline-slider" id="hudSpinSlider" min="-3200" max="4800" step="25" value="3420" aria-label="Spin" />
+        </div>
+
+        <div class="tel-cell">
+          <div class="tel-cell-top">
+            <span class="tel-label" data-i18n="hudTitleNet">过网净空</span>
+            <button class="tel-action-btn" id="btnJumpNet" data-i18n="btnJumpNet">过网</button>
+          </div>
+          <div class="tel-media-row">
+            <canvas id="hudNetGaugeCanvas" width="68" height="60"></canvas>
+            <div class="tel-media-col">
+              <span class="tel-big-mono" id="statNetClearance">+68.4 cm</span>
+              <span class="tel-meta" id="hudLaunchAngleInfo">仰角 +8.4°</span>
+            </div>
+          </div>
+          <input type="range" class="tel-inline-slider" id="hudAngleSlider" min="-10" max="32" step="0.2" value="8.4" aria-label="Launch angle" />
+        </div>
+      </section>
+
+      <!-- Tactics lesson status (docked; shown by the app during lessons) -->
+      <div class="tactical-hud-banner" id="tacticalHudBanner" style="display: none;">
+        <div class="thb-top">
+          <span class="thb-badge" id="thbTitle">Lesson 01</span>
+          <div class="thb-actions">
+            <span class="tactical-score-pill" id="thbScorePill">100 / 100</span>
+            <button class="mini-action-btn" id="thbBtnDemo" data-i18n="btnShortDemo">演示</button>
+            <button class="mini-action-btn active-accent" id="thbBtnChallenge" data-i18n="btnShortChallenge">挑战</button>
+            <button class="mini-action-btn icon-btn" id="thbBtnClose" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5"/></svg></button>
+          </div>
+        </div>
+        <div class="thb-feedback" id="thbFeedback"></div>
+      </div>
+
+      <!-- 3D wind-tunnel viewport -->
       <div class="viewport-wrapper">
         <div id="viewport3d"></div>
+        <span class="viewport-corner viewport-corner-tl" aria-hidden="true"></span>
+        <span class="viewport-corner viewport-corner-tr" aria-hidden="true"></span>
+        <span class="viewport-corner viewport-corner-bl" aria-hidden="true"></span>
+        <span class="viewport-corner viewport-corner-br" aria-hidden="true"></span>
+      </div>
 
-        <!-- HUD strip -->
-        <div class="telemetry-module" id="interactiveHudLeft">
-          <div class="tel-cell tel-cell-call" id="hudCardBounce">
-            <div class="tel-cell-top">
-              <span class="tel-label" id="hudTurnBadge" data-i18n="hudTitleCall">落点判罚</span>
-              <button class="tel-action-btn" id="btnJumpBounce" data-i18n="btnJumpBounce">定位</button>
-            </div>
-            <div class="tel-verdict-row">
-              <span class="call-tag call-in" id="hawkeyeCallBadge">IN</span>
-              <span class="tel-sub-mono" id="statLandingCoord">X 8.72 / Y 0.79m</span>
-            </div>
-            <div class="tel-meta" id="hawkeyeCallDetail">余量 79 cm</div>
-            <div class="tel-meta-mono" id="statBounceSpeed">92 → 68 km/h</div>
-          </div>
-
-          <div class="tel-cell">
-            <div class="tel-cell-top">
-              <span class="tel-label" data-i18n="hudTitleSpeed">出球速度</span>
-              <button class="tel-action-btn" id="btnCycleSpeedUnit">UNIT</button>
-            </div>
-            <div class="tel-main-row">
-              <span class="tel-big-mono" id="hudSpeedBig">138.2 km/h</span>
-              <span class="tel-badge-mono" id="hudApexBadge">APEX 2.15m</span>
-            </div>
-            <input type="range" class="tel-inline-slider" id="hudSpeedSlider" min="40" max="230" step="0.5" value="138.2" aria-label="Launch speed" />
-          </div>
-
-          <div class="tel-cell">
-            <div class="tel-cell-top">
-              <span class="tel-label" data-i18n="hudTitleSpin">旋转转速</span>
-              <span class="tel-badge-mono" id="hudSpinTypePill">上旋</span>
-            </div>
-            <div class="tel-media-row">
-              <canvas id="hudSpinBallCanvas" width="68" height="68"></canvas>
-              <div class="tel-media-col">
-                <span class="tel-big-mono" id="hudSpinBig">+3420 RPM</span>
-                <span class="tel-meta" id="hudMagnusInfo">侧旋 +280</span>
-              </div>
-            </div>
-            <input type="range" class="tel-inline-slider" id="hudSpinSlider" min="-3200" max="4800" step="25" value="3420" aria-label="Spin" />
-          </div>
-
-          <div class="tel-cell">
-            <div class="tel-cell-top">
-              <span class="tel-label" data-i18n="hudTitleNet">过网净空</span>
-              <button class="tel-action-btn" id="btnJumpNet" data-i18n="btnJumpNet">过网</button>
-            </div>
-            <div class="tel-media-row">
-              <canvas id="hudNetGaugeCanvas" width="68" height="60"></canvas>
-              <div class="tel-media-col">
-                <span class="tel-big-mono" id="statNetClearance">+68.4 cm</span>
-                <span class="tel-meta" id="hudLaunchAngleInfo">仰角 +8.4°</span>
-              </div>
-            </div>
-            <input type="range" class="tel-inline-slider" id="hudAngleSlider" min="-10" max="32" step="0.2" value="8.4" aria-label="Launch angle" />
-          </div>
+      <!-- View toolbar: cameras, layers, legend -->
+      <div class="view-toolbar">
+        <div class="cam-strip" role="group" aria-label="Camera">
+          <button class="cam-btn" data-cam="player_closeup" data-i18n="camCloseup">特写</button>
+          <button class="cam-btn" data-cam="broadcast" data-i18n="camBroadcast">全景</button>
+          <button class="cam-btn" data-cam="side" data-i18n="camSide">侧面</button>
+          <button class="cam-btn" data-cam="player_pov" data-i18n="camPov">主视角</button>
+          <button class="cam-btn" data-cam="hawkeye" data-i18n="camHawkeye">判线</button>
+          <button class="cam-btn" data-cam="top" data-i18n="camTop">俯视</button>
         </div>
-
-        <!-- Tactics banner -->
-        <div class="tactical-hud-banner" id="tacticalHudBanner" style="display: none;">
-          <div class="thb-top">
-            <span class="thb-badge" id="thbTitle">LESSON 01</span>
-            <div class="thb-actions">
-              <span class="tactical-score-pill" id="thbScorePill">100 / 100</span>
-              <button class="mini-action-btn" id="thbBtnDemo" data-i18n="btnShortDemo">演示</button>
-              <button class="mini-action-btn active-accent" id="thbBtnChallenge" data-i18n="btnShortChallenge">挑战</button>
-              <button class="mini-action-btn" id="thbBtnClose" aria-label="Close">✕</button>
-            </div>
-          </div>
-          <div class="thb-feedback" id="thbFeedback"></div>
+        <div class="layer-strip">
+          <label class="toggle-label">
+            <input type="checkbox" id="toggleVectors" checked />
+            <span data-i18n="chkVectors">物理矢量</span>
+          </label>
+          <label class="toggle-label">
+            <input type="checkbox" id="toggleGhost" checked />
+            <span data-i18n="chkGhost">无旋对比</span>
+          </label>
+          <label class="toggle-label">
+            <input type="checkbox" id="toggleTrueScale" />
+            <span data-i18n="chkTrueScale">真实球径</span>
+          </label>
+          <label class="toggle-label">
+            <input type="checkbox" id="toggleStands" checked />
+            <span data-i18n="chkStands">观众席</span>
+          </label>
+          <button class="mobile-sheet-toggle" id="btnMobileExpand3D" data-i18n="btnMobileExpand3D">全屏球场</button>
         </div>
-
-        <!-- Camera & layers (bottom-left) -->
-        <div class="hud-top-right view-controls">
-          <div class="cam-strip">
-            <button class="cam-btn" data-cam="player_closeup" data-i18n="camCloseup">特写</button>
-            <button class="cam-btn" data-cam="broadcast" data-i18n="camBroadcast">全景</button>
-            <button class="cam-btn" data-cam="side" data-i18n="camSide">侧面</button>
-            <button class="cam-btn" data-cam="player_pov" data-i18n="camPov">主视角</button>
-            <button class="cam-btn" data-cam="hawkeye" data-i18n="camHawkeye">判线</button>
-            <button class="cam-btn" data-cam="top" data-i18n="camTop">俯视</button>
-          </div>
-          <div class="layer-strip">
-            <label class="toggle-label">
-              <input type="checkbox" id="toggleVectors" checked />
-              <span data-i18n="chkVectors">物理矢量</span>
-            </label>
-            <label class="toggle-label">
-              <input type="checkbox" id="toggleGhost" checked />
-              <span data-i18n="chkGhost">无旋对比</span>
-            </label>
-            <label class="toggle-label">
-              <input type="checkbox" id="toggleTrueScale" />
-              <span data-i18n="chkTrueScale">真实球径</span>
-            </label>
-            <label class="toggle-label">
-              <input type="checkbox" id="toggleStands" checked />
-              <span data-i18n="chkStands">观众席</span>
-            </label>
-            <button class="mobile-sheet-toggle" id="btnMobileExpand3D" data-i18n="btnMobileExpand3D">全屏球场</button>
-          </div>
-        </div>
-
-        <!-- Legend (bottom-right) -->
-        <div class="legend-strip">
+        <div class="legend-strip" aria-label="Legend">
           <div class="legend-item"><span class="legend-swatch" style="background: #d97706;"></span><span data-i18n="legIncoming">来球</span></div>
           <div class="legend-item"><span class="legend-swatch" style="background: #65a30d;"></span><span data-i18n="legPreBounce">飞行</span></div>
           <div class="legend-item"><span class="legend-swatch" style="background: #0284c7;"></span><span data-i18n="legPostBounce">反弹</span></div>
           <div class="legend-item"><span class="legend-swatch" style="background: #be123c;"></span><span data-i18n="legMagnus">马格努斯力</span></div>
-          <div class="legend-item"><span class="legend-swatch" style="background: #64748b;"></span><span data-i18n="legNoSpin">无旋基准</span></div>
+          <div class="legend-item"><span class="legend-swatch legend-swatch-dash"></span><span data-i18n="legNoSpin">无旋基准</span></div>
         </div>
       </div>
 
@@ -612,7 +607,7 @@
             <option value="1.0" data-i18n="spd100">1.00x</option>
           </select>
           <div class="timeline-slider-wrap">
-            <input type="range" id="timelineSlider" min="-0.35" max="1.8" step="0.002" value="-0.35" aria-label="Timeline" />
+            <input type="range" id="timelineSlider" class="ruler-range" min="-0.35" max="1.8" step="0.002" value="-0.35" aria-label="Timeline" />
             <span class="time-readout" id="timeDisplay">0.00s / 1.40s</span>
           </div>
         </div>
@@ -633,7 +628,7 @@
     <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="importModalTitle">
       <div class="modal-header">
         <span class="modal-title" id="importModalTitle" data-i18n="modalImportTitle">导入出球参数 (CSV / JSON)</span>
-        <button class="mini-action-btn" id="btnCloseImportModal" aria-label="Close">✕</button>
+        <button class="mini-action-btn" id="btnCloseImportModal" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5"/></svg></button>
       </div>
       <div class="modal-body">
         <p class="modal-desc" data-i18n="modalImportDesc">每行输入一拍：出球速度km/h, 转速RPM, 出球仰角°, 水平角°, X, Y, Z</p>
@@ -650,6 +645,6 @@
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=23"></script>
+  <script type="module" src="./app.js?v=24"></script>
 </body>
 </html>
