@@ -1187,6 +1187,107 @@ export class TennisScene3D {
     this.netGaugeMat = new THREE.LineBasicMaterial({ color: 0x0284c7, linewidth: 2 });
     this.netGaugeLine = new THREE.Line(netGaugeGeo, this.netGaugeMat);
     this.markersGroup.add(this.netGaugeLine);
+
+    // 3D Tactical Masterclass Target Zone Overlay (Gold Bullseye + Tactical Box)
+    this.tacticalZoneGroup = new THREE.Group();
+    this.tacticalZoneGroup.visible = false;
+    this.scene.add(this.tacticalZoneGroup);
+
+    const tacPlaneGeo = new THREE.PlaneGeometry(1, 1);
+    tacPlaneGeo.rotateX(-Math.PI / 2);
+    this.tacBoxMat = new THREE.MeshBasicMaterial({
+      color: 0xd97706,
+      transparent: true,
+      opacity: 0.22,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+    this.tacBoxMesh = new THREE.Mesh(tacPlaneGeo, this.tacBoxMat);
+    this.tacBoxMesh.position.y = 0.006;
+    this.tacticalZoneGroup.add(this.tacBoxMesh);
+
+    const tacBorderPts = [
+      new THREE.Vector3(-0.5, 0, -0.5),
+      new THREE.Vector3(0.5, 0, -0.5),
+      new THREE.Vector3(0.5, 0, 0.5),
+      new THREE.Vector3(-0.5, 0, 0.5),
+      new THREE.Vector3(-0.5, 0, -0.5)
+    ];
+    const tacBorderGeo = new THREE.BufferGeometry().setFromPoints(tacBorderPts);
+    this.tacBorderMat = new THREE.LineBasicMaterial({ color: 0xf59e0b, linewidth: 2 });
+    this.tacBorderLine = new THREE.Line(tacBorderGeo, this.tacBorderMat);
+    this.tacBorderLine.position.y = 0.008;
+    this.tacticalZoneGroup.add(this.tacBorderLine);
+
+    const bullOuterGeo = new THREE.RingGeometry(0.42, 0.52, 36);
+    bullOuterGeo.rotateX(-Math.PI / 2);
+    this.bullOuterMat = new THREE.MeshBasicMaterial({
+      color: 0xfbbf24,
+      transparent: true,
+      opacity: 0.85,
+      side: THREE.DoubleSide
+    });
+    this.bullOuterMesh = new THREE.Mesh(bullOuterGeo, this.bullOuterMat);
+    this.bullOuterMesh.position.y = 0.008;
+    this.tacticalZoneGroup.add(this.bullOuterMesh);
+
+    const bullInnerGeo = new THREE.CircleGeometry(0.18, 28);
+    bullInnerGeo.rotateX(-Math.PI / 2);
+    this.bullInnerMat = new THREE.MeshBasicMaterial({
+      color: 0xfef08a,
+      transparent: true,
+      opacity: 0.92,
+      side: THREE.DoubleSide
+    });
+    this.bullInnerMesh = new THREE.Mesh(bullInnerGeo, this.bullInnerMat);
+    this.bullInnerMesh.position.y = 0.009;
+    this.tacticalZoneGroup.add(this.bullInnerMesh);
+  }
+
+  /**
+   * Renders the 3D Tactical Target Zone & Bullseye on the court when a Tactical Lesson is active.
+   */
+  updateTacticalOverlay(lesson, currentTurnIndex = 0, passed = false) {
+    if (!this.tacticalZoneGroup) return;
+    if (!lesson || !lesson.targetZone) {
+      this.tacticalZoneGroup.visible = false;
+      return;
+    }
+
+    this.tacticalZoneGroup.visible = true;
+    const tz = lesson.targetZone;
+    const sign = tz.side === 'B' ? -1 : 1;
+    const wx = sign * tz.localX;
+    const wz = -sign * tz.localY;
+    const sx = tz.rx * 2;
+    const sz = tz.ry * 2;
+
+    this.tacBoxMesh.position.set(wx, 0.006, wz);
+    this.tacBoxMesh.scale.set(sx, 1, sz);
+
+    this.tacBorderLine.position.set(wx, 0.008, wz);
+    this.tacBorderLine.scale.set(sx, 1, sz);
+
+    this.bullOuterMesh.position.set(wx, 0.008, wz);
+    this.bullInnerMesh.position.set(wx, 0.009, wz);
+
+    const isChallengeTurn = currentTurnIndex === lesson.challengeTurnIndex;
+    if (passed) {
+      this.tacBoxMat.color.setHex(0x10b981);
+      this.tacBoxMat.opacity = 0.28;
+      this.tacBorderMat.color.setHex(0x059669);
+      this.bullOuterMat.color.setHex(0x10b981);
+    } else if (isChallengeTurn) {
+      this.tacBoxMat.color.setHex(0xd97706);
+      this.tacBoxMat.opacity = 0.24;
+      this.tacBorderMat.color.setHex(0xf59e0b);
+      this.bullOuterMat.color.setHex(0xfbbf24);
+    } else {
+      this.tacBoxMat.color.setHex(0xd97706);
+      this.tacBoxMat.opacity = 0.12;
+      this.tacBorderMat.color.setHex(0xd97706);
+      this.bullOuterMat.color.setHex(0xd97706);
+    }
   }
 
   setCourtSurface(surfaceKey) {
@@ -1688,17 +1789,20 @@ export class TennisScene3D {
 
     // 2. Update Receiving Opponent on the Far Side (Running to Intercept & Coiling Backswing!)
     const intercept = simResult && simResult.interceptPoint ? simResult.interceptPoint : null;
-    const targetHitX = intercept ? intercept.nextHitX : -11.8;
-    const targetHitY = intercept ? intercept.nextHitY : -params.hitY * 0.5;
-    const targetHitZ = intercept ? intercept.nextHitZ : 1.05;
+    const recSign = activeSide === 'B' ? 1 : -1;
+    const targetHitX = intercept ? recSign * intercept.worldX : -11.8;
+    const targetHitY = intercept ? recSign * intercept.worldY : -params.hitY * 0.5;
+    const targetHitZ = intercept ? intercept.z : 1.05;
     const tIntercept = intercept ? intercept.t : 1.15;
 
     const startReadyX = -11.85;
     const startReadyY = THREE.MathUtils.clamp(-params.hitY * 0.25, -1.8, 1.8);
-    const runProgress =
-      currentTime <= 0
-        ? 0
-        : THREE.MathUtils.clamp(currentTime / Math.max(0.35, tIntercept - 0.12), 0, 1);
+    const isStaticPreview = Math.abs(currentTime) < 1e-4;
+    const runProgress = isStaticPreview
+      ? 1
+      : currentTime < 0
+      ? 0
+      : THREE.MathUtils.clamp(currentTime / Math.max(0.35, tIntercept - 0.12), 0, 1);
     const smoothMove = runProgress * runProgress * (3 - 2 * runProgress);
 
     const currRecX = THREE.MathUtils.lerp(startReadyX, targetHitX, smoothMove);
@@ -1706,8 +1810,14 @@ export class TennisScene3D {
     const currRecZ = THREE.MathUtils.lerp(1.02, targetHitZ, smoothMove);
 
     // As ball approaches tIntercept (from tIntercept - 0.35s to tIntercept + 0.35s), receiver coils and swings!
-    const receiverTau = THREE.MathUtils.clamp(currentTime - tIntercept, -0.35, 0.42);
-    const isRunning = runProgress > 0.02 && runProgress < 0.96 && Math.hypot(targetHitX - startReadyX, targetHitY - startReadyY) > 0.4;
+    const receiverTau = isStaticPreview
+      ? 0
+      : THREE.MathUtils.clamp(currentTime - tIntercept, -0.35, 0.42);
+    const isRunning =
+      !isStaticPreview &&
+      runProgress > 0.02 &&
+      runProgress < 0.96 &&
+      Math.hypot(targetHitX - startReadyX, targetHitY - startReadyY) > 0.4;
     const receiverStride = isRunning ? currentTime * 16 : 0;
 
     this._updateSinglePlayerPose(

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=6" />
+  <link rel="stylesheet" href="./styles.css?v=7" />
   <script type="importmap">
     {
       "imports": {
@@ -121,11 +121,12 @@
         </div>
       </div>
 
-      <!-- Streamlined 3-Tab Navigation (Bidirectional Physics — No Confusing Override Mode!) -->
+      <!-- Streamlined 4-Tab Navigation (Racket / Incoming / Position / Tactical Masterclass) -->
       <nav class="nav-tabs" id="sidebarNavTabs">
         <button class="nav-tab active" data-tab="tab-racket" data-i18n="tabRacket">挥拍与拍面</button>
         <button class="nav-tab" data-tab="tab-incoming" data-i18n="tabIncoming">来球与借力</button>
         <button class="nav-tab" data-tab="tab-position" data-i18n="tabPosition">站位与环境</button>
+        <button class="nav-tab nav-tab-gold" data-tab="tab-tactics" data-i18n="tabTactics">技战术教学</button>
       </nav>
 
       <!-- TAB 1: Racket & Swing (Bidirectionally coupled with Top-Left HUD!) -->
@@ -289,6 +290,49 @@
           <input type="range" id="windSpeedKmh" min="-30" max="30" step="1" value="0" />
         </div>
       </div>
+
+      <!-- TAB 4: Interactive Tactical Masterclass Lab (真实名场面 · 线路与技战术交互教学) -->
+      <div class="tab-panel" id="tab-tactics">
+        <div class="tactical-lab-card">
+          <div class="tactical-lab-header">
+            <span class="tactical-badge" id="tacticalBadgeText">MASTERCLASS // 实战名场面</span>
+            <button class="mini-action-btn" id="btnExitTactics" data-i18n="btnExitTactics">退出教学</button>
+          </div>
+
+          <div class="slider-group" style="margin-bottom: 10px;">
+            <label class="mini-lbl" data-i18n="lblTacticalSelect">选择大满贯实战技战术名场面</label>
+            <select id="tacticalLessonSelect"></select>
+          </div>
+
+          <div class="tactical-mode-row">
+            <button class="tactical-mode-btn active" id="btnTacticDemo" data-i18n="btnTacticDemo">
+              ▶ 演示原版名场面 (Pro Demo)
+            </button>
+            <button class="tactical-mode-btn challenge-accent" id="btnTacticChallenge" data-i18n="btnTacticChallenge">
+              🎯 动手挑战决胜拍 (Challenge)
+            </button>
+          </div>
+
+          <div class="tactical-theory-box">
+            <div class="tactical-box-title" data-i18n="tacticalTheoryTitle">技战术几何与物理原理剖析</div>
+            <p class="tactical-theory-text" id="tacticalPrincipleText"></p>
+          </div>
+
+          <div class="tactical-challenge-box" id="tacticalChallengeBox">
+            <div class="tactical-score-header">
+              <span class="tactical-box-title" data-i18n="tacticalMissionTitle">交互实操挑战 · 命中球场金色靶区</span>
+              <span class="tactical-score-pill" id="tacticalScoreBadge">100 / 100</span>
+            </div>
+            <p class="tactical-hint-text" id="tacticalHintText"></p>
+            <div class="tactical-coach-feedback" id="tacticalCoachFeedback"></div>
+            <div class="tactical-quick-actions">
+              <button class="mini-action-btn active-accent" id="btnJumpToRacketTab" data-i18n="btnGoTuneShot">
+                前往【挥拍与拍面】调参解谜 →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </aside>
 
     <!-- Right Main Area -->
@@ -385,7 +429,24 @@
               <input type="checkbox" id="toggleTrueScale" />
               <span data-i18n="chkTrueScale">1:1 真实球径</span>
             </label>
+            <button class="mobile-sheet-toggle" id="btnMobileExpand3D" data-i18n="btnMobileExpand3D">
+              全屏球场
+            </button>
           </div>
+        </div>
+
+        <!-- Floating Tactical Masterclass Coach Banner (Active during Tactical Lessons) -->
+        <div class="tactical-hud-banner" id="tacticalHudBanner" style="display: none;">
+          <div class="thb-top">
+            <span class="thb-badge" id="thbTitle">名场面 01 // 2017 澳网决赛</span>
+            <div class="thb-actions">
+              <span class="tactical-score-pill" id="thbScorePill">100 / 100</span>
+              <button class="mini-action-btn" id="thbBtnDemo" data-i18n="btnShortDemo">原版演示</button>
+              <button class="mini-action-btn active-accent" id="thbBtnChallenge" data-i18n="btnShortChallenge">动手挑战</button>
+              <button class="mini-action-btn" id="thbBtnClose">✕</button>
+            </div>
+          </div>
+          <div class="thb-feedback" id="thbFeedback"></div>
         </div>
 
         <!-- Minimal Bottom-Right Legend & Author Watermark -->
@@ -476,6 +537,6 @@
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=6"></script>
+  <script type="module" src="./app.js?v=7"></script>
 </body>
 </html>

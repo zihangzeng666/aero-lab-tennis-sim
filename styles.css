@@ -1086,3 +1086,367 @@ input[type="range"]::-webkit-slider-thumb:hover {
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* ==========================================================================
+   TACTICAL MASTERCLASS LAB & FLOATING COACH BANNER
+   ========================================================================== */
+.nav-tab-gold {
+  color: #8a6421 !important;
+  font-weight: 700 !important;
+}
+
+.nav-tab-gold.active {
+  background: var(--accent-primary) !important;
+  color: #f7f3eb !important;
+}
+
+.tactical-lab-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tactical-lab-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tactical-badge {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #f7f3eb;
+  background: var(--accent-primary);
+  border: 1px solid var(--accent-gold);
+  padding: 3px 8px;
+  border-radius: 2px;
+}
+
+.tactical-mode-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.tactical-mode-btn {
+  background: var(--bg-subtle);
+  color: var(--ink-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  padding: 7px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.tactical-mode-btn.active {
+  background: var(--accent-primary);
+  color: #f7f3eb;
+  border-color: var(--accent-primary);
+}
+
+.tactical-mode-btn.challenge-accent.active {
+  background: #b45309;
+  color: #ffffff;
+  border-color: #92400e;
+}
+
+.tactical-theory-box,
+.tactical-challenge-box {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tactical-challenge-box {
+  border-left: 3px solid var(--accent-gold);
+}
+
+.tactical-box-title {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--accent-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tactical-theory-text,
+.tactical-hint-text {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-secondary);
+}
+
+.tactical-score-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tactical-score-pill {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 2px;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #f59e0b;
+}
+
+.tactical-score-pill.score-pass {
+  background: #dcfce7;
+  color: #15803d;
+  border-color: #16a34a;
+}
+
+.tactical-coach-feedback {
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  padding: 7px 9px;
+  border-radius: 2px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-hairline);
+  color: var(--ink-primary);
+}
+
+.tactical-quick-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
+/* Floating Tactical Coach Banner in 3D Viewport */
+.tactical-hud-banner {
+  position: absolute;
+  bottom: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(640px, calc(100% - 28px));
+  background: rgba(247, 243, 235, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--accent-gold);
+  border-left: 4px solid var(--accent-primary);
+  border-radius: 2px;
+  padding: 8px 12px;
+  z-index: 16;
+  box-shadow: 0 8px 24px rgba(28, 25, 23, 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.thb-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.thb-badge {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--accent-primary);
+}
+
+.thb-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.thb-feedback {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  line-height: 1.4;
+}
+
+.mobile-sheet-toggle {
+  display: none;
+  background: var(--accent-primary);
+  color: #f7f3eb;
+  border: 1px solid var(--accent-gold);
+  border-radius: 2px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   MOBILE & TABLET RESPONSIVE LAYOUT (@media max-width: 920px)
+   ========================================================================== */
+@media (max-width: 920px) {
+  body {
+    overflow: hidden;
+  }
+
+  .app-layout {
+    flex-direction: column-reverse;
+    height: 100dvh;
+    width: 100vw;
+  }
+
+  /* 3D Court Area on Top (52% height default, or 82% when expanded) */
+  .main-area {
+    flex: none;
+    height: 52dvh;
+    width: 100%;
+    transition: height 0.22s ease;
+  }
+
+  /* Scrollable Control Sheet on Bottom (48% height default, or 18% when 3D expanded) */
+  .sidebar {
+    width: 100%;
+    min-width: 0;
+    height: 48dvh;
+    border-right: none;
+    border-top: 2px solid var(--border-strong);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    transition: height 0.22s ease;
+  }
+
+  body.mobile-3d-expanded .main-area {
+    height: 82dvh;
+  }
+
+  body.mobile-3d-expanded .sidebar {
+    height: 18dvh;
+  }
+
+  .mobile-sheet-toggle {
+    display: inline-block;
+  }
+
+  /* Compact Top-Left Telemetry Strip on Mobile */
+  .telemetry-module {
+    top: 8px;
+    left: 8px;
+    width: calc(100% - 16px);
+    max-width: 420px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: rgba(247, 243, 235, 0.90);
+  }
+
+  .tel-cell {
+    padding: 6px 8px;
+    gap: 2px;
+  }
+
+  .tel-big-mono {
+    font-size: 13.5px;
+  }
+
+  .tel-verdict-row .call-tag {
+    font-size: 11px;
+    padding: 1px 5px;
+  }
+
+  #hudSpinBallCanvas,
+  #hudNetGaugeCanvas {
+    display: none;
+  }
+
+  .hud-top-right {
+    top: auto;
+    bottom: 8px;
+    right: 8px;
+    left: 8px;
+    align-items: stretch;
+  }
+
+  .cam-strip {
+    overflow-x: auto;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cam-btn {
+    white-space: nowrap;
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+
+  .layer-strip {
+    justify-content: space-between;
+    flex-wrap: wrap;
+    padding: 4px 8px;
+    gap: 6px;
+  }
+
+  .watermark-plaque,
+  .legend-strip {
+    display: none;
+  }
+
+  .tactical-hud-banner {
+    bottom: 66px;
+    width: calc(100% - 16px);
+    padding: 6px 10px;
+  }
+
+  .scrubber-bar {
+    padding: 6px 10px;
+    gap: 4px;
+  }
+
+  .scrubber-controls {
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .play-btn,
+  .secondary-btn {
+    padding: 5px 8px;
+    font-size: 11px;
+    min-width: auto;
+  }
+
+  .timeline-slider-wrap {
+    width: 100%;
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+
+  .instant-telemetry {
+    display: none;
+  }
+
+  .preset-dual-row {
+    grid-template-columns: 1fr;
+  }
+
+  .racket-3d-wrap {
+    height: 155px;
+  }
+
+  #racketImpactCanvas {
+    height: 155px;
+  }
+}
+
+@media (max-width: 520px) {
+  .telemetry-module {
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+
+  .tel-meta,
+  .tel-meta-mono {
+    display: none;
+  }
+}

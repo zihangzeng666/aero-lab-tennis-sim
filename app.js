@@ -14,9 +14,11 @@ import {
   simulateTrajectory,
   SHOT_PRESETS,
   INCOMING_PRESETS,
-  ATP_RALLIES
-} from './physics.js?v=6';
-import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=6';
+  ATP_RALLIES,
+  TACTICAL_LESSONS,
+  evaluateTacticalAttempt
+} from './physics.js?v=7';
+import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=7';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;
@@ -109,7 +111,18 @@ const I18N = {
     modalImportDesc:
       '每行输入一拍实测数据（格式：出球速度km/h, 转速RPM, 出球仰角°, 水平角°, 击球X, 击球Y, 击球Z），系统将自动逆向反推每一拍所需的拍头挥速与拍面倾角并生成回合：',
     btnCancel: '取消',
-    btnApplyImport: '解析并生成回合'
+    btnApplyImport: '解析并生成回合',
+    tabTactics: '技战术教学',
+    lblTacticalSelect: '选择大满贯实战技战术名场面',
+    btnTacticDemo: '▶ 演示原版名场面 (Pro Demo)',
+    btnTacticChallenge: '🎯 动手挑战决胜拍 (Challenge)',
+    btnExitTactics: '退出教学',
+    tacticalTheoryTitle: '技战术几何与物理原理剖析',
+    tacticalMissionTitle: '交互实操挑战 · 命中球场金色靶区',
+    btnGoTuneShot: '前往【挥拍与拍面】调参解谜 →',
+    btnShortDemo: '原版演示',
+    btnShortChallenge: '动手挑战',
+    btnMobileExpand3D: '全屏球场'
   },
   en: {
     unitSpeedLabel: 'SPEED',
@@ -198,7 +211,18 @@ const I18N = {
     modalImportDesc:
       'Enter one shot per line (speedKmh, topspinRpm, launchAngleDeg, aimAngleDeg, hitX, hitY, hitZ). The inverse solver automatically reconstructs the required racket swing & builds a turn-based rally:',
     btnCancel: 'Cancel',
-    btnApplyImport: 'Parse & Build Rally'
+    btnApplyImport: 'Parse & Build Rally',
+    tabTactics: 'Tactics Lab',
+    lblTacticalSelect: 'Select Grand Slam Tactical Masterclass',
+    btnTacticDemo: '▶ Pro Demo Replay',
+    btnTacticChallenge: '🎯 Interactive Challenge',
+    btnExitTactics: 'Exit Lab',
+    tacticalTheoryTitle: 'TACTICAL GEOMETRY & BIOMECHANICS',
+    tacticalMissionTitle: 'CHALLENGE · HIT THE GOLD BULLSEYE',
+    btnGoTuneShot: 'Tune Racket Sliders to Solve →',
+    btnShortDemo: 'Pro Demo',
+    btnShortChallenge: 'Challenge',
+    btnMobileExpand3D: 'Expand 3D'
   }
 };
 
@@ -209,6 +233,8 @@ class TennisSimApp {
     this.tensionUnit = 'lbs';
 
     this.currentRallyKey = 'ao2024_sinner_medvedev';
+    this.activeTacticalKey = null;
+    this.tacticalMode = 'demo';
     this.rallyMeta = {
       playerAZh: 'J. Sinner (近端 A)',
       playerBZh: 'D. Medvedev (远端 B)',
@@ -334,6 +360,21 @@ class TennisSimApp {
         incSelect.value = currentInc;
       }
     }
+
+    const tacSelect = document.getElementById('tacticalLessonSelect');
+    if (tacSelect) {
+      const curTac = tacSelect.value || this.activeTacticalKey || 'federer_serve_plus_one';
+      tacSelect.innerHTML = '';
+      for (const [k, lesson] of Object.entries(TACTICAL_LESSONS)) {
+        const opt = document.createElement('option');
+        opt.value = k;
+        opt.textContent = this.lang === 'zh' ? lesson.titleZh : lesson.titleEn;
+        tacSelect.appendChild(opt);
+      }
+      if (TACTICAL_LESSONS[curTac]) {
+        tacSelect.value = curTac;
+      }
+    }
   }
 
   _applyLanguageUI() {
@@ -348,6 +389,7 @@ class TennisSimApp {
     this._updatePlayButtonUI();
     this._renderTurnChainUI();
     this.recomputeSimulation({ source: 'racket', skipChain: true });
+    this._updateTacticalUI();
   }
 
   /**
@@ -356,6 +398,11 @@ class TennisSimApp {
   loadRally(rallyKey) {
     const rally = ATP_RALLIES[rallyKey];
     if (!rally) return;
+
+    this.activeTacticalKey = null;
+    if (this.scene3d) {
+      this.scene3d.updateTacticalOverlay(null, 0, false);
+    }
 
     this.currentRallyKey = rallyKey;
     this.rallyMeta = {
@@ -396,6 +443,170 @@ class TennisSimApp {
 
     this._rechainRallyFromTurn(0);
     this.selectTurn(0, false);
+    this._updateTacticalUI();
+  }
+
+  /**
+   * Loads an Interactive Grand Slam Tactical Masterclass Lesson ('demo' or 'challenge' mode).
+   */
+  loadTacticalLesson(lessonKey, mode = 'demo') {
+    const lesson = TACTICAL_LESSONS[lessonKey];
+    if (!lesson) return;
+
+    this.activeTacticalKey = lessonKey;
+    this.tacticalMode = mode;
+
+    const tacSelect = document.getElementById('tacticalLessonSelect');
+    if (tacSelect) tacSelect.value = lessonKey;
+
+    this.rallyMeta = {
+      playerAZh: lesson.playerAZh,
+      playerBZh: lesson.playerBZh,
+      playerAEn: lesson.playerAEn,
+      playerBEn: lesson.playerBEn
+    };
+
+    if (lesson.surfaceKey) {
+      this.state.surfaceKey = lesson.surfaceKey;
+      const surfEl = document.getElementById('surfaceSelect');
+      if (surfEl) surfEl.value = lesson.surfaceKey;
+      this.scene3d.setCourtSurface(lesson.surfaceKey);
+    }
+
+    this.rallyTurns = lesson.turns.map((t, idx) => ({
+      side: t.side || (idx % 2 === 0 ? 'A' : 'B'),
+      titleZh: t.titleZh || `#${idx + 1} 击球`,
+      titleEn: t.titleEn || `#${idx + 1} Shot`,
+      courtMode: t.courtMode || 'singles',
+      hitX: t.hitX ?? -11.75,
+      hitY: t.hitY ?? -1.5,
+      hitZ: t.hitZ ?? 1.05,
+      racketSpeedKmh: t.racketSpeedKmh ?? 90,
+      swingPathDeg: t.swingPathDeg ?? 25,
+      faceAngleDeg: t.faceAngleDeg ?? -1.8,
+      aimAngleDeg: t.aimAngleDeg ?? 6.0,
+      incomingSpeedKmh: t.incomingSpeedKmh ?? 55,
+      incomingAngleDeg: t.incomingAngleDeg ?? -10,
+      incomingSpinRpm: t.incomingSpinRpm ?? 1800,
+      stringTensionKg: t.stringTensionKg ?? 23,
+      sidespinRpm: t.sidespinRpm ?? 200,
+      targetSpeedKmh: t.targetSpeedKmh,
+      targetLaunchAngleDeg: t.targetLaunchAngleDeg,
+      targetTopspinRpm: t.targetTopspinRpm
+    }));
+
+    const cIdx = lesson.challengeTurnIndex;
+    const override = mode === 'challenge' ? lesson.challengeStart : lesson.proSolution;
+    if (this.rallyTurns[cIdx] && override) {
+      Object.assign(this.rallyTurns[cIdx], override);
+    }
+
+    this._rechainRallyFromTurn(0);
+
+    if (mode === 'challenge') {
+      this.isPlayingFullRally = false;
+      this.selectTurn(cIdx, false);
+    } else {
+      this.isPlayingFullRally = true;
+      this.selectTurn(0, true);
+      this.currentTime = WINDUP_START_TIME;
+      this.isPlaying = true;
+      this._updatePlayButtonUI();
+    }
+    this._updateTacticalUI();
+  }
+
+  exitTacticalLesson() {
+    this.activeTacticalKey = null;
+    if (this.scene3d) {
+      this.scene3d.updateTacticalOverlay(null, 0, false);
+    }
+    this._updateTacticalUI();
+  }
+
+  _updateTacticalUI() {
+    const banner = document.getElementById('tacticalHudBanner');
+    const lesson = this.activeTacticalKey ? TACTICAL_LESSONS[this.activeTacticalKey] : null;
+
+    const demoBtn = document.getElementById('btnTacticDemo');
+    const chalBtn = document.getElementById('btnTacticChallenge');
+    if (demoBtn && chalBtn) {
+      demoBtn.classList.toggle('active', this.tacticalMode === 'demo');
+      chalBtn.classList.toggle('active', this.tacticalMode === 'challenge');
+    }
+
+    const previewLesson =
+      lesson ||
+      TACTICAL_LESSONS[document.getElementById('tacticalLessonSelect')?.value || 'federer_serve_plus_one'];
+
+    if (previewLesson) {
+      const badgeEl = document.getElementById('tacticalBadgeText');
+      if (badgeEl) {
+        badgeEl.textContent = this.lang === 'zh' ? previewLesson.badgeZh : previewLesson.badgeEn;
+      }
+      const prinEl = document.getElementById('tacticalPrincipleText');
+      if (prinEl) {
+        prinEl.textContent = this.lang === 'zh' ? previewLesson.principleZh : previewLesson.principleEn;
+      }
+      const hintEl = document.getElementById('tacticalHintText');
+      if (hintEl) {
+        hintEl.textContent = this.lang === 'zh' ? previewLesson.challengeHintZh : previewLesson.challengeHintEn;
+      }
+    }
+
+    if (!lesson) {
+      if (banner) banner.style.display = 'none';
+      if (this.scene3d) this.scene3d.updateTacticalOverlay(null, 0, false);
+      return;
+    }
+
+    if (banner) banner.style.display = 'flex';
+    const thbTitle = document.getElementById('thbTitle');
+    if (thbTitle) {
+      thbTitle.textContent = this.lang === 'zh' ? lesson.titleZh : lesson.titleEn;
+    }
+
+    const evalRes = evaluateTacticalAttempt(lesson, this.currentTurnIndex, this.state, this.simResult);
+    const scorePill = document.getElementById('tacticalScoreBadge');
+    const thbScorePill = document.getElementById('thbScorePill');
+    const coachFeedback = document.getElementById('tacticalCoachFeedback');
+    const thbFeedback = document.getElementById('thbFeedback');
+
+    if (evalRes) {
+      const scoreText = `${evalRes.score} / 100`;
+      if (scorePill) {
+        scorePill.textContent = scoreText;
+        scorePill.classList.toggle('score-pass', evalRes.passed);
+      }
+      if (thbScorePill) {
+        thbScorePill.textContent = scoreText;
+        thbScorePill.classList.toggle('score-pass', evalRes.passed);
+      }
+      const msg = this.lang === 'zh' ? evalRes.feedbackZh : evalRes.feedbackEn;
+      if (coachFeedback) coachFeedback.textContent = msg;
+      if (thbFeedback) thbFeedback.textContent = msg;
+      if (this.scene3d) {
+        this.scene3d.updateTacticalOverlay(lesson, this.currentTurnIndex, evalRes.passed);
+      }
+    } else {
+      const waitText =
+        this.lang === 'zh'
+          ? `正在铺垫前序回合（第 ${this.currentTurnIndex + 1}/${this.rallyTurns.length} 拍）· 决胜挑战拍为第 ${lesson.challengeTurnIndex + 1} 拍`
+          : `Building up rally (Shot #${this.currentTurnIndex + 1}/${this.rallyTurns.length}) · Decisive shot is Shot #${lesson.challengeTurnIndex + 1}`;
+      if (scorePill) {
+        scorePill.textContent = `#${this.currentTurnIndex + 1}`;
+        scorePill.classList.remove('score-pass');
+      }
+      if (thbScorePill) {
+        thbScorePill.textContent = `#${this.currentTurnIndex + 1}`;
+        thbScorePill.classList.remove('score-pass');
+      }
+      if (coachFeedback) coachFeedback.textContent = waitText;
+      if (thbFeedback) thbFeedback.textContent = waitText;
+      if (this.scene3d) {
+        this.scene3d.updateTacticalOverlay(lesson, this.currentTurnIndex, false);
+      }
+    }
   }
 
   /**
@@ -403,6 +614,7 @@ class TennisSimApp {
    */
   resetAll() {
     this.isPlayingFullRally = false;
+    this.activeTacticalKey = null;
     this.windSpeedKmh = 0;
     this.state.windSpeedKmh = 0;
     this.state.stringTensionKg = 23;
@@ -516,7 +728,8 @@ class TennisSimApp {
     this.recomputeSimulation({ source: 'racket', skipChain: true });
     this._renderTurnChainUI();
 
-    this.currentTime = fromFullRallyAutoAdvance ? -0.22 : WINDUP_START_TIME;
+    // When advancing from a previous rally turn at t = interceptPoint.t, the receiver's racket has JUST met the ball (t = 0.0)!
+    this.currentTime = fromFullRallyAutoAdvance ? 0.0 : WINDUP_START_TIME;
     this.isPlaying = true;
     this._updatePlayButtonUI();
     this.updateScrubberFrame();
@@ -681,17 +894,83 @@ class TennisSimApp {
       });
     });
 
-    // 4. Sidebar 3-Tab Navigation
+    // 4. Sidebar 4-Tab Navigation
+    const switchSidebarTab = (targetId) => {
+      document.querySelectorAll('#sidebarNavTabs .nav-tab').forEach((b) =>
+        b.classList.toggle('active', b.getAttribute('data-tab') === targetId)
+      );
+      document.querySelectorAll('.tab-panel').forEach((panel) =>
+        panel.classList.toggle('active', panel.id === targetId)
+      );
+      if (targetId === 'tab-tactics' && !this.activeTacticalKey) {
+        const key = document.getElementById('tacticalLessonSelect')?.value || 'federer_serve_plus_one';
+        this.loadTacticalLesson(key, 'demo');
+      }
+    };
+
     document.querySelectorAll('#sidebarNavTabs .nav-tab').forEach((tabBtn) => {
       tabBtn.addEventListener('click', () => {
-        const targetId = tabBtn.getAttribute('data-tab');
-        document.querySelectorAll('#sidebarNavTabs .nav-tab').forEach((b) =>
-          b.classList.toggle('active', b === tabBtn)
-        );
-        document.querySelectorAll('.tab-panel').forEach((panel) =>
-          panel.classList.toggle('active', panel.id === targetId)
-        );
+        switchSidebarTab(tabBtn.getAttribute('data-tab'));
       });
+    });
+
+    // 4b. Tactical Masterclass Lab Controls
+    document.getElementById('tacticalLessonSelect')?.addEventListener('change', (e) => {
+      if (e.target.value) {
+        this.loadTacticalLesson(e.target.value, this.tacticalMode || 'demo');
+      }
+    });
+
+    const triggerTacDemo = () => {
+      const key =
+        this.activeTacticalKey ||
+        document.getElementById('tacticalLessonSelect')?.value ||
+        'federer_serve_plus_one';
+      this.loadTacticalLesson(key, 'demo');
+    };
+
+    const triggerTacChallenge = () => {
+      const key =
+        this.activeTacticalKey ||
+        document.getElementById('tacticalLessonSelect')?.value ||
+        'federer_serve_plus_one';
+      this.loadTacticalLesson(key, 'challenge');
+    };
+
+    document.getElementById('btnTacticDemo')?.addEventListener('click', triggerTacDemo);
+    document.getElementById('thbBtnDemo')?.addEventListener('click', triggerTacDemo);
+    document.getElementById('btnTacticChallenge')?.addEventListener('click', triggerTacChallenge);
+    document.getElementById('thbBtnChallenge')?.addEventListener('click', triggerTacChallenge);
+
+    document.getElementById('btnExitTactics')?.addEventListener('click', () => {
+      this.exitTacticalLesson();
+    });
+    document.getElementById('thbBtnClose')?.addEventListener('click', () => {
+      this.exitTacticalLesson();
+    });
+
+    document.getElementById('btnJumpToRacketTab')?.addEventListener('click', () => {
+      if (!this.activeTacticalKey || this.tacticalMode !== 'challenge') {
+        triggerTacChallenge();
+      }
+      switchSidebarTab('tab-racket');
+    });
+
+    // 4c. Mobile 3D Court Expand / Collapse Toggle
+    document.getElementById('btnMobileExpand3D')?.addEventListener('click', (e) => {
+      const expanded = document.body.classList.toggle('mobile-3d-expanded');
+      e.currentTarget.textContent =
+        this.lang === 'zh'
+          ? expanded
+            ? '收起球场'
+            : '全屏球场'
+          : expanded
+          ? 'Split View'
+          : 'Expand 3D';
+      setTimeout(() => {
+        if (this.scene3d) this.scene3d._onResize();
+        if (this.racket3d) this.racket3d.resize();
+      }, 240);
     });
 
     // 5. Rally & Shot Preset Selectors
@@ -1164,6 +1443,7 @@ class TennisSimApp {
 
     this._updateRacketImpact3D();
     this._updateTopLeftInteractiveHUD();
+    this._updateTacticalUI();
     this.updateScrubberFrame();
   }
 
