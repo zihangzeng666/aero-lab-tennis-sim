@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=28';
+import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=29';
 
 // Net profile drawn with singles sticks in place (matches the physics for singles play):
 // 0.914 m at the centre rising to 1.07 m at the sticks, then level out to the posts.
@@ -21,7 +21,7 @@ const SCENE_THEMES = {
     ambient: 0.76, hemi: 0.6, sun: 1.48, fill: 0.42,
     line: 0xf8fafc, netMesh: [0x09090b, 0.56], netWire: [0x334155, 0.42],
     concrete: [0x9e998f, 0x938e84], trim: 0xcfc9bc, crowdTint: 0xffffff,
-    traj: { incoming: [0xea580c, 0.68], pre: [0x84cc16, 0x65a30d, 0.45], post: [0x0284c7, 0x0369a1, 0.35], shadow: [0x0f172a, 0.42], ghost: [0x64748b, 0.65] },
+    traj: { incoming: [0xea580c, 0.68], pre: [0x84cc16, 0x000000, 0], post: [0x0284c7, 0x000000, 0], shadow: [0x0f172a, 0.42], ghost: [0x64748b, 0.65] },
     players: null
   },
   dark: {

@@ -14,15 +14,15 @@ import {
   samplePointAtTime,
   airDensityFromConditions,
   chainRallyTurns
-} from './physics.js?v=28';
+} from './physics.js?v=29';
 import {
   SHOT_PRESETS,
   INCOMING_PRESETS,
   EXAMPLE_RALLIES,
   TACTICAL_LESSONS,
   evaluateTacticalAttempt
-} from './presets.js?v=28';
-import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=28';
+} from './presets.js?v=29';
+import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=29';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;

@@ -74,6 +74,22 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
 
+html {
+  -webkit-tap-highlight-color: transparent; /* no grey flash on tap; :active gives feedback instead */
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;                /* no pull-to-refresh / page rubber-band over the canvas */
+}
+
+button, a, [role="button"], .loading-mode-card, .turn-pill, summary {
+  touch-action: manipulation;               /* no 300 ms double-tap wait */
+  -webkit-user-select: none;
+  user-select: none;                        /* long-press must not select control labels */
+  -webkit-touch-callout: none;
+}
+
+/* Sliders own horizontal drags; the page keeps vertical panning everywhere else (labels, gaps) */
+input[type="range"] { touch-action: pan-x; }
+
 body {
   font-family: var(--font-sans);
   font-size: 13px;
@@ -119,8 +135,7 @@ svg { display: block; }
   user-select: none;
   transition: background-color 120ms var(--ease), color 120ms var(--ease), transform 80ms var(--ease);
 }
-.mini-action-btn:hover, .ghost-btn:hover, .secondary-btn:hover, .stroke-btn:hover, .tactical-mode-btn:hover,
-.cam-btn:hover, .tel-action-btn:hover, .mode-switch-btn:hover { background: var(--panel-2); }
+
 .mini-action-btn:active, .ghost-btn:active, .secondary-btn:active, .stroke-btn:active, .tactical-mode-btn:active,
 .cam-btn:active, .tel-action-btn:active, .play-btn:active, .loading-enter-btn:active, .mode-switch-btn:active,
 .seg-btn:active, .turn-pill:active, .mobile-sheet-toggle:active { transform: scale(0.97); }
@@ -133,7 +148,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
   color: var(--accent-ink);
   font-weight: 600;
 }
-.mini-action-btn.active-accent:hover, .play-btn:hover, .loading-enter-btn:hover, .mobile-sheet-toggle:hover { background: var(--accent-press); }
+
 .icon-btn { width: 26px; padding: 0; }
 .ghost-btn { height: 28px; padding: 0 12px; font-size: 12.5px; }
 
@@ -155,7 +170,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
   transition: background-color 120ms var(--ease), color 120ms var(--ease);
 }
 .seg-btn:first-child { border-left: none; }
-.seg-btn:hover { color: var(--ink); background: var(--panel-2); }
+
 .seg-btn.active { background: var(--ink); color: var(--panel); }
 .mini-seg .seg-btn { padding: 2px 8px; font-size: 11px; }
 
@@ -172,7 +187,7 @@ select {
   text-overflow: ellipsis;
   cursor: pointer;
 }
-select:hover { background-color: var(--panel-2); }
+
 
 /* ---------- Mechanical slider: 2px track, tick scale, fader-cap thumb ---------- */
 input[type="range"] {
@@ -204,7 +219,7 @@ input[type="range"]::-webkit-slider-thumb {
   background: linear-gradient(var(--ink), var(--ink)) center / 1px 10px no-repeat, var(--panel);
   transition: background-color 80ms var(--ease);
 }
-input[type="range"]:hover::-webkit-slider-thumb { background-color: #ffffff; }
+
 input[type="range"]:active::-webkit-slider-thumb { background: linear-gradient(#ffffff, #ffffff) center / 1px 10px no-repeat, var(--accent); }
 input[type="range"]::-moz-range-track { height: 2px; background: var(--edge); border: none; }
 input[type="range"]::-moz-range-progress { height: 2px; background: var(--accent); }
@@ -225,8 +240,7 @@ input[type="range"]::-moz-range-thumb {
   grid-template-rows: var(--topbar-h) minmax(0, 1fr);
   grid-template-areas: "top top" "side main";
   gap: 1px;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
   height: 100dvh;
   background: var(--rule);
 }
@@ -264,7 +278,7 @@ input[type="range"]::-moz-range-thumb {
 }
 .mode-switch-btn:first-child { border-left: none; }
 .mode-switch-btn.active { background: var(--ink); color: var(--panel); }
-.mode-switch-btn.active:hover { background: var(--ink); }
+
 .topbar-actions { display: flex; align-items: center; gap: 8px; flex: none; }
 
 /* =========================================================================
@@ -305,7 +319,7 @@ input[type="range"]::-moz-range-thumb {
 }
 .stroke-btn:first-child { border-left: none; }
 .stroke-btn.active { background: var(--ink); color: var(--panel); }
-.stroke-btn.active:hover { background: var(--ink); }
+
 
 /* Rally chain: a ruled list */
 .rally-turn-box { margin-top: 10px; }
@@ -329,7 +343,7 @@ input[type="range"]::-moz-range-thumb {
 .turn-pill:first-child { border-top: none; }
 .turn-pill > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .turn-pill > span:last-child { font-size: 11.5px; }
-.turn-pill:hover { background: var(--panel-2); color: var(--ink); }
+
 .turn-pill.active { background: var(--ink); color: var(--panel); }
 .turn-side-badge {
   display: inline-grid;
@@ -390,7 +404,7 @@ input[type="range"]::-moz-range-thumb {
   transition: background-color 120ms var(--ease), color 120ms var(--ease);
 }
 .nav-tab:first-child { border-left: none; }
-.nav-tab:hover { color: var(--ink); background: var(--panel-2); }
+
 .nav-tab.active { color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); font-weight: 600; }
 .nav-tab:active { transform: none; }
 
@@ -591,7 +605,7 @@ input[type="range"]::-moz-range-thumb {
 .scrubber-controls { display: flex; align-items: center; gap: 6px; }
 .play-btn { min-width: 72px; height: 30px; padding: 0 14px; font-size: 13px; }
 .secondary-btn { height: 30px; padding: 0 11px; font-size: 12.5px; color: var(--ink-2); }
-.secondary-btn:hover { color: var(--ink); }
+
 .active-rally-btn.playing { background: var(--ink); color: var(--panel); }
 #speedSelect { width: 84px; height: 30px; flex: none; font-size: 12px; }
 .timeline-slider-wrap { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 120px; margin-left: 6px; }
@@ -705,7 +719,7 @@ input[type="range"]::-moz-range-thumb {
   transition: background-color 120ms var(--ease);
 }
 .loading-mode-card:first-child { border-left: none; }
-.loading-mode-card:hover { background: var(--panel-2); }
+
 .loading-mode-card.active { box-shadow: inset 0 3px 0 var(--accent); }
 .loading-mode-card:active { transform: scale(0.99); }
 .lmc-top { display: flex; justify-content: space-between; align-items: center; }
@@ -727,7 +741,7 @@ input[type="range"]::-moz-range-thumb {
 .loading-footer-bar { display: flex; align-items: center; gap: 18px; padding: 14px 24px; border-top: 1px solid var(--edge); }
 .loading-spacer { flex: 1; }
 .loading-doc-link { font-size: 13px; font-weight: 500; color: var(--ink-2); text-underline-offset: 3px; white-space: nowrap; }
-.loading-doc-link:hover { color: var(--ink); }
+
 .loading-enter-btn { height: 40px; padding: 0 22px; font-size: 14px; }
 
 /* =========================================================================
@@ -797,6 +811,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* Touch targets: 44px minimum on coarse pointers */
 @media (pointer: coarse) {
+  select, textarea { font-size: 16px; }
   .mini-action-btn, .ghost-btn, .secondary-btn, .play-btn, .cam-btn, .seg-btn, .stroke-btn, .tactical-mode-btn,
   .mode-switch-btn, .mobile-sheet-toggle, .nav-tab, .turn-pill, select { min-height: 44px; }
   .icon-btn { min-width: 44px; }
@@ -818,4 +833,88 @@ input[type="range"]::-moz-range-thumb {
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
+}
+
+/* =========================================================================
+   Phone (< 768px): native-app layout
+   - the 3D court is pinned to the top 45dvh (sticky) so trajectories stay in view
+     while a finger drags a slider below it
+   - everything else scrolls as one panel; the playback bar is pinned to the
+     bottom and clears the home indicator
+   ========================================================================= */
+@media (max-width: 767px) {
+  body { background: var(--panel); }
+  .app-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    height: 100dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--panel);
+  }
+  .main-area { display: contents; } /* lets the viewport stick across the whole scroll */
+
+  .topbar { order: 1; padding-top: calc(8px + env(safe-area-inset-top, 0px)); border-bottom: 1px solid var(--rule); }
+  .viewport-wrapper {
+    order: 2;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    flex: none;
+    height: 45dvh;
+    border-bottom: 1px solid var(--rule);
+  }
+  body.mobile-3d-expanded .viewport-wrapper { height: 72dvh; }
+  .view-toolbar { order: 3; flex: none; border-bottom: 1px solid var(--rule); }
+  .telemetry-module { order: 4; flex: none; border-bottom: 1px solid var(--rule); }
+  .tactical-hud-banner { order: 5; flex: none; }
+  .sidebar { order: 6; flex: none; overflow: visible; border-top: none; min-height: auto; }
+  .scrubber-bar {
+    order: 7;
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    flex: none;
+    border-top: 1px solid var(--rule);
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+  /* Parameter tabs stick just under the court so the active tab stays reachable */
+  .nav-tabs { top: 45dvh; z-index: 15; }
+  body.mobile-3d-expanded .nav-tabs { top: 72dvh; }
+
+  .tactical-hud-banner { display: none !important; }
+  .tactical-hud-banner[style*="flex"] { display: flex !important; } /* docked, so it no longer covers the court */
+  .viewport-corner { display: none; }
+  .sidebar-footer { padding-bottom: 16px; }
+
+  /* 44px touch targets */
+  input[type="range"] { height: 44px; }
+  input[type="range"]::-webkit-slider-thumb { width: 14px; height: 28px; margin-top: -13px; }
+  .mini-action-btn, .ghost-btn, .secondary-btn, .play-btn, .cam-btn, .seg-btn, .stroke-btn, .tactical-mode-btn,
+  .mode-switch-btn, .mobile-sheet-toggle, .nav-tab, .turn-pill, .tel-action-btn, select { min-height: 44px; }
+  .icon-btn { min-width: 44px; }
+  .toggle-label { min-height: 44px; }
+  .slider-group { margin-bottom: 6px; }
+  .slider-header { padding-top: 6px; } /* label row: a scroll-safe strip between slider hit areas */
+
+  /* iOS zooms into inputs under 16px */
+  select, textarea { font-size: 16px; }
+}
+
+/* All hover styles: only where the primary input can hover precisely (no sticky hover after a tap) */
+@media (hover: hover) and (pointer: fine) {
+  .mini-action-btn:hover, .ghost-btn:hover, .secondary-btn:hover, .stroke-btn:hover, .tactical-mode-btn:hover,
+  .cam-btn:hover, .tel-action-btn:hover, .mode-switch-btn:hover { background: var(--panel-2); }
+  .mini-action-btn.active-accent:hover, .play-btn:hover, .loading-enter-btn:hover, .mobile-sheet-toggle:hover { background: var(--accent-press); }
+  .seg-btn:hover { color: var(--ink); background: var(--panel-2); }
+  select:hover { background-color: var(--panel-2); }
+  input[type="range"]:hover::-webkit-slider-thumb { background-color: #ffffff; }
+  .mode-switch-btn.active:hover { background: var(--ink); }
+  .stroke-btn.active:hover { background: var(--ink); }
+  .turn-pill:hover { background: var(--panel-2); color: var(--ink); }
+  .nav-tab:hover { color: var(--ink); background: var(--panel-2); }
+  .secondary-btn:hover { color: var(--ink); }
+  .loading-mode-card:hover { background: var(--panel-2); }
+  .loading-doc-link:hover { color: var(--ink); }
 }
