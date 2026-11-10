@@ -22,7 +22,7 @@
 // Ranges and steps mirror the sliders in index.html
 const DIALS = {
   faceAngleDeg: { min: -18, max: 32, step: 0.2 },
-  swingPathDeg: { min: -22, max: 42, step: 0.5 },
+  swingPathDeg: { min: -30, max: 42, step: 0.5 },
   aimAngleDeg: { min: -28, max: 28, step: 0.2 }
 };
 const normDeg = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
@@ -119,6 +119,21 @@ export class RacketDiagram {
   }
 
   renderStep() {}
+
+  /** Briefly highlights one dial (switching view if that dial lives in the other one). */
+  flashDial(key) {
+    if (!['faceAngleDeg', 'swingPathDeg', 'aimAngleDeg'].includes(key)) return null;
+    const want = key === 'aimAngleDeg' ? 'top' : 'side';
+    if (this.mode !== want) this.setViewMode(want);
+    this._flashKey = key;
+    this._render();
+    clearTimeout(this._flashTimer);
+    this._flashTimer = setTimeout(() => {
+      this._flashKey = null;
+      this._render();
+    }, 1600);
+    return want;
+  }
   setTheme() {}
   _onResize() {}
 
@@ -165,7 +180,8 @@ export class RacketDiagram {
     };
     const knob = (x, y, key, label) => {
       const active = this._drag && this._drag.key === key;
-      parts.push(`<g class="rd-knob${active ? ' active' : ''}" data-dial="${key}" role="slider" aria-label="${label}">`
+      const flash = this._flashKey === key;
+      parts.push(`<g class="rd-knob${active ? ' active' : ''}${flash ? ' flash' : ''}" data-dial="${key}" role="slider" aria-label="${label}">`
         + `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="18" fill="transparent"/>`
         + `<rect x="${(x - 5).toFixed(1)}" y="${(y - 5).toFixed(1)}" width="10" height="10" rx="1" fill="${active ? 'var(--accent)' : 'var(--panel)'}" stroke="var(--ink)" stroke-width="1.25"/>`
         + `</g>`);

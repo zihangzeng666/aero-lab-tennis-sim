@@ -140,6 +140,25 @@ test('every tactical lesson demo solution passes its own challenge', () => {
     const sim = simulateTrajectory({ ...t, surfaceKey: lesson.surfaceKey });
     const res = evaluateTacticalAttempt(lesson, lesson.challengeTurnIndex, t, sim);
     assert.ok(res && res.passed, `${key}: ${res?.feedbackEn}`);
+    // The answer must be reachable with the swing controls (slider ranges in index.html)
+    const ranges = { racketSpeedKmh: [30, 175], swingPathDeg: [-30, 42], faceAngleDeg: [-18, 32], aimAngleDeg: [-28, 28] };
+    for (const [k, [lo, hi]] of Object.entries(ranges)) {
+      assert.ok(t[k] >= lo && t[k] <= hi, `${key}: ${k} = ${t[k].toFixed(1)} is outside ${lo}..${hi}`);
+    }
+  }
+});
+
+test('every tactical lesson starts as a failing shot with a concrete tip', () => {
+  for (const [key, lesson] of Object.entries(TACTICAL_LESSONS)) {
+    const turns = normaliseTurns(lesson.turns);
+    Object.assign(turns[lesson.challengeTurnIndex], lesson.challengeStart);
+    chainRallyTurns(turns, 0, { surfaceKey: lesson.surfaceKey });
+    const t = turns[lesson.challengeTurnIndex];
+    const sim = simulateTrajectory({ ...t, surfaceKey: lesson.surfaceKey });
+    const res = evaluateTacticalAttempt(lesson, lesson.challengeTurnIndex, t, sim);
+    assert.ok(res && !res.passed, `${key}: the starting shot should not pass`);
+    assert.ok(res.tips.length > 0 && res.tips.every((tip) => tip.control && tip.zh && tip.en), `${key}: needs tips`);
+    assert.ok(res.score < 88, `${key}: score ${res.score}`);
   }
 });
 

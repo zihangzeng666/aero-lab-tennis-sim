@@ -484,23 +484,22 @@ export const EXAMPLE_RALLIES = {
 export const TACTICAL_LESSONS = {
   federer_serve_plus_one: {
     id: 'federer_serve_plus_one',
-    badgeZh: '战术课 01 // 发球+1 组合拳',
-    badgeEn: 'LESSON 01 // SERVE + 1',
-    titleZh: '灵感 · 2017 澳网决赛 · 费德勒「外角一发 + 迎前反方向正手制胜」',
-    titleEn: 'Inspired by 2017 AO Final · Federer Wide Serve + Inside-In Forehand Winner',
+    number: '01',
+    nameZh: '发球 + 1',
+    nameEn: 'Serve + 1',
+    inspirationZh: '灵感：2017 澳网决赛，费德勒对纳达尔',
+    inspirationEn: 'Inspired by the 2017 Australian Open final',
     surfaceKey: 'hard',
-    playerAZh: 'R. Federer (近端 A)',
-    playerBZh: 'R. Nadal (远端 B)',
-    playerAEn: 'R. Federer (Near A)',
-    playerBEn: 'R. Nadal (Far B)',
-    principleZh:
-      '【战术核心：Serve + 1 空间剥夺】第1拍利用平分大外角切发（aim +7.6°）将对手拉出单打边线外 1.5 米；第2拍对手被迫挡回中路浅球；第3拍（决胜拍）绝不能退后，必须踏入底线内（X = -10.4m）抢上升期，向对手来不及回位的反方向（右区空档，水平角 -5.6°）打出平快制胜分。',
-    principleEn:
-      '[Tactical Core: Serve + 1 Geometry] Shot #1 slices wide (+7.6°) to pull the receiver 1.5m outside the alley. Shot #2 is a forced defensive block to the center. On Shot #3, step inside the baseline (X = -10.4m) and redirect flat & fast (-5.6°) into the vacated deuce corner.',
-    challengeHintZh:
-      '【实操挑战】当前第3拍瞄准了中路（水平角 +1.5°）且球速偏慢，容易被纳达尔追上反击。请调节【水平出球方向角】至右区空档（约 -9.5° ~ -11.5°）并提升【出球初速度】至 ≥140 km/h，命中球场右前方的金色靶区！',
-    challengeHintEn:
-      '[Interactive Challenge] Shot #3 is currently aimed safely to the middle (+1.5°). Adjust Horizontal Aim toward the open right corner (-9.5° to -11.5°) and boost Launch Speed >= 140 km/h to hit the Gold Target Zone!',
+    playerAZh: 'R. Federer',
+    playerBZh: 'R. Nadal',
+    playerAEn: 'R. Federer',
+    playerBEn: 'R. Nadal',
+    ideaZh:
+      '外角发球把接发方拉出场外。回球一短，就迎前一步，打向他刚离开的那一侧。',
+    ideaEn:
+      'Serve wide to pull the returner off the court. When the reply lands short, step in and hit to the side they just left.',
+    goalZh: '第 3 拍：迎前把球打进右侧空档，要快。',
+    goalEn: 'Shot 3: step in and drive it into the open right corner, fast.',
     challengeTurnIndex: 2,
     targetZone: {
       side: 'A',
@@ -533,8 +532,8 @@ export const TACTICAL_LESSONS = {
     turns: [
       {
         side: 'A',
-        titleZh: '#1 费德勒大外角一发调动',
-        titleEn: '#1 Federer Wide Slice Serve',
+        titleZh: '外角发球',
+        titleEn: 'Wide serve',
         courtMode: 'serve_deuce',
         hitX: -11.88,
         hitY: -0.85,
@@ -553,8 +552,8 @@ export const TACTICAL_LESSONS = {
       },
       {
         side: 'B',
-        titleZh: '#2 纳达尔被动中路挡接发',
-        titleEn: '#2 Nadal Stretched Center Block',
+        titleZh: '被动挡回中路',
+        titleEn: 'Blocked return',
         courtMode: 'singles',
         racketSpeedKmh: 76,
         swingPathDeg: 22.0,
@@ -567,8 +566,8 @@ export const TACTICAL_LESSONS = {
       },
       {
         side: 'A',
-        titleZh: '#3 费德勒迎前反方向制胜 [挑战拍]',
-        titleEn: '#3 Federer Inside-In Winner [Challenge]',
+        titleZh: '迎前打空档',
+        titleEn: 'Step in, hit the gap',
         courtMode: 'singles',
         hitX: -10.65,
         hitY: 1.15,
@@ -587,23 +586,22 @@ export const TACTICAL_LESSONS = {
 
   nadal_spanish_x: {
     id: 'nadal_spanish_x',
-    badgeZh: '战术课 02 // 西班牙十字战术',
-    badgeEn: 'LESSON 02 // THE SPANISH X',
-    titleZh: '灵感 · 2008 温网史诗决赛 · 纳达尔「超级上旋锁反手 + 侧身大对角突袭」',
-    titleEn: 'Inspired by 2008 Wimbledon Final · Nadal Heavy Topspin Cage + Inside-Out Whip',
+    number: '02',
+    nameZh: '上旋压反手',
+    nameEn: 'Topspin to the backhand',
+    inspirationZh: '灵感：2008 温网决赛，纳达尔对费德勒',
+    inspirationEn: 'Inspired by the 2008 Wimbledon final',
     surfaceKey: 'grass',
-    playerAZh: 'R. Nadal (近端 A)',
-    playerBZh: 'R. Federer (远端 B)',
-    playerAEn: 'R. Nadal (Near A)',
-    playerBEn: 'R. Federer (Far B)',
-    principleZh:
-      '【战术核心：高弹跳上旋笼子 + 大对角撕扯】第1拍纳达尔用 >3800 RPM 的高弧线重上旋压迫费德勒单反高点；第2拍费德勒只能用单反切削过渡；第3拍（决胜拍）纳达尔抓来球较慢的机会，利用极陡的低向高挥拍轨迹（>34°）刷出 3800+ RPM 超级上旋，打向球场左深角（+8.2°），依靠马格努斯下压力让球在底线前急坠！',
-    principleEn:
-      '[Tactical Core: High-Bounce Cage + Inside-Out Whip] Shot #1 pins Federer’s backhand high with >3800 RPM topspin. Shot #2 forces a defensive slice. On Shot #3, use a steep low-to-high swing (>34°) to generate >=3600 RPM topspin angled wide (+8.2°) so Magnus downforce dips the ball inside the corner!',
-    challengeHintZh:
-      '【实操挑战】当前第3拍上旋不足（仅 2100 RPM）且角度偏正，球容易飞出底线或被对手拦截。请调高【挥拍轨迹仰角】（或直接拉高左上角 RPM 滑块至 ≥3600 RPM），并将【水平出球方向角】调至左区深角（+7.5° ~ +9.0°）！',
-    challengeHintEn:
-      '[Interactive Challenge] Shot #3 currently lacks topspin (2100 RPM) and angle. Increase Swing Path / Spin Rate to >= 3600 RPM and set Horizontal Aim to +7.5°..+9.0° to dip the ball into the deep left target box!',
+    playerAZh: 'R. Nadal',
+    playerBZh: 'R. Federer',
+    playerAEn: 'R. Nadal',
+    playerBEn: 'R. Federer',
+    ideaZh:
+      '高弧线重上旋把单反压在肩膀以上。等来一个慢的切削，用更陡的挥拍刷出大角度，让球在底线前下坠。',
+    ideaEn:
+      'Heavy, high topspin pins a one-handed backhand above the shoulder. When a slow slice comes back, swing steeper and whip it wide so it dips before the baseline.',
+    goalZh: '第 3 拍：上旋拉满，打进左侧深角。',
+    goalEn: 'Shot 3: max out the topspin and land it deep in the left corner.',
     challengeTurnIndex: 2,
     targetZone: {
       side: 'A',
@@ -636,8 +634,8 @@ export const TACTICAL_LESSONS = {
     turns: [
       {
         side: 'A',
-        titleZh: '#1 纳达尔高压上旋锁反手',
-        titleEn: '#1 Nadal High Topspin Cage',
+        titleZh: '高弧线上旋压反手',
+        titleEn: 'High topspin to the backhand',
         courtMode: 'singles',
         hitX: -12.10,
         hitY: -1.80,
@@ -656,8 +654,8 @@ export const TACTICAL_LESSONS = {
       },
       {
         side: 'B',
-        titleZh: '#2 费德勒被动反手切削过渡',
-        titleEn: '#2 Federer Defensive Slice',
+        titleZh: '单反切削过渡',
+        titleEn: 'Defensive slice',
         courtMode: 'singles',
         racketSpeedKmh: 63,
         swingPathDeg: -14.0,
@@ -670,8 +668,8 @@ export const TACTICAL_LESSONS = {
       },
       {
         side: 'A',
-        titleZh: '#3 纳达尔重旋大对角突袭 [挑战拍]',
-        titleEn: '#3 Nadal Heavy Whip Winner [Challenge]',
+        titleZh: '重上旋大角度',
+        titleEn: 'Heavy topspin, wide',
         courtMode: 'singles',
         racketSpeedKmh: 96.0,
         swingPathDeg: 36.5,
@@ -687,24 +685,23 @@ export const TACTICAL_LESSONS = {
 
   djokovic_wardlaw_dtl: {
     id: 'djokovic_wardlaw_dtl',
-    badgeZh: '战术课 03 // 沃德洛变线法则',
-    badgeEn: 'LESSON 03 // WARDLAW DTL REDIRECT',
-    titleZh: '灵感 · 2019 温网决赛 · 德约科维奇「斜线相持耐心蓄力 + 借力变直线」',
-    titleEn: 'Inspired by 2019 Wimbledon Final · Djokovic Cross-Court Patience + DTL Redirect',
+    number: '03',
+    nameZh: '斜线相持，直线变线',
+    nameEn: 'Cross-court, then down the line',
+    inspirationZh: '灵感：2019 温网决赛，德约科维奇对费德勒',
+    inspirationEn: 'Inspired by the 2019 Wimbledon final',
     surfaceKey: 'grass',
-    playerAZh: 'R. Federer (近端 A)',
-    playerBZh: 'N. Djokovic (远端 B)',
-    playerAEn: 'R. Federer (Near A)',
-    playerBEn: 'N. Djokovic (Far B)',
-    principleZh:
-      '【战术核心：保罗·沃德洛方向法则 (Wardlaw Directionals)】斜线对角线比直线长 1.4 米且球网中心最低（0.914m vs 边线 1.00m）。前两拍通过斜线相持把对手吸在单打边线外；第3拍（决胜拍，远端德约 B）迎着对手斜线来球，借力直线变线（水平角 -2.8°），同时压低出球仰角（约 5.8°~6.5°）以弥补直线距离较短的几何限制。',
-    principleEn:
-      '[Tactical Core: Wardlaw Directionals] Cross-court offers +1.4m extra court length and a lower net center (0.914m vs 1.00m). After pinning the opponent wide cross-court, redirect Shot #3 Down-the-Line (-2.8°) with a lower launch angle (5.8°..6.5°) so it stays inside the shorter baseline!',
-    challengeHintZh:
-      '【实操挑战】当前第3拍（远端德约 B）仍在回打斜线（+6.5°）且仰角偏高。请将【水平出球方向角】改为直线走廊（约 -2.2° ~ -3.6°），并压低【触球拍面倾角 / 过网仰角】让球精准落在直线深区靶框内！',
-    challengeHintEn:
-      '[Interactive Challenge] Shot #3 (Player B) is currently aimed back cross-court (+6.5°) and too high. Change Horizontal Aim to Down-the-Line (-2.2° to -3.6°) and lower Launch Angle (~6.2°) to hit the DTL corridor target!',
-    challengeTurnIndex: 2,
+    playerAZh: 'R. Federer',
+    playerBZh: 'N. Djokovic',
+    playerAEn: 'R. Federer',
+    playerBEn: 'N. Djokovic',
+    ideaZh:
+      '斜线更长，过网点也更低，所以相持打斜线。等对手被拉到边线外，再变直线。直线短，出球要压低一点。',
+    ideaEn:
+      'Cross-court is longer and crosses the low middle of the net, so rally there. Once the opponent is pulled wide, change to down the line. The line is shorter, so keep the ball lower.',
+    goalZh: '第 4 拍（远端球员）：变直线，落进直线深区。',
+    goalEn: 'Shot 4 (far player): go down the line and land it deep.',
+    challengeTurnIndex: 3,
     targetZone: {
       side: 'B',
       localX: 8.2,
@@ -736,8 +733,8 @@ export const TACTICAL_LESSONS = {
     turns: [
       {
         side: 'A',
-        titleZh: '#1 费德勒正手大斜线相持',
-        titleEn: '#1 Federer Cross-Court Drive',
+        titleZh: '正手斜线',
+        titleEn: 'Cross-court forehand',
         courtMode: 'singles',
         hitX: -11.75,
         hitY: -1.65,
@@ -756,8 +753,8 @@ export const TACTICAL_LESSONS = {
       },
       {
         side: 'B',
-        titleZh: '#2 德约科维奇深区斜线压制',
-        titleEn: '#2 Djokovic Deep Cross-Court',
+        titleZh: '斜线回压',
+        titleEn: 'Deep cross-court reply',
         courtMode: 'singles',
         racketSpeedKmh: 90,
         swingPathDeg: 24.5,
@@ -770,8 +767,8 @@ export const TACTICAL_LESSONS = {
       },
       {
         side: 'A',
-        titleZh: '#3 费德勒继续斜线拉扯',
-        titleEn: '#3 Federer Cross-Court Rally',
+        titleZh: '继续斜线',
+        titleEn: 'Cross-court again',
         courtMode: 'singles',
         racketSpeedKmh: 93,
         swingPathDeg: 26.0,
@@ -784,8 +781,8 @@ export const TACTICAL_LESSONS = {
       },
       {
         side: 'B',
-        titleZh: '#4 德约借力突袭变直线 [挑战拍]',
-        titleEn: '#4 Djokovic DTL Redirect [Challenge]',
+        titleZh: '借力变直线',
+        titleEn: 'Redirect down the line',
         courtMode: 'singles',
         racketSpeedKmh: 92.5,
         swingPathDeg: 24.5,
@@ -801,23 +798,22 @@ export const TACTICAL_LESSONS = {
 
   alcaraz_drop_shot: {
     id: 'alcaraz_drop_shot',
-    badgeZh: '战术课 04 // 纵深撕扯放小球',
-    badgeEn: 'LESSON 04 // DEPTH & DROP SHOT',
-    titleZh: '灵感 · 2023 温网决赛 · 阿尔卡拉斯「重炮逼退底线 + 突然切削放小球」',
-    titleEn: 'Inspired by 2023 Wimbledon Final · Alcaraz Heavy Drive + Disguised Drop Shot',
+    number: '04',
+    nameZh: '深球后放小球',
+    nameEn: 'Deep, then drop',
+    inspirationZh: '灵感：2023 温网决赛，阿尔卡拉斯对德约科维奇',
+    inspirationEn: 'Inspired by the 2023 Wimbledon final',
     surfaceKey: 'grass',
-    playerAZh: 'C. Alcaraz (近端 A)',
-    playerBZh: 'N. Djokovic (远端 B)',
-    playerAEn: 'C. Alcaraz (Near A)',
-    playerBEn: 'N. Djokovic (Far B)',
-    principleZh:
-      '【战术核心：纵深空间撕扯 (Longitudinal Manipulation)】第1拍阿尔卡拉斯用 140 km/h 重炮将德约逼退至底线后方 2 米；第2拍对手回球偏短；第3拍（决胜拍）阿尔卡拉斯在相同引拍动作下突然减力打开拍面（挥速 ~42 km/h，下旋 -1650 RPM），让球柔和越过球网后迅速死跳在发球线前（X = 2.5m ~ 4.8m）！',
-    principleEn:
-      '[Tactical Core: Longitudinal Depth Tear] Shot #1 pushes Djokovic 2m behind the baseline with heavy pace. On Shot #3, disguise a soft underspin Drop Shot (speed ~62 km/h, backspin -1650 RPM) so the ball lands short inside the service box (X = 2.5m..4.8m) and dies on the grass!',
-    challengeHintZh:
-      '【实操挑战】当前第3拍仍是常规底线抽球（135 km/h 上旋），球会直接送到对手手里。请大幅降低【出球初速度】（至 56~72 km/h）并切换为【切削下旋】（RPM 调至 -1200 ~ -2000 RPM），让球落在网前浅区金色靶圈内！',
-    challengeHintEn:
-      '[Interactive Challenge] Shot #3 is currently a deep drive (135 km/h). Reduce Launch Speed to 56..72 km/h and dial in Backspin (-1200 to -2000 RPM) so the ball drops inside the short front-court target zone!',
+    playerAZh: 'C. Alcaraz',
+    playerBZh: 'N. Djokovic',
+    playerAEn: 'C. Alcaraz',
+    playerBEn: 'N. Djokovic',
+    ideaZh:
+      '先用重球把对手压到底线后面。再用同样的引拍突然放短，下旋让球落地后几乎不往前走。',
+    ideaEn:
+      'First push the opponent well behind the baseline with heavy drives. Then, from the same preparation, play it short; backspin keeps the ball from running on after the bounce.',
+    goalZh: '第 3 拍：放慢、打下旋，落进网前浅区。',
+    goalEn: 'Shot 3: slow it down, add backspin, land it short near the net.',
     challengeTurnIndex: 2,
     targetZone: {
       side: 'A',
@@ -851,8 +847,8 @@ export const TACTICAL_LESSONS = {
     turns: [
       {
         side: 'A',
-        titleZh: '#1 阿尔卡拉斯重炮深区压迫',
-        titleEn: '#1 Alcaraz Heavy Deep Drive',
+        titleZh: '重球压底线',
+        titleEn: 'Heavy deep drive',
         courtMode: 'singles',
         hitX: -11.70,
         hitY: -1.60,
@@ -871,8 +867,8 @@ export const TACTICAL_LESSONS = {
       },
       {
         side: 'B',
-        titleZh: '#2 德约底线退后中路过渡',
-        titleEn: '#2 Djokovic Deep Baseline Neutralizer',
+        titleZh: '退后中路过渡',
+        titleEn: 'Neutral reply from deep',
         courtMode: 'singles',
         racketSpeedKmh: 84,
         swingPathDeg: 23.0,
@@ -885,8 +881,8 @@ export const TACTICAL_LESSONS = {
       },
       {
         side: 'A',
-        titleZh: '#3 阿尔卡拉斯突然切削放小球 [挑战拍]',
-        titleEn: '#3 Alcaraz Disguised Drop Shot [Challenge]',
+        titleZh: '突然放小球',
+        titleEn: 'Disguised drop shot',
         courtMode: 'singles',
         racketSpeedKmh: 38.0,
         swingPathDeg: -16.0,
@@ -901,11 +897,42 @@ export const TACTICAL_LESSONS = {
   }
 };
 
-TACTICAL_LESSONS.djokovic_wardlaw_dtl.challengeTurnIndex = 3;
+/**
+ * Human-readable requirements for a lesson's decisive shot, used by the checklist.
+ * Spin is in rpm; negative values are backspin.
+ */
+export function describeTacticalGoal(lesson) {
+  const tz = lesson?.targetZone;
+  if (!tz) return [];
+  const rows = [{ key: 'zone', zh: '落进目标区', en: 'Lands in the target' }];
+  if (tz.minSpeedKmh !== undefined || tz.maxSpeedKmh !== undefined) {
+    const lo = tz.minSpeedKmh;
+    const hi = tz.maxSpeedKmh;
+    const range = lo !== undefined && hi !== undefined ? `${lo}–${hi}` : lo !== undefined ? `≥ ${lo}` : `≤ ${hi}`;
+    rows.push({ key: 'speed', zh: `球速 ${range} km/h`, en: `Speed ${range} km/h` });
+  }
+  if (tz.minSpinRpm !== undefined || tz.maxSpinRpm !== undefined) {
+    const back = (tz.maxSpinRpm ?? 0) < 0;
+    if (back) {
+      const a = Math.abs(tz.maxSpinRpm);
+      const b = Math.abs(tz.minSpinRpm ?? -9999);
+      rows.push({ key: 'spin', zh: `下旋 ${a}–${b} rpm`, en: `Backspin ${a}–${b} rpm` });
+    } else {
+      const lo = tz.minSpinRpm;
+      const hi = tz.maxSpinRpm;
+      const range = lo !== undefined && hi !== undefined ? `${lo}–${hi}` : lo !== undefined ? `≥ ${lo}` : `≤ ${hi}`;
+      rows.push({ key: 'spin', zh: `上旋 ${range} rpm`, en: `Topspin ${range} rpm` });
+    }
+  }
+  return rows;
+}
 
 /**
- * Evaluates the user's current shot against the active Tactical Lesson's target zone & physics criteria.
- * Returns `{ score, passed, distErrM, feedbackZh, feedbackEn }`.
+ * Scores the current shot against the active lesson.
+ * Returns null unless the decisive shot is selected. Otherwise:
+ * `{ score, passed, checks: {zone, speed, spin}, tips: [{control, zh, en}], landing, feedbackZh, feedbackEn }`.
+ * `control` names the input that fixes the problem (a slider / dial id).
+ * Score: position up to 70 (Gaussian in normalised ellipse distance) + 15 speed + 15 spin.
  */
 export function evaluateTacticalAttempt(lesson, turnIndex, state, simResult) {
   if (!lesson || turnIndex !== lesson.challengeTurnIndex || !simResult) {
@@ -914,92 +941,104 @@ export function evaluateTacticalAttempt(lesson, turnIndex, state, simResult) {
 
   const tz = lesson.targetZone;
   const b = simResult.firstBounce;
+  const halfLen = 11.885;
+  const halfWidth = 4.115;
+  const speed = state.speedKmh;
+  const spin = state.topspinRpm;
+  const wantsBackspin = (tz.maxSpinRpm ?? 0) < 0;
+
+  const checks = { zone: false, speed: true, spin: true };
+  const tips = [];
+  const tip = (control, zh, en) => tips.push({ control, zh, en });
+
+  if (tz.minSpeedKmh !== undefined && speed < tz.minSpeedKmh) {
+    checks.speed = false;
+    tip('racketSpeedKmh', `挥速再快一点（球速 ${speed.toFixed(0)}，要 ≥ ${tz.minSpeedKmh} km/h）`,
+      `Swing faster (ball ${speed.toFixed(0)} km/h, need ≥ ${tz.minSpeedKmh})`);
+  }
+  if (tz.maxSpeedKmh !== undefined && speed > tz.maxSpeedKmh) {
+    checks.speed = false;
+    tip('racketSpeedKmh', `挥速放慢（球速 ${speed.toFixed(0)}，要 ≤ ${tz.maxSpeedKmh} km/h）`,
+      `Swing slower (ball ${speed.toFixed(0)} km/h, need ≤ ${tz.maxSpeedKmh})`);
+  }
+  if (tz.minSpinRpm !== undefined && spin < tz.minSpinRpm) {
+    checks.spin = false;
+    if (wantsBackspin) {
+      tip('swingPathDeg', `切得更深：轨迹再往下（现在 ${Math.round(spin)} rpm）`,
+        `Cut more: steeper downward path (now ${Math.round(spin)} rpm)`);
+    } else {
+      tip('swingPathDeg', `轨迹更由下往上，多刷上旋（现在 ${Math.round(spin)} rpm）`,
+        `Swing more low-to-high for more topspin (now ${Math.round(spin)} rpm)`);
+    }
+  }
+  if (tz.maxSpinRpm !== undefined && spin > tz.maxSpinRpm) {
+    checks.spin = false;
+    if (wantsBackspin) {
+      tip('swingPathDeg', `要下旋：轨迹改成从上往下，拍面打开（现在 ${Math.round(spin)} rpm）`,
+        `Needs backspin: swing high-to-low with an open face (now ${Math.round(spin)} rpm)`);
+    } else {
+      tip('swingPathDeg', `上旋太多，轨迹放平一点（现在 ${Math.round(spin)} rpm）`,
+        `Too much topspin; flatten the swing path (now ${Math.round(spin)} rpm)`);
+    }
+  }
+
+  const finish = (score, passed, headZh, headEn) => {
+    const first = tips[0];
+    return {
+      score,
+      passed,
+      checks,
+      tips,
+      landing: b && !simResult.hitNet ? { localX: b.localX, localY: b.localY } : null,
+      feedbackZh: first ? `${headZh}${first.zh}` : headZh.replace(/[：，]$/, ''),
+      feedbackEn: first ? `${headEn}${first.en}` : headEn.replace(/[:,] $/, '')
+    };
+  };
 
   if (simResult.hitNet || !b || b.localX <= 0) {
-    return {
-      score: 15,
-      passed: false,
-      feedbackZh: '球挂网了！请适当调高【触球拍面倾角】或【过网仰角】，确保安全过网。',
-      feedbackEn: 'Net error! Increase Face Tilt or Launch Angle to clear the net cord.'
-    };
+    tips.unshift({ control: 'faceAngleDeg', zh: '拍面打开一点，让球过网', en: 'Open the face a little to clear the net' });
+    return finish(15, false, '下网。', 'Into the net. ');
   }
 
   if (!b.isIn) {
-    return {
-      score: 28,
-      passed: false,
-      feedbackZh: `球出界了（${b.callTextZh}）！请稍微压低拍面倾角、增加上旋或微调水平方向角。`,
-      feedbackEn: `Shot went ${b.callTextEn}! Close the racket face slightly, add topspin, or adjust horizontal aim.`
-    };
+    if (Math.abs(b.localY) > halfWidth) {
+      const toLeft = b.localY < 0;
+      tips.unshift({ control: 'aimAngleDeg', zh: `出边线：方向往${toLeft ? '左（+）' : '右（−）'}收`,
+        en: `Wide: aim back to the ${toLeft ? 'left (+)' : 'right (−)'}` });
+    } else if (b.localX > halfLen) {
+      tips.unshift({ control: 'faceAngleDeg', zh: '出底线：拍面关一点，或多加上旋', en: 'Long: close the face a little or add topspin' });
+    }
+    return finish(28, false, '出界。', 'Out. ');
   }
 
   const normDx = (b.localX - tz.localX) / tz.rx;
   const normDy = (b.localY - tz.localY) / tz.ry;
   const radialNorm = Math.hypot(normDx, normDy);
-  const inZone = radialNorm <= 1.05;
+  checks.zone = radialNorm <= 1.05;
 
-  let speedOk = true;
-  let spinOk = true;
-  const tipsZh = [];
-  const tipsEn = [];
-
-  if (radialNorm > 1.05) {
-    if (b.localY < tz.localY - tz.ry * 0.7) {
-      tipsZh.push('落点偏右，请向【左(+)】调大水平方向角');
-      tipsEn.push('Landing too far right — increase Horizontal Aim (L+)');
-    } else if (b.localY > tz.localY + tz.ry * 0.7) {
-      tipsZh.push('落点偏左，请向【右(-)】调小水平方向角');
-      tipsEn.push('Landing too far left — adjust Horizontal Aim (R-)');
+  if (!checks.zone) {
+    const posTips = [];
+    if (normDy < -0.7) posTips.push({ control: 'aimAngleDeg', zh: '落点偏右：方向往左（+）', en: 'Landing right of target: aim left (+)' });
+    else if (normDy > 0.7) posTips.push({ control: 'aimAngleDeg', zh: '落点偏左：方向往右（−）', en: 'Landing left of target: aim right (−)' });
+    if (normDx < -0.7) {
+      posTips.push(wantsBackspin
+        ? { control: 'faceAngleDeg', zh: '落点太浅：拍面再开一点', en: 'Too short: open the face a little' }
+        : { control: 'faceAngleDeg', zh: '落点太浅：拍面开一点或挥快一点', en: 'Too short: open the face a little or swing faster' });
+    } else if (normDx > 0.7) {
+      posTips.push(wantsBackspin
+        ? { control: 'racketSpeedKmh', zh: '落点太深：挥速再慢一点', en: 'Too deep: swing slower' }
+        : { control: 'faceAngleDeg', zh: '落点太深：拍面关一点', en: 'Too deep: close the face a little' });
     }
-    if (b.localX < tz.localX - tz.rx * 0.7) {
-      tipsZh.push('落点偏浅，请提高出球速度或仰角');
-      tipsEn.push('Landing too short — increase speed or launch angle');
-    } else if (b.localX > tz.localX + tz.rx * 0.7) {
-      tipsZh.push('落点过深偏离靶心，请降低球速或仰角');
-      tipsEn.push('Landing too deep past target — reduce speed or angle');
-    }
-  }
-
-  if (tz.minSpeedKmh !== undefined && state.speedKmh < tz.minSpeedKmh) {
-    speedOk = false;
-    tipsZh.push(`球速需 ≥${tz.minSpeedKmh} km/h（当前 ${state.speedKmh.toFixed(0)} km/h）`);
-    tipsEn.push(`Need speed >= ${tz.minSpeedKmh} km/h (currently ${state.speedKmh.toFixed(0)})`);
-  }
-  if (tz.maxSpeedKmh !== undefined && state.speedKmh > tz.maxSpeedKmh) {
-    speedOk = false;
-    tipsZh.push(`放小球球速需 ≤${tz.maxSpeedKmh} km/h（当前 ${state.speedKmh.toFixed(0)} km/h）`);
-    tipsEn.push(`Drop shot speed must be <= ${tz.maxSpeedKmh} km/h`);
-  }
-  if (tz.minSpinRpm !== undefined && state.topspinRpm < tz.minSpinRpm) {
-    spinOk = false;
-    tipsZh.push(`上旋需 ≥${tz.minSpinRpm} RPM（当前 ${Math.round(state.topspinRpm)} RPM）`);
-    tipsEn.push(`Need spin >= ${tz.minSpinRpm} RPM`);
-  }
-  if (tz.maxSpinRpm !== undefined && state.topspinRpm > tz.maxSpinRpm) {
-    spinOk = false;
-    tipsZh.push(`切削下旋需 ≤${tz.maxSpinRpm} RPM（当前 ${Math.round(state.topspinRpm)} RPM）`);
-    tipsEn.push(`Need backspin <= ${tz.maxSpinRpm} RPM`);
+    tips.push(...posTips); // pace/spin fixes first: they also move the landing
   }
 
   const posScore = Math.max(0, Math.round(70 * Math.exp(-0.55 * radialNorm * radialNorm)));
-  const spdBonus = speedOk ? 15 : 4;
-  const spnBonus = spinOk ? 15 : 4;
-  const totalScore = Math.min(100, posScore + spdBonus + spnBonus);
-  const passed = inZone && speedOk && spinOk;
+  const totalScore = Math.min(100, posScore + (checks.speed ? 15 : 4) + (checks.spin ? 15 : 4));
+  const passed = checks.zone && checks.speed && checks.spin;
 
   if (passed) {
-    return {
-      score: Math.max(88, totalScore),
-      passed: true,
-      feedbackZh: `战术完美达成（${Math.max(88, totalScore)}分）！落点精准命中金色制胜靶区，球速与旋转达到本课目标！`,
-      feedbackEn: `Lesson passed (${Math.max(88, totalScore)}/100)! Bullseye hit with the target pace & spin!`
-    };
+    const score = Math.max(88, totalScore);
+    return finish(score, true, '完成：落点、球速和旋转都达标。', 'Done: placement, pace and spin all on target.');
   }
-
-  return {
-    score: totalScore,
-    passed: false,
-    feedbackZh: `当前评分 ${totalScore}分 · 教练建议：${tipsZh.join('；') || '微调角度与球速以更贴近金色靶心'}`,
-    feedbackEn: `Score ${totalScore}/100 · Coach Tip: ${tipsEn.join('; ') || 'Fine-tune aim and speed toward the Gold Bullseye'}`
-  };
+  return finish(totalScore, false, '', '');
 }

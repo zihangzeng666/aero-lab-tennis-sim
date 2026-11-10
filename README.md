@@ -10,7 +10,7 @@ An interactive 3D simulator for tennis ball flight. Change the swing and the inc
 
 - **Solo lab**: forehand, two- and one-handed backhand and serve. The racket–ball impact splits launch speed into the swing's own contribution and the pace "borrowed" from the incoming ball.
 - **Rally mode**: two players take turns. Each shot's post-bounce state becomes the next player's incoming ball.
-- **Tactics mode**: scripted rallies with a target zone for the last shot.
+- **Tactics mode**: four lessons inspired by well-known points (not reconstructions). Each one plays a scripted rally, then hands you the key shot: a top-down court map, a checklist (placement, pace, spin) and tips that jump to the control that fixes the shot.
 - **Inverse solver**: drag the launch speed, angle or spin on the HUD and the racket speed, swing path and face angle are back-solved (damped Newton on a 3×3 Jacobian).
 
 ## Model
@@ -111,7 +111,7 @@ Tests use Node's built-in runner (Node 18+, no dependencies):
 npm test
 ```
 
-They cover the vacuum limit, 4th-order convergence, A/B mirror symmetry, line calls (including the 10 cm baseline), that every preset lands in, that every example rally and tactics lesson works, the inverse solver, air density and cross wind.
+They cover the vacuum limit, 4th-order convergence, A/B mirror symmetry, line calls (including the 10 cm baseline), that every preset lands in, that every example rally and tactics lesson works (the answer passes inside the slider ranges, the starting shot fails with a tip), the inverse solver, air density and cross wind.
 
 ## Files
 
@@ -119,6 +119,7 @@ They cover the vacuum limit, 4th-order convergence, A/B mirror symmetry, line ca
 |---|---|
 | `physics.js` | Flight integrator, impact and bounce models, line calls, rally chaining, `MODEL_ASSUMPTIONS` |
 | `presets.js` | Hand-tuned style presets, example rallies, tactics lessons and their scoring |
+| `lessonMap.js` | Top-down court map for the tactics card |
 | `mocap/` | Converted motion-capture strokes (3DTennisDS; Tennis-MoCap, CC BY-SA 3.0) and the conversion scripts |
 | `app.js` | UI controller: sliders, HUD, modes, playback |
 | `scene3d.js` | three.js court, player rigs and racket views |

@@ -638,25 +638,108 @@ input[type="range"]::-moz-range-thumb {
 /* =========================================================================
    Tactics card
    ========================================================================= */
-.tactical-lab-card { display: flex; flex-direction: column; gap: 10px; padding-bottom: 8px; }
-.tactical-lab-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.tactical-badge { font-size: 12px; font-weight: 600; color: var(--ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tactical-lab-card { display: flex; flex-direction: column; gap: 14px; padding-bottom: 8px; }
+
+/* Lesson picker: one row per lesson, number + name + progress */
+.lesson-list { display: flex; flex-direction: column; border: 1px solid var(--rule); }
+.lesson-row {
+  display: grid; grid-template-columns: 26px 1fr auto; align-items: center; gap: 8px;
+  min-height: 36px; padding: 0 10px; border: none; border-radius: 0; background: transparent;
+  text-align: left; font-size: 13px; color: var(--ink-2);
+}
+.lesson-row + .lesson-row { border-top: 1px solid var(--rule-soft); }
+.lesson-row[aria-selected="true"] { background: var(--panel-2); color: var(--ink); box-shadow: inset 2px 0 0 var(--accent); }
+.lr-num { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.lr-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lr-status { font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.lr-status.is-pass { color: var(--in); }
+
+.lesson-detail { display: flex; flex-direction: column; gap: 12px; }
+.lesson-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.lesson-head-text { min-width: 0; }
+.lesson-name { font-size: 15px; font-weight: 600; color: var(--ink); letter-spacing: -0.005em; white-space: pre; }
+.lesson-insp { margin-top: 2px; font-size: 12px; color: var(--ink-3); }
+.lesson-idea { font-size: 13px; line-height: 1.6; color: var(--ink-2); max-width: 60ch; }
+
+/* The rally as numbered shots; the key shot is marked */
+.lesson-rally { list-style: none; display: flex; flex-direction: column; border-left: 1px solid var(--rule); margin-left: 9px; }
+.lr-shot {
+  display: flex; align-items: flex-start; gap: 10px; width: 100%; min-height: 34px;
+  padding: 4px 0 4px 0; border: none; border-radius: 0; background: transparent; text-align: left;
+}
+.lr-shot-n {
+  flex: none; width: 19px; height: 19px; margin-left: -10px; display: grid; place-items: center;
+  font-family: var(--font-mono); font-size: 11px; color: var(--ink-3);
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 50%;
+}
+.lr-shot-body { display: flex; flex-direction: column; min-width: 0; padding-top: 1px; }
+.lr-shot-title { font-size: 12.5px; color: var(--ink-2); }
+.lr-shot-who { font-size: 11.5px; color: var(--ink-3); }
+.lr-shot.is-key .lr-shot-n { border-color: var(--accent); color: var(--accent); }
+.lr-shot.is-key .lr-shot-title { color: var(--ink); font-weight: 600; }
+.lr-shot.is-current .lr-shot-n { background: var(--ink); border-color: var(--ink); color: var(--panel); }
+.lr-shot.is-key.is-current .lr-shot-n { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
 .tactical-mode-row { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--edge); border-radius: var(--r-ctl); overflow: hidden; }
-.tactical-mode-btn { height: 32px; border: none; border-radius: 0; font-size: 13px; color: var(--ink-2); }
+.tactical-mode-btn { height: 34px; border: none; border-radius: 0; font-size: 13px; color: var(--ink-2); }
 .tactical-mode-btn + .tactical-mode-btn { border-left: 1px solid var(--edge); }
 .tactical-mode-btn.active { background: var(--ink); color: var(--panel); }
 .tactical-mode-btn.challenge-accent.active { background: var(--accent); color: var(--accent-ink); }
-.tactical-theory-box, .tactical-challenge-box { border: 1px solid var(--edge); padding: 10px 12px; }
-.tactical-challenge-box { box-shadow: inset 3px 0 0 var(--accent); }
-.tactical-box-title { font-size: 12px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; }
-.tactical-theory-text, .tactical-hint-text { font-size: 12.5px; line-height: 1.6; color: var(--ink-2); max-width: 65ch; }
-.tactical-score-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.tactical-score-header .tactical-box-title { margin-bottom: 0; }
-.tactical-score-pill { font-size: 12px; font-weight: 600; padding: 1px 7px; border: 1px solid var(--edge); border-radius: var(--r-ctl); white-space: nowrap; }
+
+/* Goal: what the key shot must do, a court map and a checklist */
+.lesson-goal { border-top: 1px solid var(--rule); padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.lesson-goal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.lesson-goal-text { font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.5; }
+.tactical-score-pill {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600; padding: 1px 7px;
+  border: 1px solid var(--edge); border-radius: var(--r-ctl); white-space: nowrap; font-variant-numeric: tabular-nums;
+}
 .tactical-score-pill.score-pass { background: var(--in); border-color: var(--in); color: var(--accent-ink); }
-.tactical-coach-feedback { margin-top: 8px; font-size: 12.5px; line-height: 1.55; }
-.tactical-coach-feedback:empty { display: none; }
-.tactical-quick-actions { margin-top: 10px; display: flex; justify-content: flex-end; }
+
+.lesson-map { border: 1px solid var(--rule); background: var(--panel-2); }
+.lm-svg { display: block; width: 100%; height: auto; }
+.lm-surface { fill: none; }
+.lm-line { stroke: var(--edge); stroke-width: 0.07; }
+.lm-net { stroke: var(--ink-2); stroke-width: 0.14; }
+.lm-zone { fill: var(--accent); fill-opacity: 0.16; stroke: var(--accent); stroke-width: 0.1; stroke-dasharray: 0.35 0.25; }
+.lm-zone.is-pass { fill: var(--in); stroke: var(--in); stroke-dasharray: none; }
+.lm-path { stroke: var(--ink-2); stroke-width: 0.1; stroke-linecap: round; stroke-linejoin: round; }
+.lm-hitter { fill: var(--panel); stroke: var(--ink); stroke-width: 0.1; }
+.lm-landing { fill: var(--ball); stroke: var(--ink); stroke-width: 0.1; }
+.lm-landing.is-out { fill: var(--out); }
+.lm-ghost { fill: none; stroke: var(--ink-3); stroke-width: 0.08; }
+
+.lesson-checks { list-style: none; display: flex; flex-direction: column; }
+.lc-row { display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: 8px; min-height: 28px; font-size: 12.5px; color: var(--ink-2); }
+.lc-row + .lc-row { border-top: 1px solid var(--rule-soft); }
+.lc-mark { width: 10px; height: 10px; border: 1px solid var(--edge); border-radius: 50%; }
+.lc-row.is-ok .lc-mark { background: var(--in); border-color: var(--in); }
+.lc-row.is-bad .lc-mark { border-color: var(--out); box-shadow: inset 0 0 0 2px var(--panel), inset 0 0 0 5px var(--out); }
+.lc-row.is-ok .lc-label { color: var(--ink); }
+.lc-val { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.lc-row.is-bad .lc-val { color: var(--out); }
+
+.lesson-tips { display: flex; flex-direction: column; gap: 6px; }
+.lesson-tips:empty { display: none; }
+.lt-note { font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
+.lt-note.is-pass { color: var(--in); font-weight: 600; }
+.lt-tip {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%;
+  min-height: 34px; padding: 6px 10px; text-align: left; font-size: 12.5px; line-height: 1.4;
+  color: var(--ink); background: var(--panel); border: 1px solid var(--edge); border-radius: var(--r-ctl);
+}
+.lt-tip::after { content: ""; flex: none; width: 6px; height: 6px; border-top: 1.5px solid var(--ink-3); border-right: 1.5px solid var(--ink-3); transform: rotate(45deg); }
+.lt-tip:active { background: var(--panel-2); }
+.lesson-howto { font-size: 12px; line-height: 1.5; color: var(--ink-3); }
+.lesson-actions { display: flex; align-items: center; gap: 6px; }
+.lesson-best { margin-right: auto; font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.lesson-goal.is-idle .lesson-howto, .lesson-goal.is-idle .lesson-actions { display: none; }
+
+/* Coach tip -> the control it names */
+@keyframes flash-target { 0%, 60% { box-shadow: inset 2px 0 0 var(--accent); background: var(--panel-2); } 100% { box-shadow: inset 2px 0 0 transparent; background: transparent; } }
+.slider-group.flash-target { animation: flash-target 1.6s var(--ease); }
+.rd-knob.flash rect { stroke: var(--accent); stroke-width: 2.5; }
+@media (prefers-reduced-motion: reduce) { .slider-group.flash-target { animation-duration: 0.01s; } }
 
 /* =========================================================================
    Import dialog
@@ -818,7 +901,7 @@ input[type="range"]::-moz-range-thumb {
 @media (pointer: coarse) {
   select, textarea { font-size: 16px; }
   .mini-action-btn, .ghost-btn, .secondary-btn, .play-btn, .cam-btn, .seg-btn, .stroke-btn, .tactical-mode-btn,
-  .mode-switch-btn, .mobile-sheet-toggle, .nav-tab, .turn-pill, select { min-height: 44px; }
+  .mode-switch-btn, .mobile-sheet-toggle, .nav-tab, .turn-pill, .lesson-row, .lt-tip, .lr-shot, select { min-height: 44px; }
   .icon-btn { min-width: 44px; }
   input[type="range"] { height: 44px; }
   input[type="range"]::-webkit-slider-thumb { width: 14px; height: 26px; margin-top: -12px; }
@@ -972,7 +1055,7 @@ input[type="range"]::-moz-range-thumb {
   input[type="range"] { height: 44px; }
   input[type="range"]::-webkit-slider-thumb { width: 14px; height: 28px; margin-top: -13px; }
   .mini-action-btn, .ghost-btn, .secondary-btn, .play-btn, .cam-btn, .seg-btn, .stroke-btn, .tactical-mode-btn,
-  .nav-tab, .turn-pill, .tel-action-btn, .toggle-label, select { min-height: 44px; }
+  .nav-tab, .turn-pill, .tel-action-btn, .toggle-label, .lesson-row, .lt-tip, .lr-shot, select { min-height: 44px; }
   .icon-btn { min-width: 44px; }
   .slider-group { margin-bottom: 6px; }
   .slider-header { padding-top: 6px; } /* label row: a scroll-safe strip between slider hit areas */
@@ -996,4 +1079,8 @@ input[type="range"]::-moz-range-thumb {
   .secondary-btn:hover { color: var(--ink); }
   .loading-mode-card:hover { background: var(--panel-2); }
   .loading-doc-link:hover { color: var(--ink); }
+  .lesson-row:hover, .lt-tip:hover { background: var(--panel-2); color: var(--ink); }
+  .lr-shot:hover .lr-shot-title { color: var(--ink); }
+  .tactical-mode-btn.active:hover { background: var(--ink); }
+  .tactical-mode-btn.challenge-accent.active:hover { background: var(--accent-press); }
 }

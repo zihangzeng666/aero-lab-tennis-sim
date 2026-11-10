@@ -14,16 +14,18 @@ import {
   samplePointAtTime,
   airDensityFromConditions,
   chainRallyTurns
-} from './physics.js?v=37';
+} from './physics.js?v=41';
 import {
   SHOT_PRESETS,
   INCOMING_PRESETS,
   EXAMPLE_RALLIES,
   TACTICAL_LESSONS,
-  evaluateTacticalAttempt
-} from './presets.js?v=37';
-import { TennisScene3D } from './scene3d.js?v=37';
-import { RacketDiagram } from './racketDiagram.js?v=37';
+  evaluateTacticalAttempt,
+  describeTacticalGoal
+} from './presets.js?v=41';
+import { TennisScene3D } from './scene3d.js?v=41';
+import { RacketDiagram } from './racketDiagram.js?v=41';
+import { LessonMap } from './lessonMap.js?v=41';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;
@@ -156,15 +158,23 @@ const I18N = {
     btnCancel: '取消',
     btnApplyImport: '解析生成',
     tabTactics: '战术',
-    lblTacticalSelect: '选择战术课',
-    btnTacticDemo: '演示',
-    btnTacticChallenge: '挑战',
+    btnTacticDemo: '看示范',
+    btnTacticChallenge: '自己打',
     btnExitTactics: '退出',
-    tacticalTheoryTitle: '战术要点',
-    tacticalMissionTitle: '挑战目标 · 命中金色靶区',
-    btnGoTuneShot: '前往【挥拍】调参解谜 →',
-    btnShortDemo: '演示',
-    btnShortChallenge: '挑战',
+    btnShortDemo: '示范',
+    btnShortChallenge: '自己打',
+    btnTacticReset: '重来',
+    btnTacticAnswer: '看答案',
+    tacticalHowTo: '用挥拍滑块或示意图里的旋钮调这一拍；长按 3D 里的球员可以换站位。',
+    tacDecisive: '关键拍',
+    tacBest: '最佳',
+    tacTries: (n) => `${n} 次尝试`,
+    tacPassed: '已完成',
+    tacWatching: '示范中',
+    tacShotOf: (i, n) => `第 ${i}/${n} 拍`,
+    tacOnTurn: (i) => `第 ${i} 拍是你来打的。先看完示范，或直接点「自己打」。`,
+    tacMapLabel: '俯视球场：目标区、球路和落点',
+    tacAnswerShown: '这是示范的参数。改动任意一项再试试。',
     btnMobileExpand3D: '全屏球场'
   },
   en: {
@@ -294,15 +304,23 @@ const I18N = {
     btnCancel: 'Cancel',
     btnApplyImport: 'Build Rally',
     tabTactics: 'Tactics',
-    lblTacticalSelect: 'Select lesson',
-    btnTacticDemo: 'Demo',
-    btnTacticChallenge: 'Challenge',
+    btnTacticDemo: 'Watch',
+    btnTacticChallenge: 'Your turn',
     btnExitTactics: 'Exit',
-    tacticalTheoryTitle: 'Tactical key',
-    tacticalMissionTitle: 'Target: hit the gold zone',
-    btnGoTuneShot: 'Tune Swing Sliders →',
-    btnShortDemo: 'Demo',
-    btnShortChallenge: 'Challenge',
+    btnShortDemo: 'Watch',
+    btnShortChallenge: 'Your turn',
+    btnTacticReset: 'Reset',
+    btnTacticAnswer: 'Show answer',
+    tacticalHowTo: 'Tune this shot with the swing sliders or the dials in the diagram. Long-press the player in 3D to move them.',
+    tacDecisive: 'Key shot',
+    tacBest: 'Best',
+    tacTries: (n) => (n === 1 ? '1 try' : `${n} tries`),
+    tacPassed: 'Done',
+    tacWatching: 'Watching',
+    tacShotOf: (i, n) => `Shot ${i}/${n}`,
+    tacOnTurn: (i) => `Shot ${i} is yours. Watch the demo first, or go straight to Your turn.`,
+    tacMapLabel: 'Court from above: target, ball path and landing',
+    tacAnswerShown: 'These are the demo settings. Change anything and try again.',
     btnMobileExpand3D: 'Expand 3D'
   }
 };
@@ -497,20 +515,7 @@ class TennisSimApp {
       }
     }
 
-    const tacSelect = document.getElementById('tacticalLessonSelect');
-    if (tacSelect) {
-      const curTac = tacSelect.value || this.activeTacticalKey || 'federer_serve_plus_one';
-      tacSelect.innerHTML = '';
-      for (const [k, lesson] of Object.entries(TACTICAL_LESSONS)) {
-        const opt = document.createElement('option');
-        opt.value = k;
-        opt.textContent = this.lang === 'zh' ? lesson.titleZh : lesson.titleEn;
-        tacSelect.appendChild(opt);
-      }
-      if (TACTICAL_LESSONS[curTac]) {
-        tacSelect.value = curTac;
-      }
-    }
+    this._renderLessonList();
   }
 
   /**
@@ -779,18 +784,106 @@ class TennisSimApp {
     this._updateTacticalUI();
   }
 
+  _lessonKey() {
+    return this.activeTacticalKey || this._pickedLessonKey || 'federer_serve_plus_one';
+  }
+
+  _loadLessonProgress() {
+    if (this._lessonProgress) return this._lessonProgress;
+    let saved = {};
+    try {
+      saved = JSON.parse(localStorage.getItem('aerolab.lessons') || '{}') || {};
+    } catch (e) {
+      saved = {};
+    }
+    this._lessonProgress = saved;
+    return saved;
+  }
+
+  _saveLessonProgress() {
+    try {
+      localStorage.setItem('aerolab.lessons', JSON.stringify(this._lessonProgress || {}));
+    } catch (e) {
+      /* private mode: progress lasts for this visit only */
+    }
+  }
+
+  _renderLessonList() {
+    const list = document.getElementById('tacticalLessonList');
+    if (!list) return;
+    const zh = this.lang === 'zh';
+    const dict = I18N[this.lang] || I18N.zh;
+    const progress = this._loadLessonProgress();
+    const current = this._lessonKey();
+    list.replaceChildren();
+    for (const [k, lesson] of Object.entries(TACTICAL_LESSONS)) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'lesson-row';
+      btn.setAttribute('role', 'option');
+      btn.setAttribute('aria-selected', String(k === current));
+      btn.dataset.lesson = k;
+      const p = progress[k];
+      const status = p?.passed ? dict.tacPassed : p?.best ? `${dict.tacBest} ${p.best}` : '';
+      btn.innerHTML =
+        `<span class="lr-num">${lesson.number}</span>` +
+        `<span class="lr-name">${zh ? lesson.nameZh : lesson.nameEn}</span>` +
+        `<span class="lr-status${p?.passed ? ' is-pass' : ''}">${status}</span>`;
+      btn.addEventListener('click', () => {
+        this._pickedLessonKey = k;
+        this.loadTacticalLesson(k, 'demo');
+      });
+      list.appendChild(btn);
+    }
+  }
+
+  _renderLessonRally(lesson) {
+    const ol = document.getElementById('tacticalRally');
+    if (!ol) return;
+    const zh = this.lang === 'zh';
+    const dict = I18N[this.lang] || I18N.zh;
+    ol.replaceChildren();
+    lesson.turns.forEach((t, i) => {
+      const li = document.createElement('li');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'lr-shot';
+      const isKey = i === lesson.challengeTurnIndex;
+      btn.classList.toggle('is-key', isKey);
+      btn.classList.toggle('is-current', !!this.activeTacticalKey && i === this.currentTurnIndex);
+      const who = (t.side || (i % 2 ? 'B' : 'A')) === 'A'
+        ? (zh ? lesson.playerAZh : lesson.playerAEn)
+        : (zh ? lesson.playerBZh : lesson.playerBEn);
+      btn.innerHTML =
+        `<span class="lr-shot-n">${i + 1}</span>` +
+        `<span class="lr-shot-body"><span class="lr-shot-title">${zh ? t.titleZh : t.titleEn}</span>` +
+        `<span class="lr-shot-who">${who}${isKey ? ` · ${dict.tacDecisive}` : ''}</span></span>`;
+      btn.addEventListener('click', () => {
+        if (this.activeTacticalKey !== lesson.id) this.loadTacticalLesson(lesson.id, 'demo');
+        this.selectTurn(i, false);
+      });
+      li.appendChild(btn);
+      ol.appendChild(li);
+    });
+  }
+
   /**
-   * Loads an Interactive Grand Slam Tactical Masterclass Lesson ('demo' or 'challenge' mode).
+   * Loads a tactics lesson. 'demo' plays the scripted rally with the worked answer on the
+   * key shot; 'challenge' jumps to the key shot with deliberately off settings to fix.
    */
   loadTacticalLesson(lessonKey, mode = 'demo') {
     const lesson = TACTICAL_LESSONS[lessonKey];
     if (!lesson) return;
 
+    if (this.activeTacticalKey !== lessonKey || mode !== this.tacticalMode) {
+      this._tacticAttempts = [];
+      this._tacticAnswerShown = false;
+    }
+    // The starting settings are not an attempt; only changes the user makes count.
+    this._tacticBaselinePending = mode === 'challenge';
     this.activeTacticalKey = lessonKey;
+    this._pickedLessonKey = lessonKey;
     this.tacticalMode = mode;
-
-    const tacSelect = document.getElementById('tacticalLessonSelect');
-    if (tacSelect) tacSelect.value = lessonKey;
 
     this.rallyMeta = {
       playerAZh: lesson.playerAZh,
@@ -808,8 +901,8 @@ class TennisSimApp {
 
     this.rallyTurns = lesson.turns.map((t, idx) => ({
       side: t.side || (idx % 2 === 0 ? 'A' : 'B'),
-      titleZh: t.titleZh || `#${idx + 1} 击球`,
-      titleEn: t.titleEn || `#${idx + 1} Shot`,
+      titleZh: `#${idx + 1} ${t.titleZh || '击球'}`,
+      titleEn: `#${idx + 1} ${t.titleEn || 'Shot'}`,
       courtMode: t.courtMode || 'singles',
       hitX: t.hitX ?? -11.75,
       hitY: t.hitY ?? -1.5,
@@ -846,46 +939,205 @@ class TennisSimApp {
       this.isPlaying = true;
       this._updatePlayButtonUI();
     }
+    this._renderLessonList();
     this._updateTacticalUI();
+  }
+
+  /** Puts the key shot back to its starting (challenge) settings. */
+  resetTacticalChallenge() {
+    this._tacticAttempts = [];
+    this._tacticAnswerShown = false;
+    this.tacticalMode = null; // force a clean reload
+    this.loadTacticalLesson(this._lessonKey(), 'challenge');
+  }
+
+  /** Applies the worked answer to the key shot without leaving the challenge. */
+  showTacticalAnswer() {
+    const lesson = TACTICAL_LESSONS[this._lessonKey()];
+    if (!lesson) return;
+    if (this.activeTacticalKey !== lesson.id || this.tacticalMode !== 'challenge') {
+      this.loadTacticalLesson(lesson.id, 'challenge');
+    }
+    const cIdx = lesson.challengeTurnIndex;
+    // Same path as the demo: the key shot's racket settings are solved from its target launch.
+    Object.assign(this.rallyTurns[cIdx], lesson.proSolution);
+    this._rechainRallyFromTurn(0);
+    this._tacticAnswerShown = true;
+    this._tacticBaselinePending = true;
+    this.selectTurn(cIdx, false);
   }
 
   exitTacticalLesson() {
     this.activeTacticalKey = null;
+    clearTimeout(this._tacticAttemptTimer);
     if (this.scene3d) {
       this.scene3d.updateTacticalOverlay(null, 0, false);
     }
+    this._renderLessonList();
     this._updateTacticalUI();
   }
 
+  /** Records a landing as an attempt once the controls have been still for a moment. */
+  _queueTacticalAttempt(lesson, evalRes) {
+    clearTimeout(this._tacticAttemptTimer);
+    if (this.tacticalMode !== 'challenge' || !evalRes) return;
+    const sig = [this.state.racketSpeedKmh, this.state.swingPathDeg, this.state.faceAngleDeg,
+      this.state.aimAngleDeg, this.state.hitX, this.state.hitY].join('|');
+    if (this._tacticBaselinePending) {
+      this._tacticBaselinePending = false;
+      this._tacticLastSig = sig;
+      return;
+    }
+    if (sig === this._tacticLastSig) return;
+    this._tacticAnswerShown = false;
+    this._tacticAttemptTimer = setTimeout(() => {
+      this._tacticLastSig = sig;
+      if (evalRes.landing) {
+        this._tacticAttempts = [...(this._tacticAttempts || []), evalRes.landing].slice(-8);
+      }
+      {
+        const progress = this._loadLessonProgress();
+        const p = progress[lesson.id] || { best: 0, passed: false, tries: 0 };
+        p.tries = (p.tries || 0) + 1;
+        p.best = Math.max(p.best || 0, evalRes.score);
+        p.passed = p.passed || evalRes.passed;
+        progress[lesson.id] = p;
+        this._saveLessonProgress();
+        this._renderLessonList();
+      }
+      this._updateTacticalUI();
+    }, 700);
+  }
+
+  /** Flashes the control a coach tip refers to (and opens the swing tab if needed). */
+  _focusControl(controlId) {
+    const input = document.getElementById(controlId);
+    if (!input) return;
+    const tabBtn = document.querySelector('#sidebarNavTabs .nav-tab[data-tab="tab-racket"]');
+    if (tabBtn && !tabBtn.classList.contains('active')) tabBtn.click();
+    const row = input.closest('.slider-group') || input.parentElement;
+    row?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    row?.classList.remove('flash-target');
+    void row?.offsetWidth;
+    row?.classList.add('flash-target');
+    const view = this.racket3d?.flashDial?.(controlId);
+    if (view) {
+      const details = document.getElementById('racketVizDetails');
+      if (details) details.open = true;
+      document.querySelectorAll('#racket3DViewGroup .seg-btn').forEach((b) =>
+        b.classList.toggle('active', b.getAttribute('data-racket-view') === view)
+      );
+    }
+  }
+
   _updateTacticalUI() {
+    const zh = this.lang === 'zh';
+    const dict = I18N[this.lang] || I18N.zh;
     const banner = document.getElementById('tacticalHudBanner');
     const lesson = this.activeTacticalKey ? TACTICAL_LESSONS[this.activeTacticalKey] : null;
+    const shown = lesson || TACTICAL_LESSONS[this._lessonKey()];
 
     const demoBtn = document.getElementById('btnTacticDemo');
     const chalBtn = document.getElementById('btnTacticChallenge');
     if (demoBtn && chalBtn) {
-      demoBtn.classList.toggle('active', this.tacticalMode === 'demo');
-      chalBtn.classList.toggle('active', this.tacticalMode === 'challenge');
+      demoBtn.classList.toggle('active', !!lesson && this.tacticalMode === 'demo');
+      chalBtn.classList.toggle('active', !!lesson && this.tacticalMode === 'challenge');
     }
 
-    const previewLesson =
-      lesson ||
-      TACTICAL_LESSONS[document.getElementById('tacticalLessonSelect')?.value || 'federer_serve_plus_one'];
+    const setText = (id, text) => {
+      const n = document.getElementById(id);
+      if (n) n.textContent = text;
+    };
+    if (shown) {
+      setText('tacticalLessonName', `${shown.number}  ${zh ? shown.nameZh : shown.nameEn}`);
+      setText('tacticalBadgeText', zh ? shown.inspirationZh : shown.inspirationEn);
+      setText('tacticalPrincipleText', zh ? shown.ideaZh : shown.ideaEn);
+      setText('tacticalHintText', zh ? shown.goalZh : shown.goalEn);
+      this._renderLessonRally(shown);
+    }
 
-    if (previewLesson) {
-      const badgeEl = document.getElementById('tacticalBadgeText');
-      if (badgeEl) {
-        badgeEl.textContent = this.lang === 'zh' ? previewLesson.badgeZh : previewLesson.badgeEn;
-      }
-      const prinEl = document.getElementById('tacticalPrincipleText');
-      if (prinEl) {
-        prinEl.textContent = this.lang === 'zh' ? previewLesson.principleZh : previewLesson.principleEn;
-      }
-      const hintEl = document.getElementById('tacticalHintText');
-      if (hintEl) {
-        hintEl.textContent = this.lang === 'zh' ? previewLesson.challengeHintZh : previewLesson.challengeHintEn;
+    const evalRes = lesson ? evaluateTacticalAttempt(lesson, this.currentTurnIndex, this.state, this.simResult) : null;
+    const onKey = !!evalRes;
+
+    // Checklist
+    const checksEl = document.getElementById('tacticalChecks');
+    if (checksEl && shown) {
+      checksEl.replaceChildren();
+      const values = {
+        zone: '',
+        speed: `${this.state.speedKmh?.toFixed(0) ?? '–'} km/h`,
+        spin: `${Math.round(this.state.topspinRpm ?? 0)} rpm`
+      };
+      for (const row of describeTacticalGoal(shown)) {
+        const li = document.createElement('li');
+        const ok = onKey ? evalRes.checks[row.key] : null;
+        li.className = 'lc-row' + (ok === true ? ' is-ok' : ok === false ? ' is-bad' : '');
+        li.innerHTML =
+          `<span class="lc-mark" aria-hidden="true"></span>` +
+          `<span class="lc-label">${zh ? row.zh : row.en}</span>` +
+          `<span class="lc-val">${onKey ? values[row.key] : ''}</span>`;
+        checksEl.appendChild(li);
       }
     }
+
+    // Coach tips: each one points at the control that fixes it
+    const tipsEl = document.getElementById('tacticalCoachFeedback');
+    if (tipsEl) {
+      tipsEl.replaceChildren();
+      let note = '';
+      if (!lesson) note = '';
+      else if (!onKey) note = dict.tacOnTurn(shown.challengeTurnIndex + 1);
+      else if (this._tacticAnswerShown) note = dict.tacAnswerShown;
+      else if (evalRes.passed) note = zh ? evalRes.feedbackZh : evalRes.feedbackEn;
+      if (note) {
+        const p = document.createElement('p');
+        p.className = 'lt-note' + (onKey && evalRes.passed ? ' is-pass' : '');
+        p.textContent = note;
+        tipsEl.appendChild(p);
+      }
+      if (onKey && !evalRes.passed) {
+        const seen = new Set();
+        for (const t of evalRes.tips) {
+          if (seen.has(t.control) || seen.size >= 2) continue;
+          seen.add(t.control);
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'lt-tip';
+          btn.textContent = zh ? t.zh : t.en;
+          btn.addEventListener('click', () => this._focusControl(t.control));
+          tipsEl.appendChild(btn);
+        }
+      }
+    }
+
+    // Score + best
+    const scoreText = onKey ? String(evalRes.score) : lesson ? dict.tacShotOf(this.currentTurnIndex + 1, this.rallyTurns.length) : '';
+    for (const id of ['tacticalScoreBadge', 'thbScorePill']) {
+      const pill = document.getElementById(id);
+      if (!pill) continue;
+      pill.textContent = scoreText;
+      pill.classList.toggle('score-pass', onKey && evalRes.passed);
+      pill.hidden = !scoreText;
+    }
+    const prog = shown ? this._loadLessonProgress()[shown.id] : null;
+    setText('tacticalBest', prog?.tries ? `${dict.tacBest} ${prog.best} · ${dict.tacTries(prog.tries)}` : '');
+
+    // Map
+    const mapEl = document.getElementById('tacticalMap');
+    if (mapEl && !this.lessonMap) {
+      this.lessonMap = new LessonMap(mapEl);
+    }
+    if (this.lessonMap) {
+      this.lessonMap.setLabel(dict.tacMapLabel);
+      this.lessonMap.update({
+        lesson: shown,
+        sim: lesson ? this.simResult : null,
+        showZone: !!lesson && (onKey || this.tacticalMode === 'demo'),
+        passed: onKey ? evalRes.passed : null,
+        attempts: onKey ? this._tacticAttempts || [] : []
+      });
+    }
+    document.getElementById('tacticalChallengeBox')?.classList.toggle('is-idle', !lesson);
 
     if (!lesson) {
       if (banner) banner.style.display = 'none';
@@ -893,53 +1145,25 @@ class TennisSimApp {
       return;
     }
 
+    // Docked banner over the court
     if (banner) banner.style.display = 'flex';
-    const thbTitle = document.getElementById('thbTitle');
-    if (thbTitle) {
-      thbTitle.textContent = this.lang === 'zh' ? lesson.titleZh : lesson.titleEn;
-    }
-
-    const evalRes = evaluateTacticalAttempt(lesson, this.currentTurnIndex, this.state, this.simResult);
-    const scorePill = document.getElementById('tacticalScoreBadge');
-    const thbScorePill = document.getElementById('thbScorePill');
-    const coachFeedback = document.getElementById('tacticalCoachFeedback');
+    setText('thbTitle', `${lesson.number} ${zh ? lesson.nameZh : lesson.nameEn} · ${dict.tacShotOf(this.currentTurnIndex + 1, this.rallyTurns.length)}`);
     const thbFeedback = document.getElementById('thbFeedback');
-
-    if (evalRes) {
-      const scoreText = `${evalRes.score} / 100`;
-      if (scorePill) {
-        scorePill.textContent = scoreText;
-        scorePill.classList.toggle('score-pass', evalRes.passed);
-      }
-      if (thbScorePill) {
-        thbScorePill.textContent = scoreText;
-        thbScorePill.classList.toggle('score-pass', evalRes.passed);
-      }
-      const msg = this.lang === 'zh' ? evalRes.feedbackZh : evalRes.feedbackEn;
-      if (coachFeedback) coachFeedback.textContent = msg;
-      if (thbFeedback) thbFeedback.textContent = msg;
-      if (this.scene3d) {
-        this.scene3d.updateTacticalOverlay(lesson, this.currentTurnIndex, evalRes.passed);
-      }
-    } else {
-      const waitText =
-        this.lang === 'zh'
-          ? `正在铺垫前序回合（第 ${this.currentTurnIndex + 1}/${this.rallyTurns.length} 拍）· 决胜挑战拍为第 ${lesson.challengeTurnIndex + 1} 拍`
-          : `Building up rally (Shot #${this.currentTurnIndex + 1}/${this.rallyTurns.length}) · Decisive shot is Shot #${lesson.challengeTurnIndex + 1}`;
-      if (scorePill) {
-        scorePill.textContent = `#${this.currentTurnIndex + 1}`;
-        scorePill.classList.remove('score-pass');
-      }
-      if (thbScorePill) {
-        thbScorePill.textContent = `#${this.currentTurnIndex + 1}`;
-        thbScorePill.classList.remove('score-pass');
-      }
-      if (coachFeedback) coachFeedback.textContent = waitText;
-      if (thbFeedback) thbFeedback.textContent = waitText;
-      if (this.scene3d) {
-        this.scene3d.updateTacticalOverlay(lesson, this.currentTurnIndex, false);
+    if (thbFeedback) {
+      if (onKey) {
+        const top = evalRes.tips[0];
+        thbFeedback.textContent = evalRes.passed
+          ? (zh ? evalRes.feedbackZh : evalRes.feedbackEn)
+          : top ? (zh ? top.zh : top.en) : '';
+      } else {
+        thbFeedback.textContent = zh ? lesson.goalZh : lesson.goalEn;
       }
     }
+
+    if (this.scene3d) {
+      this.scene3d.updateTacticalOverlay(lesson, this.currentTurnIndex, onKey && evalRes.passed);
+    }
+    if (onKey) this._queueTacticalAttempt(lesson, evalRes);
   }
 
   /**
@@ -1081,8 +1305,7 @@ class TennisSimApp {
       document.querySelectorAll('.tab-panel').forEach((panel) =>
         panel.classList.toggle('active', panel.id === 'tab-tactics')
       );
-      const key = document.getElementById('tacticalLessonSelect')?.value || 'federer_serve_plus_one';
-      this.loadTacticalLesson(key, this.tacticalMode || 'demo');
+      this.loadTacticalLesson(this._lessonKey(), this.tacticalMode || 'demo');
     }
   }
 
@@ -1441,8 +1664,7 @@ class TennisSimApp {
         panel.classList.toggle('active', panel.id === targetId)
       );
       if (targetId === 'tab-tactics' && !this.activeTacticalKey) {
-        const key = document.getElementById('tacticalLessonSelect')?.value || 'federer_serve_plus_one';
-        this.loadTacticalLesson(key, 'demo');
+        this.loadTacticalLesson(this._lessonKey(), 'demo');
       }
     };
 
@@ -1452,47 +1674,18 @@ class TennisSimApp {
       });
     });
 
-    // 4b. Tactical Masterclass Lab Controls
-    document.getElementById('tacticalLessonSelect')?.addEventListener('change', (e) => {
-      if (e.target.value) {
-        this.loadTacticalLesson(e.target.value, this.tacticalMode || 'demo');
-      }
-    });
-
-    const triggerTacDemo = () => {
-      const key =
-        this.activeTacticalKey ||
-        document.getElementById('tacticalLessonSelect')?.value ||
-        'federer_serve_plus_one';
-      this.loadTacticalLesson(key, 'demo');
-    };
-
-    const triggerTacChallenge = () => {
-      const key =
-        this.activeTacticalKey ||
-        document.getElementById('tacticalLessonSelect')?.value ||
-        'federer_serve_plus_one';
-      this.loadTacticalLesson(key, 'challenge');
-    };
+    // 4b. Tactics lesson controls
+    const triggerTacDemo = () => this.loadTacticalLesson(this._lessonKey(), 'demo');
+    const triggerTacChallenge = () => this.loadTacticalLesson(this._lessonKey(), 'challenge');
 
     document.getElementById('btnTacticDemo')?.addEventListener('click', triggerTacDemo);
     document.getElementById('thbBtnDemo')?.addEventListener('click', triggerTacDemo);
     document.getElementById('btnTacticChallenge')?.addEventListener('click', triggerTacChallenge);
     document.getElementById('thbBtnChallenge')?.addEventListener('click', triggerTacChallenge);
-
-    document.getElementById('btnExitTactics')?.addEventListener('click', () => {
-      this.exitTacticalLesson();
-    });
-    document.getElementById('thbBtnClose')?.addEventListener('click', () => {
-      this.exitTacticalLesson();
-    });
-
-    document.getElementById('btnJumpToRacketTab')?.addEventListener('click', () => {
-      if (!this.activeTacticalKey || this.tacticalMode !== 'challenge') {
-        triggerTacChallenge();
-      }
-      switchSidebarTab('tab-racket');
-    });
+    document.getElementById('btnTacticReset')?.addEventListener('click', () => this.resetTacticalChallenge());
+    document.getElementById('btnTacticAnswer')?.addEventListener('click', () => this.showTacticalAnswer());
+    document.getElementById('btnExitTactics')?.addEventListener('click', () => this.exitTacticalLesson());
+    document.getElementById('thbBtnClose')?.addEventListener('click', () => this.exitTacticalLesson());
 
     // 4c. Mobile 3D Court Expand / Collapse Toggle
     document.getElementById('btnMobileExpand3D')?.addEventListener('click', (e) => {

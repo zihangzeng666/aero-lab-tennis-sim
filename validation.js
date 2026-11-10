@@ -10,8 +10,8 @@ import {
   computeRacketBallImpact,
   aeroCoefficients,
   courtPaceIndex
-} from './physics.js?v=37';
-import { SHOT_PRESETS } from './presets.js?v=37';
+} from './physics.js?v=41';
+import { SHOT_PRESETS } from './presets.js?v=41';
 
 const R = ITF_COURT.ballRadius;
 const G = 9.80665;

@@ -16,7 +16,7 @@
       if (localStorage.getItem('aerolab-theme') === 'light') document.documentElement.dataset.theme = 'light';
     } catch (e) {}
   </script>
-  <link rel="stylesheet" href="./styles.css?v=37" />
+  <link rel="stylesheet" href="./styles.css?v=41" />
   <script type="importmap">
     {
       "imports": {
@@ -243,7 +243,7 @@
               <span class="slider-label" data-i18n="lblSwingPath">挥拍仰角</span>
               <span class="slider-val" id="swingPathDegVal">+28.5°</span>
             </div>
-            <input type="range" id="swingPathDeg" min="-22" max="42" step="0.5" value="28.5" />
+            <input type="range" id="swingPathDeg" min="-30" max="42" step="0.5" value="28.5" />
           </div>
           <div class="slider-group">
             <div class="slider-header">
@@ -400,28 +400,39 @@
         <!-- Tactics -->
         <div class="tab-panel" id="tab-tactics">
           <div class="tactical-lab-card">
-            <div class="tactical-lab-header">
-              <span class="tactical-badge" id="tacticalBadgeText">LESSON</span>
-              <button class="mini-action-btn" id="btnExitTactics" data-i18n="btnExitTactics">退出</button>
-            </div>
-            <select id="tacticalLessonSelect" aria-label="Lesson"></select>
-            <div class="tactical-mode-row">
-              <button class="tactical-mode-btn active" id="btnTacticDemo" data-i18n="btnTacticDemo">演示</button>
-              <button class="tactical-mode-btn challenge-accent" id="btnTacticChallenge" data-i18n="btnTacticChallenge">挑战</button>
-            </div>
-            <div class="tactical-theory-box">
-              <div class="tactical-box-title" data-i18n="tacticalTheoryTitle">战术要点</div>
-              <p class="tactical-theory-text" id="tacticalPrincipleText"></p>
-            </div>
-            <div class="tactical-challenge-box" id="tacticalChallengeBox">
-              <div class="tactical-score-header">
-                <span class="tactical-box-title" data-i18n="tacticalMissionTitle">挑战评分</span>
-                <span class="tactical-score-pill" id="tacticalScoreBadge">100 / 100</span>
+            <div class="lesson-list" id="tacticalLessonList" role="listbox" aria-label="Lessons"></div>
+
+            <div class="lesson-detail">
+              <div class="lesson-head">
+                <div class="lesson-head-text">
+                  <h3 class="lesson-name" id="tacticalLessonName"></h3>
+                  <p class="lesson-insp" id="tacticalBadgeText"></p>
+                </div>
+                <button class="mini-action-btn" id="btnExitTactics" data-i18n="btnExitTactics">退出</button>
               </div>
-              <p class="tactical-hint-text" id="tacticalHintText"></p>
-              <div class="tactical-coach-feedback" id="tacticalCoachFeedback"></div>
-              <div class="tactical-quick-actions">
-                <button class="mini-action-btn active-accent" id="btnJumpToRacketTab" data-i18n="btnGoTuneShot">前往调参 →</button>
+              <p class="lesson-idea" id="tacticalPrincipleText"></p>
+
+              <ol class="lesson-rally" id="tacticalRally"></ol>
+
+              <div class="tactical-mode-row">
+                <button class="tactical-mode-btn active" id="btnTacticDemo" data-i18n="btnTacticDemo">看示范</button>
+                <button class="tactical-mode-btn challenge-accent" id="btnTacticChallenge" data-i18n="btnTacticChallenge">自己打</button>
+              </div>
+
+              <div class="lesson-goal" id="tacticalChallengeBox">
+                <div class="lesson-goal-head">
+                  <p class="lesson-goal-text" id="tacticalHintText"></p>
+                  <span class="tactical-score-pill" id="tacticalScoreBadge"></span>
+                </div>
+                <div class="lesson-map" id="tacticalMap"></div>
+                <ul class="lesson-checks" id="tacticalChecks"></ul>
+                <div class="lesson-tips" id="tacticalCoachFeedback"></div>
+                <p class="lesson-howto" data-i18n="tacticalHowTo">用挥拍滑块或示意图里的旋钮调这一拍；长按 3D 里的球员可以换站位。</p>
+                <div class="lesson-actions">
+                  <span class="lesson-best" id="tacticalBest"></span>
+                  <button class="mini-action-btn" id="btnTacticReset" data-i18n="btnTacticReset">重来</button>
+                  <button class="mini-action-btn" id="btnTacticAnswer" data-i18n="btnTacticAnswer">看答案</button>
+                </div>
               </div>
             </div>
           </div>
@@ -546,8 +557,8 @@
           <span class="thb-badge" id="thbTitle">Lesson 01</span>
           <div class="thb-actions">
             <span class="tactical-score-pill" id="thbScorePill">100 / 100</span>
-            <button class="mini-action-btn" id="thbBtnDemo" data-i18n="btnShortDemo">演示</button>
-            <button class="mini-action-btn active-accent" id="thbBtnChallenge" data-i18n="btnShortChallenge">挑战</button>
+            <button class="mini-action-btn" id="thbBtnDemo" data-i18n="btnShortDemo">示范</button>
+            <button class="mini-action-btn active-accent" id="thbBtnChallenge" data-i18n="btnShortChallenge">自己打</button>
             <button class="mini-action-btn icon-btn" id="thbBtnClose" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5"/></svg></button>
           </div>
         </div>
@@ -669,6 +680,6 @@
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=37"></script>
+  <script type="module" src="./app.js?v=41"></script>
 </body>
 </html>
