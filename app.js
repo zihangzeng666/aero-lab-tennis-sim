@@ -14,15 +14,15 @@ import {
   samplePointAtTime,
   airDensityFromConditions,
   chainRallyTurns
-} from './physics.js?v=25';
+} from './physics.js?v=26';
 import {
   SHOT_PRESETS,
   INCOMING_PRESETS,
   EXAMPLE_RALLIES,
   TACTICAL_LESSONS,
   evaluateTacticalAttempt
-} from './presets.js?v=25';
-import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=25';
+} from './presets.js?v=26';
+import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=26';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;
@@ -2063,10 +2063,13 @@ class TennisSimApp {
       ctx.stroke();
       ctx.setLineDash([]);
 
-      ctx.fillStyle = res.hitNet ? outC : cssToken('--accent', '#d9f24a');
+      ctx.fillStyle = res.hitNet ? outC : cssToken('--ball', '#c6d93a');
       ctx.beginPath();
       ctx.arc(netX, ballY, 5.5, 0, Math.PI * 2);
       ctx.fill();
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
     }
   }
 
@@ -2093,13 +2096,16 @@ class TennisSimApp {
     ctx.translate(cx, cy);
     ctx.rotate(this.hudBallPhase);
 
-    // Flat optic-yellow ball with chalk seams (no gradient)
-    ctx.fillStyle = cssToken('--accent', '#d9f24a');
+    // Flat tennis-ball yellow with an ink outline and white seams (no gradient)
+    ctx.fillStyle = cssToken('--ball', '#c6d93a');
     ctx.beginPath();
     ctx.arc(0, 0, R, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = cssToken('--ink', '#1b1a17');
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
 
-    ctx.strokeStyle = cssToken('--panel', '#10212a');
+    ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2.8;
     ctx.beginPath();
     ctx.arc(-R * 0.58, 0, R * 0.65, -0.85, 0.85);
