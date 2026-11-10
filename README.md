@@ -9,8 +9,11 @@ An interactive 3D simulator for tennis ball flight. Change the swing and the inc
 ## What it does
 
 - **Solo lab**: forehand, two- and one-handed backhand and serve. The racket–ball impact splits launch speed into the swing's own contribution and the pace "borrowed" from the incoming ball.
-- **Rally mode**: two players take turns. Each shot's post-bounce state becomes the next player's incoming ball.
-- **Tactics mode**: four lessons inspired by well-known points (not reconstructions). Each one plays a scripted rally, then hands you the key shot: a top-down court map, a checklist (placement, pace, spin) and tips that jump to the control that fixes the shot.
+- **Hit it from here** (solo lab): pause at any instant after the ball crosses the net and hand the ball to the other player. Its position, velocity and topspin at that instant become the next shot's contact point and incoming ball.
+- **Rally mode**: two players take turns. The ball's state where the next player meets it becomes their incoming ball; a turn can volley it before the bounce or step in and take it inside the court.
+- **Tactics mode**: nine lessons grouped by game situation (serving, returning, baseline, net, defence, transition): serve + 1, serve and volley, the deep return, cross-court then down the line (Wardlaw directionals), topspin to the backhand, the run-around forehand, approach and volley, high deep defence, and the drop shot. Some are inspired by well-known points; none are reconstructions. Every shot in a lesson was tuned against the physics, so each ball lands where its explanation says.
+- **Court map** (rally and tactics): the rally drawn from above, shot by shot. For the selected shot it shows the opponent's widest replies, their bisector and your recovery spot on it (Cochet's angle rule), how far the opponent has to run and how much time they have, the lesson's target, and the common mistake as a ghost path. Opponent movement assumes a 4 m/s recovery speed.
+- **Impact diagram**: arrows are vectors you can drag. Direction is the angle, length is the speed: swing (path + racket speed), incoming ball (angle + speed), launch (angle + speed, back-solved), face angle, and aim in the top view.
 - **Inverse solver**: drag the launch speed, angle or spin on the HUD and the racket speed, swing path and face angle are back-solved (damped Newton on a 3×3 Jacobian).
 
 ## Model
@@ -24,7 +27,7 @@ An interactive 3D simulator for tennis ball flight. Change the swing and the inc
 | Air density | Ideal gas + ISA pressure lapse from temperature and altitude (20 °C, sea level → 1.204 kg/m³) | standard |
 | Wind | Head/tail and cross wind, constant in space and time | — |
 | Racket impact | Rigid oblique impact in the vertical plane: v_out,n = (1+e_A)·v_racket,n + e_A·v_in,n; contact patch grips (e_T) or slides (friction 0.48) | Brody, Cross & Lindsey (2002); e_A ≈ 0.4 near the centre |
-| Court bounce | Vertical COR + slide-or-grip tangential impulse, I = 0.55·mR² | Cross; COR calibrated to the ITF drop-test band (0.765–0.785), μ and e_T are assumptions |
+| Court bounce | Vertical COR + slide-or-grip tangential impulse, I = 0.55·mR², normal force acting D = k·|v_n| ahead of the centre (k = 0.64 ms) | Cross; COR calibrated to the ITF drop-test band (0.765–0.785), μ and e_T are assumptions; k fitted to one 500 fps grass bounce and checked on a clay bounce |
 | Line calls | Lines belong to the court; 10 cm baseline, 5 cm other lines; 2.2 cm mark half-width | ITF court dimensions |
 
 Every tunable constant lives in `MODEL_ASSUMPTIONS` in [physics.js](physics.js) with a `source` field that says whether it is from the literature or an assumption.
@@ -90,7 +93,7 @@ Only slices still use the procedural keyframe swing.
 1. **Time-step convergence**: landing-point error vs Δt for three shots; observed order ≈ 4.0, error at the default 2 ms step ≈ 2·10⁻¹¹ m.
 2. **Analytic limit**: with air density 0 the landing time and point match the parabola to ~10⁻¹³.
 3. **Aerodynamic coefficients** against the in-flight C_D measured by Cross & Lindsey (2014).
-4. **Court bounce**: ITF ball drop test per surface (all three in band after calibration), and a Court Pace Index check that clay < hard < grass.
+4. **Court bounce**: ITF ball drop test per surface (all three in band after calibration), and a Court Pace Index check that clay < hard < grass. The bounce model is also tested against two bounces filmed at 500 fps by R. Cross: grass (29.1 / 8.92 m/s in, no spin; 20.5 / 7.14 m/s and 314 rad/s out), which sets the normal-force offset, and clay (25.1 / 7.54 m/s in; 14.9 / 6.89 m/s and 443 rad/s out), which the model predicts at 15.0 / 6.86 m/s and 435 rad/s without being fitted to it. Without the offset the grass spin would be 467 rad/s.
 5. **Racket e_A** vs string tension, compared with the ~0.4 centre value in the literature.
 
 Still to do: point-by-point comparison of C_L with wind-tunnel data, and a check against published serve speed-loss or landing statistics.
@@ -119,7 +122,9 @@ They cover the vacuum limit, 4th-order convergence, A/B mirror symmetry, line ca
 |---|---|
 | `physics.js` | Flight integrator, impact and bounce models, line calls, rally chaining, `MODEL_ASSUMPTIONS` |
 | `presets.js` | Hand-tuned style presets, example rallies, tactics lessons and their scoring |
-| `lessonMap.js` | Top-down court map for the tactics card |
+| `lessonMap.js` | Small top-down map in the tactics card |
+| `tacticsBoard.js` | Court map: rally from above, recovery bisector, opponent run and time |
+| `racketDiagram.js` | Impact diagram with draggable vectors |
 | `mocap/` | Converted motion-capture strokes (3DTennisDS; Tennis-MoCap, CC BY-SA 3.0) and the conversion scripts |
 | `app.js` | UI controller: sliders, HUD, modes, playback |
 | `scene3d.js` | three.js court, player rigs and racket views |
@@ -135,6 +140,11 @@ They cover the vacuum limit, 4th-order convergence, A/B mirror symmetry, line ca
 4. H. Brody, R. Cross, C. Lindsey, *The Physics and Technology of Tennis*, Racquet Tech Publishing (2002).
 5. R. Cross, "Measurements of the horizontal and vertical speeds of tennis courts," *Sports Engineering* (2003).
 6. International Tennis Federation, *Rules of Tennis*, Appendix I and court dimensions.
+7. R. Cross, "Measurement of the speed and bounce of tennis courts" (University of Sydney); the two 500 fps bounces used above.
+8. R. Cross, "Bounce of a spinning ball near normal incidence," *Am. J. Phys.* 73, 914–920 (2005).
+9. R. Cross, "Oblique impact of a tennis ball on the strings of a tennis racket," *Sports Engineering* 6, 235–254 (2003).
+
+Coaching ideas behind the lessons: P. Wardlaw's "directionals" (when to keep the ball cross-court and when to change direction); H. Cochet's bisector rule for positioning, examined with tracking data in *Scientific Reports* (2024, doi:10.1038/s41598-024-53136-7); and common serve-and-volley and approach guidance (serve down the T to narrow return angles, approach down the line, volley to the open court). The lesson text is written for this simulator; the numbers on the court map come from the simulation, not from match data.
 
 ## Third-party code and names
 

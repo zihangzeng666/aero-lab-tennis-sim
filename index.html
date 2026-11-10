@@ -16,7 +16,7 @@
       if (localStorage.getItem('aerolab-theme') === 'light') document.documentElement.dataset.theme = 'light';
     } catch (e) {}
   </script>
-  <link rel="stylesheet" href="./styles.css?v=41" />
+  <link rel="stylesheet" href="./styles.css?v=45" />
   <script type="importmap">
     {
       "imports": {
@@ -236,7 +236,7 @@
               <span class="slider-label" data-i18n="lblRacketSpeed">挥拍速度</span>
               <span class="slider-val" id="racketSpeedKmhVal">94 km/h</span>
             </div>
-            <input type="range" id="racketSpeedKmh" min="30" max="175" step="0.5" value="94" />
+            <input type="range" id="racketSpeedKmh" min="20" max="175" step="0.5" value="94" />
           </div>
           <div class="slider-group">
             <div class="slider-header">
@@ -279,21 +279,21 @@
               <span class="slider-label" data-i18n="lblIncomingSpeed">来球速度</span>
               <span class="slider-val" id="incomingSpeedKmhVal">56 km/h</span>
             </div>
-            <input type="range" id="incomingSpeedKmh" min="0" max="140" step="1" value="56" />
+            <input type="range" id="incomingSpeedKmh" min="0" max="200" step="1" value="56" />
           </div>
           <div class="slider-group">
             <div class="slider-header">
               <span class="slider-label" data-i18n="lblIncomingAngle">入射仰角</span>
               <span class="slider-val" id="incomingAngleDegVal">-11.0°</span>
             </div>
-            <input type="range" id="incomingAngleDeg" min="-28" max="22" step="0.5" value="-11" />
+            <input type="range" id="incomingAngleDeg" min="-40" max="35" step="0.5" value="-11" />
           </div>
           <div class="slider-group">
             <div class="slider-header">
               <span class="slider-label" data-i18n="lblIncomingSpin">来球旋转</span>
               <span class="slider-val" id="incomingSpinRpmVal">+1950 RPM</span>
             </div>
-            <input type="range" id="incomingSpinRpm" min="-3000" max="3800" step="50" value="1950" />
+            <input type="range" id="incomingSpinRpm" min="-4500" max="5000" step="50" value="1950" />
           </div>
           <div class="incoming-effect-box">
             <div class="effect-title" data-i18n="incomingEffectTitle">借力增量 (对比定点球)</div>
@@ -411,6 +411,7 @@
                 <button class="mini-action-btn" id="btnExitTactics" data-i18n="btnExitTactics">退出</button>
               </div>
               <p class="lesson-idea" id="tacticalPrincipleText"></p>
+              <ul class="lesson-keys" id="tacticalKeyPoints"></ul>
 
               <ol class="lesson-rally" id="tacticalRally"></ol>
 
@@ -568,6 +569,11 @@
       <!-- 3D wind-tunnel viewport -->
       <div class="viewport-wrapper">
         <div id="viewport3d"></div>
+        <div class="tactics-board" id="tacticsBoard" hidden></div>
+        <div class="seg-control view-switch" id="viewSwitch" hidden>
+          <button class="seg-btn active" data-view="3d">3D</button>
+          <button class="seg-btn" data-view="board" data-i18n="viewBoard">平面图</button>
+        </div>
         <span class="viewport-corner viewport-corner-tl" aria-hidden="true"></span>
         <span class="viewport-corner viewport-corner-tr" aria-hidden="true"></span>
         <span class="viewport-corner viewport-corner-bl" aria-hidden="true"></span>
@@ -626,6 +632,8 @@
           <button class="secondary-btn active-rally-btn" id="btnPlayFullRally" data-i18n="btnPlayFullRally">连播回合</button>
           <button class="secondary-btn" id="btnRestart" data-i18n="btnRestart">重播</button>
           <button class="secondary-btn" id="btnSnapImpact" data-i18n="btnSnapImpact">触球 t=0</button>
+          <button class="secondary-btn active-accent" id="btnHandoff" data-i18n="btnHandoff" hidden>从这一刻接球</button>
+          <button class="secondary-btn" id="btnHandoffBack" data-i18n="btnHandoffBack" hidden>上一拍</button>
           <button class="secondary-btn" id="btnResetAll" data-i18n="btnReset">重置</button>
           <select id="speedSelect" aria-label="Playback speed">
             <option value="0.15" data-i18n="spd015">0.15x</option>
@@ -680,6 +688,6 @@
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=41"></script>
+  <script type="module" src="./app.js?v=45"></script>
 </body>
 </html>

@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=41';
+import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=45';
 
 // Net profile drawn with singles sticks in place (matches the physics for singles play):
 // 0.914 m at the centre rising to 1.07 m at the sticks, then level out to the posts.
@@ -115,7 +115,13 @@ export class TennisScene3D {
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.06;
+    this.controls.dampingFactor = 0.08;
+    // Calmer camera: the defaults (1.0) spin the court too fast for fine framing,
+    // especially on touch screens where a short swipe covers a large angle.
+    const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    this.controls.rotateSpeed = coarse ? 0.38 : 0.5;
+    this.controls.zoomSpeed = 0.6;
+    this.controls.panSpeed = 0.6;
     this.controls.maxPolarAngle = Math.PI / 2 - 0.012;
     this.controls.minDistance = 0.4;
     this.controls.maxDistance = 60;

@@ -13,17 +13,45 @@
  * Public interface matches what app.js expects: updateFromState, setViewMode,
  * renderStep, setTheme, _onResize.
  *
- * Dials: in the side view the top of the racket face (face angle) and the tail of the
- * swing arrow (swing path) can be dragged; in the top view the launch arrow head (aim).
- * Each knob sits on a faint dial arc that shows its allowed range. Changes are reported
- * through `onChange(key, value)`; app.js applies them like the matching slider.
+ * Direct manipulation. Arrows are vectors: their direction is an angle and their length
+ * is a speed, so dragging a knob anywhere around the contact point sets both at once.
+ *   side view  face top        -> face angle
+ *              swing tail      -> swing path (direction) + racket speed (length)
+ *              incoming tail   -> incoming angle + incoming speed
+ *              launch head     -> launch angle + launch speed (racket back-solved)
+ *   top view   launch head     -> aim
+ * Changes go out through `onChange(updates, source)`, where `updates` maps state keys to
+ * values and `source` is 'racket' (inputs) or 'hud' (a launch target to back-solve).
  */
 
 // Ranges and steps mirror the sliders in index.html
 const DIALS = {
   faceAngleDeg: { min: -18, max: 32, step: 0.2 },
   swingPathDeg: { min: -30, max: 42, step: 0.5 },
-  aimAngleDeg: { min: -28, max: 28, step: 0.2 }
+  aimAngleDeg: { min: -28, max: 28, step: 0.2 },
+  racketSpeedKmh: { min: 20, max: 175, step: 0.5 },
+  incomingSpeedKmh: { min: 0, max: 200, step: 1 },
+  incomingAngleDeg: { min: -40, max: 35, step: 0.5 },
+  speedKmh: { min: 40, max: 230, step: 0.5 },
+  launchAngleDeg: { min: -10, max: 32, step: 0.2 }
+};
+// Vector length (SVG units) <-> speed (km/h) for each arrow
+const LEN = {
+  swing: { r0: 26, k: 0.5 },     // 30..175 km/h -> 41..114
+  incoming: { r0: 22, k: 0.45 }, // 0..200 km/h  -> 22..112
+  launch: { r0: 36, k: 0.52 }    // 40..230 km/h -> 57..156
+};
+const lenOf = (kind, v) => LEN[kind].r0 + LEN[kind].k * v;
+const speedOf = (kind, r) => (r - LEN[kind].r0) / LEN[kind].k;
+const clampStep = (key, v) => {
+  const d = DIALS[key];
+  return Math.round(Math.max(d.min, Math.min(d.max, Math.round(v / d.step) * d.step)) * 10) / 10;
+};
+// Which knob owns a control (used by flashDial and coach tips)
+const KNOB_OF = {
+  faceAngleDeg: 'face', swingPathDeg: 'swing', racketSpeedKmh: 'swing',
+  incomingAngleDeg: 'incoming', incomingSpeedKmh: 'incoming',
+  speedKmh: 'launch', launchAngleDeg: 'launch', aimAngleDeg: 'aim'
 };
 const normDeg = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
 
@@ -66,13 +94,13 @@ export class RacketDiagram {
     this._bindDials();
   }
 
-  // Pointer position -> math angle (deg) around the contact point, in SVG units
-  _angleAt(e) {
+  // Pointer position -> polar (math angle in deg, radius in SVG units) around the contact point
+  _polarAt(e) {
     const pt = this.svg.createSVGPoint();
     pt.x = e.clientX;
     pt.y = e.clientY;
     const p = pt.matrixTransform(this.svg.getScreenCTM().inverse());
-    return Math.atan2(-(p.y - C.y), p.x - C.x) / DEG;
+    return { theta: Math.atan2(-(p.y - C.y), p.x - C.x) / DEG, r: Math.hypot(p.x - C.x, p.y - C.y) };
   }
 
   _bindDials() {
@@ -87,21 +115,45 @@ export class RacketDiagram {
         /* capture unavailable: dragging still works while over the diagram */
       }
       this.el.classList.add('dialing');
+      this._render();
     });
     this.svg.addEventListener('pointermove', (e) => {
       if (!this._drag) return;
-      const theta = this._angleAt(e);
-      const key = this._drag.key;
-      // knob angle -> parameter: face top sits at 90+f, swing tail at 180+sw, launch head at aim
-      let v = key === 'faceAngleDeg' ? normDeg(theta - 90) : key === 'swingPathDeg' ? normDeg(theta - 180) : normDeg(theta);
-      const d = DIALS[key];
-      v = Math.max(d.min, Math.min(d.max, Math.round(v / d.step) * d.step));
-      v = Math.round(v * 10) / 10;
-      if (this.state[key] !== v && typeof this.onChange === 'function') this.onChange(key, v);
+      const { theta, r } = this._polarAt(e);
+      const kind = this._drag.key;
+      let updates;
+      let source = 'racket';
+      if (kind === 'face') {
+        updates = { faceAngleDeg: clampStep('faceAngleDeg', normDeg(theta - 90)) };
+      } else if (kind === 'aim') {
+        updates = { aimAngleDeg: clampStep('aimAngleDeg', normDeg(theta)) };
+      } else if (kind === 'swing') {
+        // the tail sits behind the contact point, opposite the travel direction
+        updates = {
+          swingPathDeg: clampStep('swingPathDeg', normDeg(theta - 180)),
+          racketSpeedKmh: clampStep('racketSpeedKmh', speedOf('swing', r))
+        };
+      } else if (kind === 'incoming') {
+        updates = {
+          incomingAngleDeg: clampStep('incomingAngleDeg', -normDeg(theta)),
+          incomingSpeedKmh: clampStep('incomingSpeedKmh', speedOf('incoming', r))
+        };
+      } else if (kind === 'launch') {
+        updates = {
+          launchAngleDeg: clampStep('launchAngleDeg', normDeg(theta)),
+          speedKmh: clampStep('speedKmh', speedOf('launch', r))
+        };
+        source = 'hud';
+      }
+      if (!updates) return;
+      const changed = Object.entries(updates).some(([k, v]) => Math.abs((this.state[k] ?? 0) - v) > 1e-9);
+      if (changed && typeof this.onChange === 'function') this.onChange(updates, source);
     });
     const end = () => {
+      if (!this._drag) return;
       this._drag = null;
       this.el.classList.remove('dialing');
+      this._render();
     };
     this.svg.addEventListener('pointerup', end);
     this.svg.addEventListener('pointercancel', end);
@@ -122,10 +174,11 @@ export class RacketDiagram {
 
   /** Briefly highlights one dial (switching view if that dial lives in the other one). */
   flashDial(key) {
-    if (!['faceAngleDeg', 'swingPathDeg', 'aimAngleDeg'].includes(key)) return null;
-    const want = key === 'aimAngleDeg' ? 'top' : 'side';
+    const knob = KNOB_OF[key];
+    if (!knob) return null;
+    const want = knob === 'aim' ? 'top' : 'side';
     if (this.mode !== want) this.setViewMode(want);
-    this._flashKey = key;
+    this._flashKey = knob;
     this._render();
     clearTimeout(this._flashTimer);
     this._flashTimer = setTimeout(() => {
@@ -178,9 +231,13 @@ export class RacketDiagram {
         line(C.x + x0, C.y + y0, C.x + x1, C.y + y1, active ? 'var(--ink-3)' : 'var(--rule)', 1);
       }
     };
-    const knob = (x, y, key, label) => {
+    const knob = (x, y, key, label, readout = '') => {
       const active = this._drag && this._drag.key === key;
       const flash = this._flashKey === key;
+      if (active && readout) {
+        const right = x < W / 2;
+        parts.push(`<text x="${(x + (right ? 12 : -12)).toFixed(1)}" y="${(y - 10).toFixed(1)}" text-anchor="${right ? 'start' : 'end'}" class="rd-text rd-readout" font-size="11">${readout}</text>`);
+      }
       parts.push(`<g class="rd-knob${active ? ' active' : ''}${flash ? ' flash' : ''}" data-dial="${key}" role="slider" aria-label="${label}">`
         + `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="18" fill="transparent"/>`
         + `<rect x="${(x - 5).toFixed(1)}" y="${(y - 5).toFixed(1)}" width="10" height="10" rx="1" fill="${active ? 'var(--accent)' : 'var(--panel)'}" stroke="var(--ink)" stroke-width="1.25"/>`
@@ -221,34 +278,46 @@ export class RacketDiagram {
       text(14, H - 12, `← ${L.hitter}`, 'var(--ink-3)', 'start');
 
       // Dial ranges (drawn first, under everything)
-      dial(46, 90 + DIALS.faceAngleDeg.min, 90 + DIALS.faceAngleDeg.max, this._drag?.key === 'faceAngleDeg');
-      dial(104, 180 + DIALS.swingPathDeg.min, 180 + DIALS.swingPathDeg.max, this._drag?.key === 'swingPathDeg');
+      const drag = this._drag?.key;
+      const vR = s.racketSpeedKmh ?? 90;
+      const swingLen = lenOf('swing', vR);
+      dial(46, 90 + DIALS.faceAngleDeg.min, 90 + DIALS.faceAngleDeg.max, drag === 'face');
+      dial(swingLen, 180 + DIALS.swingPathDeg.min, 180 + DIALS.swingPathDeg.max, drag === 'swing');
 
-      // Swing path: arrives from behind along the swing angle (neutral ink; the ball path owns the colour)
+      // Swing: arrives from behind along the swing angle; arrow length = racket speed
       const [sx, sy] = vec(1, sw);
-      const tailX = C.x - sx * 104;
-      const tailY = C.y - sy * 104;
+      const tailX = C.x - sx * swingLen;
+      const tailY = C.y - sy * swingLen;
+      if (drag === 'swing') {
+        // length scale along the swing direction: min and max racket speed
+        line(C.x - sx * lenOf('swing', DIALS.racketSpeedKmh.min), C.y - sy * lenOf('swing', DIALS.racketSpeedKmh.min),
+          C.x - sx * lenOf('swing', DIALS.racketSpeedKmh.max), C.y - sy * lenOf('swing', DIALS.racketSpeedKmh.max), 'var(--ink-3)', 1, '2 3');
+      }
       arrow(tailX, tailY, C.x - sx * 26, C.y - sy * 26, 'var(--ink-2)', 2);
       text(tailX, tailY + (sw >= 0 ? 16 : -8), L.swing, 'var(--ink-2)', 'start');
 
       // Incoming ball: arrives from the net side. Travel direction is (-cos a, sin a), so a
       // descending ball (a < 0) comes from above-right.
+      let inTail = null;
       if (!isToss) {
-        const lenIn = Math.max(44, Math.min(84, vIn * 1.1));
+        const lenIn = lenOf('incoming', vIn);
         const [ix, iy] = vec(1, -aIn); // where the ball came from, relative to contact
         const tx = C.x + ix * lenIn;
         const ty = C.y + iy * lenIn;
+        if (drag === 'incoming') dial(lenIn, -DIALS.incomingAngleDeg.max, -DIALS.incomingAngleDeg.min, true);
         arrow(tx, ty, C.x + ix * 16, C.y + iy * 16, 'var(--traj-in)', 1.5, '4 3');
         text(tx, ty + (iy <= 0 ? -8 : 16), L.incoming, 'var(--ink-3)', 'middle');
+        inTail = [tx, ty];
       } else {
         text(C.x, C.y - 30, L.toss, 'var(--ink-3)', 'middle');
       }
 
       // Outgoing ball: towards the net at the launch angle, in the flight-path colour
-      const lenOut = Math.max(96, Math.min(160, vOut * 0.85));
+      const lenOut = lenOf('launch', vOut);
       const [ox, oy] = vec(1, la);
-      const hx = Math.min(C.x + ox * lenOut, W - 14);
-      const hy = C.y + oy * (hx - C.x) / Math.max(0.2, ox);
+      const hx = C.x + ox * lenOut;
+      const hy = C.y + oy * lenOut;
+      if (drag === 'launch') dial(lenOut, DIALS.launchAngleDeg.min, DIALS.launchAngleDeg.max, true);
       arrow(C.x + ox * 14, C.y + oy * 14, hx, hy, 'var(--traj-pre)', 2.5);
       text(hx, hy + (la >= aIn ? 16 : -9), L.out, 'var(--ink)', 'end');
 
@@ -264,9 +333,13 @@ export class RacketDiagram {
       const spin = s.topspinRpm ?? 0;
       spinArc(spin, spin >= 0 ? L.top : L.back);
 
-      // Knobs (on top): face angle at the racket's top end, swing path at the arrow's tail
-      knob(C.x + fx, C.y + fy, 'faceAngleDeg', L.face);
-      knob(tailX, tailY, 'swingPathDeg', L.swing);
+      // Knobs (on top). Each arrow's knob sets its direction and its length (speed).
+      const kmh = (v) => `${Math.round(v)} km/h`;
+      const deg = (v) => `${signed(v)}°`;
+      knob(C.x + fx, C.y + fy, 'face', L.face, deg(f));
+      knob(tailX, tailY, 'swing', L.swing, `${kmh(vR)} · ${deg(sw)}`);
+      if (inTail) knob(inTail[0], inTail[1], 'incoming', L.incoming, `${kmh(vIn)} · ${deg(aIn)}`);
+      knob(hx, hy, 'launch', L.out, `${kmh(vOut)} · ${deg(la)}`);
     } else {
       const a = s.aimAngleDeg ?? 0;
 
@@ -282,7 +355,7 @@ export class RacketDiagram {
 
       // Outgoing at the aim angle (up = hitter's left); the head is the aim dial's knob
       const len = 120;
-      dial(len, DIALS.aimAngleDeg.min, DIALS.aimAngleDeg.max, this._drag?.key === 'aimAngleDeg');
+      dial(len, DIALS.aimAngleDeg.min, DIALS.aimAngleDeg.max, this._drag?.key === 'aim');
       const [ox, oy] = vec(1, a);
       arrow(C.x + ox * 14, C.y + oy * 14, C.x + ox * len, C.y + oy * len, 'var(--traj-pre)', 2.5);
       arc(44, 0, a, 'var(--ink-2)', 1);
@@ -297,7 +370,7 @@ export class RacketDiagram {
       // physics.js: positive sidespin -> Magnus force towards the hitter's right
       const side = s.sidespinRpm ?? 0;
       spinArc(side, side >= 0 ? L.curveR : L.curveL);
-      knob(C.x + ox * len, C.y + oy * len, 'aimAngleDeg', L.aim);
+      knob(C.x + ox * len, C.y + oy * len, 'aim', L.aim, `${signed(a)}°`);
     }
 
     this.svg.setAttribute(

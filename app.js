@@ -13,8 +13,9 @@ import {
   simulateTrajectory,
   samplePointAtTime,
   airDensityFromConditions,
-  chainRallyTurns
-} from './physics.js?v=41';
+  chainRallyTurns,
+  handoffFromPoint
+} from './physics.js?v=45';
 import {
   SHOT_PRESETS,
   INCOMING_PRESETS,
@@ -22,10 +23,11 @@ import {
   TACTICAL_LESSONS,
   evaluateTacticalAttempt,
   describeTacticalGoal
-} from './presets.js?v=41';
-import { TennisScene3D } from './scene3d.js?v=41';
-import { RacketDiagram } from './racketDiagram.js?v=41';
-import { LessonMap } from './lessonMap.js?v=41';
+} from './presets.js?v=45';
+import { TennisScene3D } from './scene3d.js?v=45';
+import { RacketDiagram } from './racketDiagram.js?v=45';
+import { LessonMap } from './lessonMap.js?v=45';
+import { TacticsBoard } from './tacticsBoard.js?v=45';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;
@@ -142,6 +144,9 @@ const I18N = {
     btnPlayFullRally: '连播回合',
     btnRestart: '重播',
     btnSnapImpact: '触球 t=0',
+    btnHandoff: '从这一刻接球',
+    btnHandoffBack: '上一拍',
+    handoffHint: '暂停在球过网之后、离地 0.25–2.9 m 的瞬间才能接',
     spd015: '0.15x',
     spd025: '0.25x',
     spd040: '0.40x',
@@ -164,6 +169,7 @@ const I18N = {
     btnShortDemo: '示范',
     btnShortChallenge: '自己打',
     btnTacticReset: '重来',
+    viewBoard: '平面图',
     btnTacticAnswer: '看答案',
     tacticalHowTo: '用挥拍滑块或示意图里的旋钮调这一拍；长按 3D 里的球员可以换站位。',
     tacDecisive: '关键拍',
@@ -288,6 +294,9 @@ const I18N = {
     btnPlayFullRally: 'Full Rally',
     btnRestart: 'Replay',
     btnSnapImpact: 'Impact t=0',
+    btnHandoff: 'Hit it from here',
+    btnHandoffBack: 'Previous shot',
+    handoffHint: 'Pause once the ball is past the net and 0.25–2.9 m off the ground',
     spd015: '0.15x',
     spd025: '0.25x',
     spd040: '0.40x',
@@ -310,6 +319,7 @@ const I18N = {
     btnShortDemo: 'Watch',
     btnShortChallenge: 'Your turn',
     btnTacticReset: 'Reset',
+    viewBoard: 'Court map',
     btnTacticAnswer: 'Show answer',
     tacticalHowTo: 'Tune this shot with the swing sliders or the dials in the diagram. Long-press the player in 3D to move them.',
     tacDecisive: 'Key shot',
@@ -446,9 +456,10 @@ class TennisSimApp {
     if (racketCanvasEl) {
       this.racket3d = new RacketDiagram(racketCanvasEl);
       // Dragging a dial in the diagram behaves exactly like moving the matching slider
-      this.racket3d.onChange = (key, value) => {
-        this.state[key] = value;
-        this.recomputeSimulation({ source: 'racket' });
+      // Diagram knobs: { key: value } updates; 'hud' = a launch target to back-solve
+      this.racket3d.onChange = (updates, source = 'racket') => {
+        Object.assign(this.state, updates);
+        this.recomputeSimulation({ source });
       };
     }
   }
@@ -816,7 +827,16 @@ class TennisSimApp {
     const progress = this._loadLessonProgress();
     const current = this._lessonKey();
     list.replaceChildren();
+    let group = null;
     for (const [k, lesson] of Object.entries(TACTICAL_LESSONS)) {
+      const situation = zh ? lesson.situationZh : lesson.situationEn;
+      if (situation && situation !== group) {
+        group = situation;
+        const h = document.createElement('div');
+        h.className = 'lesson-group';
+        h.textContent = situation;
+        list.appendChild(h);
+      }
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'lesson-row';
@@ -854,10 +874,14 @@ class TennisSimApp {
       const who = (t.side || (i % 2 ? 'B' : 'A')) === 'A'
         ? (zh ? lesson.playerAZh : lesson.playerAEn)
         : (zh ? lesson.playerBZh : lesson.playerBEn);
+      const isCur = !!this.activeTacticalKey && i === this.currentTurnIndex;
+      const why = isCur ? (zh ? t.whyZh : t.whyEn) : '';
       btn.innerHTML =
         `<span class="lr-shot-n">${i + 1}</span>` +
         `<span class="lr-shot-body"><span class="lr-shot-title">${zh ? t.titleZh : t.titleEn}</span>` +
-        `<span class="lr-shot-who">${who}${isKey ? ` · ${dict.tacDecisive}` : ''}</span></span>`;
+        `<span class="lr-shot-who">${who}${isKey ? ` · ${dict.tacDecisive}` : ''}</span>` +
+        (why ? `<span class="lr-shot-why">${why}</span>` : '') +
+        `</span>`;
       btn.addEventListener('click', () => {
         if (this.activeTacticalKey !== lesson.id) this.loadTacticalLesson(lesson.id, 'demo');
         this.selectTurn(i, false);
@@ -918,7 +942,10 @@ class TennisSimApp {
       sidespinRpm: t.sidespinRpm ?? 200,
       targetSpeedKmh: t.targetSpeedKmh,
       targetLaunchAngleDeg: t.targetLaunchAngleDeg,
-      targetTopspinRpm: t.targetTopspinRpm
+      targetTopspinRpm: t.targetTopspinRpm,
+      receive: t.receive,
+      whyZh: t.whyZh,
+      whyEn: t.whyEn
     }));
 
     const cIdx = lesson.challengeTurnIndex;
@@ -1053,6 +1080,15 @@ class TennisSimApp {
       setText('tacticalBadgeText', zh ? shown.inspirationZh : shown.inspirationEn);
       setText('tacticalPrincipleText', zh ? shown.ideaZh : shown.ideaEn);
       setText('tacticalHintText', zh ? shown.goalZh : shown.goalEn);
+      const keysEl = document.getElementById('tacticalKeyPoints');
+      if (keysEl) {
+        keysEl.replaceChildren();
+        for (const k of (zh ? shown.keyPointsZh : shown.keyPointsEn) || []) {
+          const li = document.createElement('li');
+          li.textContent = k;
+          keysEl.appendChild(li);
+        }
+      }
       this._renderLessonRally(shown);
     }
 
@@ -1217,6 +1253,19 @@ class TennisSimApp {
    */
   setAppMode(mode = 'solo') {
     this.appMode = mode;
+    const viewSwitch = document.getElementById('viewSwitch');
+    if (viewSwitch) viewSwitch.hidden = mode === 'solo';
+    if (mode === 'solo' && this.boardView) this.setCourtView('3d');
+    if (mode === 'tactics' && !this._courtViewChosen) {
+      this._courtViewChosen = true;
+      this.boardView = true;
+      const boardEl = document.getElementById('tacticsBoard');
+      if (boardEl) boardEl.hidden = false;
+      window.addEventListener('resize', () => this._renderBoard());
+    document.querySelectorAll('#viewSwitch [data-view]').forEach((b) =>
+        b.classList.toggle('active', b.getAttribute('data-view') === 'board')
+      );
+    }
 
     // Sync top-level mode buttons
     document.querySelectorAll('#appModeSwitchGroup [data-app-mode]').forEach((btn) => {
@@ -1943,6 +1992,19 @@ class TennisSimApp {
       this.updateScrubberFrame();
     });
 
+    document.querySelectorAll('#viewSwitch [data-view]').forEach((b) =>
+      b.addEventListener('click', () => {
+        this._courtViewChosen = true;
+        this.setCourtView(b.getAttribute('data-view'));
+      })
+    );
+
+    document.getElementById('btnHandoff')?.addEventListener('click', () => {
+      this.isPlaying = false;
+      this.handoffAtCurrentTime();
+    });
+    document.getElementById('btnHandoffBack')?.addEventListener('click', () => this.handoffBack());
+
     document.getElementById('btnSnapImpact')?.addEventListener('click', () => {
       this.isPlaying = false;
       this.isPlayingFullRally = false;
@@ -2184,15 +2246,19 @@ class TennisSimApp {
     }
 
     const stopAtIntercept = this.appMode !== 'solo';
+    // How the next player takes this ball (volley / inside the court), if the rally says so
+    const receive = this.appMode !== 'solo' ? this.rallyTurns[this.currentTurnIndex + 1]?.receive : undefined;
     this.simResult = simulateTrajectory({
       ...this.state,
-      stopAtIntercept
+      stopAtIntercept,
+      receive
     });
     this.ghostSimResult = simulateTrajectory({
       ...this.state,
       topspinRpm: 0,
       sidespinRpm: 0,
-      stopAtIntercept
+      stopAtIntercept,
+      receive
     });
 
     this._updateSoloSpeedCard(impact, this.simResult);
@@ -2236,8 +2302,60 @@ class TennisSimApp {
     this._updateRacketImpact3D();
     this._updateTopLeftInteractiveHUD();
     this._updateTacticalUI();
+    this._renderBoard();
     this.updateScrubberFrame();
     paintAllRanges();
+  }
+
+  /** Shows the 3D court or the top-down tactics board (rally and tactics modes only). */
+  setCourtView(view) {
+    this.boardView = view === 'board' && this.appMode !== 'solo';
+    const boardEl = document.getElementById('tacticsBoard');
+    if (boardEl) boardEl.hidden = !this.boardView;
+    document.querySelectorAll('#viewSwitch [data-view]').forEach((b) =>
+      b.classList.toggle('active', b.getAttribute('data-view') === (this.boardView ? 'board' : '3d'))
+    );
+    this._renderBoard();
+  }
+
+  _renderBoard() {
+    if (!this.boardView || this.appMode === 'solo' || !this.simResult) return;
+    if (!this.board) {
+      const boardEl = document.getElementById('tacticsBoard');
+      if (!boardEl) return;
+      this.board = new TacticsBoard(boardEl);
+      this.board.onStep = (delta) => {
+        const i = Math.max(0, Math.min(this.rallyTurns.length - 1, this.currentTurnIndex + delta));
+        if (i !== this.currentTurnIndex) this.selectTurn(i, false);
+      };
+    }
+    const lesson = this.appMode === 'tactics' && this.activeTacticalKey ? TACTICAL_LESSONS[this.activeTacticalKey] : null;
+    // On the key shot, ghost the lesson's common mistake from the same contact point
+    let mistakeSim = null;
+    if (lesson && this.currentTurnIndex === lesson.challengeTurnIndex && lesson.challengeStart) {
+      const m = lesson.challengeStart;
+      mistakeSim = simulateTrajectory({
+        ...this.state,
+        speedKmh: m.targetSpeedKmh,
+        launchAngleDeg: m.targetLaunchAngleDeg,
+        topspinRpm: m.targetTopspinRpm,
+        aimAngleDeg: m.aimAngleDeg,
+        stopAtIntercept: false
+      });
+    }
+    this.board.render({
+      turns: this.rallyTurns,
+      current: this.currentTurnIndex,
+      liveSim: this.simResult,
+      lesson,
+      mistakeSim,
+      lang: this.lang,
+      metrics: {
+        speedKmh: this.state.speedKmh,
+        launchAngleDeg: this.state.launchAngleDeg,
+        topspinRpm: this.state.topspinRpm
+      }
+    });
   }
 
   updateScrubberFrame() {
@@ -2261,6 +2379,8 @@ class TennisSimApp {
     }
 
     if (t < 0) {
+      this._framePoint = null;
+      this._updateHandoffButton(null);
       this.scene3d.updateBallAtFrame(null, {
         t,
         side: this.state.side,
@@ -2292,6 +2412,8 @@ class TennisSimApp {
     }
 
     const pt = samplePointAtTime(pts, t);
+    this._framePoint = pt;
+    this._updateHandoffButton(pt);
 
     this.scene3d.updateBallAtFrame(pt, null);
 
@@ -2306,6 +2428,62 @@ class TennisSimApp {
     document.getElementById('instPos').textContent = `${pt.x.toFixed(2)}, ${pt.y.toFixed(2)}m`;
     document.getElementById('instSpin').textContent = `${Math.round(pt.rpm)} RPM`;
     document.getElementById('instAero').textContent = `Cd ${pt.cd.toFixed(2)} / Cl ${pt.cl.toFixed(2)}`;
+  }
+
+  /** A ball you can still hit: past the net and in reach (solo mode only). */
+  _canHandoff(pt) {
+    return !!pt && this.appMode === 'solo' && pt.localX > 0.3 && pt.z >= 0.25 && pt.z <= 2.9 && pt.speedKmh > 3;
+  }
+
+  _updateHandoffButton(pt) {
+    const btn = document.getElementById('btnHandoff');
+    const back = document.getElementById('btnHandoffBack');
+    const solo = this.appMode === 'solo';
+    if (btn) {
+      btn.hidden = !solo;
+      const ok = this._canHandoff(pt);
+      if (btn.disabled === ok) btn.disabled = !ok;
+      const dict = I18N[this.lang] || I18N.zh;
+      btn.title = ok ? '' : dict.handoffHint;
+    }
+    if (back) back.hidden = !solo || !(this._handoffStack && this._handoffStack.length);
+  }
+
+  /**
+   * Freezes the ball at the current instant and hands it to the other player: its position,
+   * velocity and topspin there become the next shot's contact point and incoming ball.
+   * The new shot is shown from the near side (the court is symmetric).
+   */
+  handoffAtCurrentTime() {
+    const pt = this._framePoint;
+    if (!this._canHandoff(pt)) return;
+    const h = handoffFromPoint(pt, 'A');
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    this._handoffStack = [...(this._handoffStack || []), { ...this.state }].slice(-12);
+    Object.assign(this.state, {
+      hitX: clamp(h.nextHitX, -19, -0.3),
+      hitY: clamp(h.nextHitY, -5.4, 5.4),
+      hitZ: clamp(h.nextHitZ, 0.25, 2.9),
+      incomingSpeedKmh: clamp(h.nextIncomingSpeedKmh, 0, 200),
+      incomingAngleDeg: clamp(h.nextIncomingAngleDeg, -40, 35),
+      incomingSpinRpm: clamp(h.nextIncomingSpinRpm, -4500, 5000)
+    });
+    this.recomputeSimulation({ source: 'racket' });
+    this.currentTime = WINDUP_START_TIME;
+    this.isPlaying = true;
+    this._updatePlayButtonUI();
+    this.updateScrubberFrame();
+  }
+
+  handoffBack() {
+    const prev = this._handoffStack?.pop();
+    if (!prev) return;
+    Object.assign(this.state, prev);
+    this.recomputeSimulation({ source: 'racket' });
+    this.currentTime = WINDUP_START_TIME;
+    this.isPlaying = true;
+    this._updatePlayButtonUI();
+    this.updateScrubberFrame();
   }
 
   /**

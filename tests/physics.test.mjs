@@ -13,7 +13,9 @@ import {
   aeroCoefficients,
   courtPaceIndex,
   samplePointAtTime,
-  chainRallyTurns
+  chainRallyTurns,
+  computeCourtBounce,
+  handoffFromPoint
 } from '../physics.js';
 import { SHOT_PRESETS, EXAMPLE_RALLIES, TACTICAL_LESSONS, evaluateTacticalAttempt } from '../presets.js';
 
@@ -43,7 +45,8 @@ function normaliseTurns(turns) {
     sidespinRpm: t.sidespinRpm ?? 200,
     targetSpeedKmh: t.targetSpeedKmh,
     targetLaunchAngleDeg: t.targetLaunchAngleDeg,
-    targetTopspinRpm: t.targetTopspinRpm
+    targetTopspinRpm: t.targetTopspinRpm,
+    receive: t.receive
   }));
 }
 
@@ -141,7 +144,7 @@ test('every tactical lesson demo solution passes its own challenge', () => {
     const res = evaluateTacticalAttempt(lesson, lesson.challengeTurnIndex, t, sim);
     assert.ok(res && res.passed, `${key}: ${res?.feedbackEn}`);
     // The answer must be reachable with the swing controls (slider ranges in index.html)
-    const ranges = { racketSpeedKmh: [30, 175], swingPathDeg: [-30, 42], faceAngleDeg: [-18, 32], aimAngleDeg: [-28, 28] };
+    const ranges = { racketSpeedKmh: [20, 175], swingPathDeg: [-30, 42], faceAngleDeg: [-18, 32], aimAngleDeg: [-28, 28] };
     for (const [k, [lo, hi]] of Object.entries(ranges)) {
       assert.ok(t[k] >= lo && t[k] <= hi, `${key}: ${k} = ${t[k].toFixed(1)} is outside ${lo}..${hi}`);
     }
@@ -160,6 +163,31 @@ test('every tactical lesson starts as a failing shot with a concrete tip', () =>
     assert.ok(res.tips.length > 0 && res.tips.every((tip) => tip.control && tip.zh && tip.en), `${key}: needs tips`);
     assert.ok(res.score < 88, `${key}: score ${res.score}`);
   }
+});
+
+test('court bounce matches two bounces filmed at 500 fps (Cross)', () => {
+  // Grass (used to fit the normal-force offset) and clay (not used in the fit).
+  const cases = [
+    { name: 'grass', in: [29.1, 8.92], cor: 0.80, mu: 0.53, out: { vx: 20.5, vz: 7.14, w: 314 }, tolW: 0.03 },
+    { name: 'clay', in: [25.1, 7.54], cor: 0.91, mu: 0.70, out: { vx: 14.9, vz: 6.89, w: 443 }, tolW: 0.05 }
+  ];
+  for (const c of cases) {
+    const r = computeCourtBounce(c.in[0], 0, -c.in[1], 0, 0, 0, { cor: c.cor, mu: c.mu, eTangential: 0 });
+    assert.ok(Math.abs(r.vx - c.out.vx) / c.out.vx < 0.03, `${c.name} vx ${r.vx.toFixed(2)}`);
+    assert.ok(Math.abs(r.vz - c.out.vz) / c.out.vz < 0.03, `${c.name} vz ${r.vz.toFixed(2)}`);
+    assert.ok(Math.abs(r.wy - c.out.w) / c.out.w < c.tolW, `${c.name} spin ${r.wy.toFixed(0)} rad/s`);
+  }
+});
+
+test('handoff turns a ball in flight into the next incoming ball', () => {
+  const sim = simulateTrajectory({ speedKmh: 120, launchAngleDeg: 8, topspinRpm: 2500, aimAngleDeg: 0, hitX: -11.8, hitY: 0, hitZ: 1 });
+  const p = sim.points.find((q) => q.phase === 1 && q.vz < -1 && q.z < 1.1);
+  const h = handoffFromPoint(p, 'A');
+  assert.equal(h.nextSide, 'B');
+  assert.ok(Math.abs(h.nextHitX + p.localX) < 0.01 && Math.abs(h.nextHitZ - p.z) < 0.01);
+  assert.ok(Math.abs(h.nextIncomingSpeedKmh - p.speedKmh) < 0.1);
+  assert.ok(h.nextIncomingAngleDeg < 0, 'descending ball');
+  assert.ok(h.nextIncomingSpinRpm > 0, 'topspin stays topspin');
 });
 
 test('inverse impact solver reproduces its targets', () => {

@@ -115,6 +115,14 @@ export const MODEL_ASSUMPTIONS = {
   },
   bounce: {
     sidespinRetention: { value: 0.85, source: 'assumption' },
+    // The normal force acts a distance D ahead of the centre of mass (the ball and court
+    // deform), which takes spin away. D grows with impact speed: D = k |v_n|, capped at 0.4 R.
+    normalOffset: {
+      kSeconds: 0.00064,
+      source:
+        'fitted to one grass-court bounce filmed at 500 fps by R. Cross (in 29.1 / 8.92 m/s, no spin; out 20.5 / 7.14 m/s, 314 rad/s), giving D = 5.7 mm. ' +
+        'Without D the model gives 467 rad/s for that bounce. Check: the clay bounce in the same paper (in 25.1 / 7.54 m/s) is predicted at about 435 rad/s vs 443 measured.'
+    },
     source:
       'Cross rigid-body bounce: slide-or-grip with friction mu and tangential restitution; vertical COR is constant (it does not fall with impact speed here)'
   },
@@ -639,7 +647,7 @@ export function samplePointAtTime(points, t) {
   if (span <= 0) return a;
   const f = (t - a.t) / span;
   const out = { ...a, t };
-  for (const k of ['x', 'y', 'z', 'localX', 'localY', 'vx', 'vy', 'vz', 'speedKmh', 'rpm', 'spinAngleRad', 'cd', 'cl', 'fDrag', 'fMagnus']) {
+  for (const k of ['x', 'y', 'z', 'localX', 'localY', 'localVx', 'localVy', 'localWx', 'localWy', 'vx', 'vy', 'vz', 'speedKmh', 'rpm', 'spinAngleRad', 'cd', 'cl', 'fDrag', 'fMagnus']) {
     if (typeof a[k] === 'number' && typeof b[k] === 'number') out[k] = a[k] + (b[k] - a[k]) * f;
   }
   return out;
@@ -655,6 +663,27 @@ export function samplePointAtTime(points, t) {
  * density unless `airDensity` is given explicitly. `windSpeedKmh` blows along
  * world +X (towards the far baseline), `crossWindKmh` along world +Y.
  */
+/**
+ * Hands a ball in flight to the other player: the trajectory point `p` (from
+ * simulateTrajectory, in the current hitter's frame) becomes the next hitter's contact
+ * position and incoming ball, in the NEXT hitter's canonical frame (rotated 180°).
+ * Speed, direction and the topspin component are taken as they are at that instant.
+ */
+export function handoffFromPoint(p, side = 'A') {
+  const horiz = Math.max(0.1, Math.hypot(p.localVx, p.localVy));
+  // topspin component: spin about the horizontal axis perpendicular to the travel direction
+  const wTop = ((p.localWy ?? 0) * p.localVx - (p.localWx ?? 0) * p.localVy) / horiz;
+  return {
+    nextSide: side === 'A' ? 'B' : 'A',
+    nextHitX: Math.round(-p.localX * 100) / 100,
+    nextHitY: Math.round(-p.localY * 100) / 100,
+    nextHitZ: Math.round(p.z * 100) / 100,
+    nextIncomingSpeedKmh: Math.round(p.speedKmh * 10) / 10,
+    nextIncomingAngleDeg: Math.round(((Math.atan2(p.vz, horiz) * 180) / Math.PI) * 10) / 10,
+    nextIncomingSpinRpm: Math.round(((wTop * 60) / (2 * Math.PI)) / 10) * 10
+  };
+}
+
 export function simulateTrajectory(config) {
   const {
     side = 'A',
@@ -740,6 +769,7 @@ export function simulateTrajectory(config) {
       wx: sign * S.wx,
       wy: sign * S.wy,
       wz: S.wz,
+      localWx: S.wx,
       localWy: S.wy,
       rpm: (Math.hypot(S.wx, S.wy, S.wz) * 60) / (2 * Math.PI),
       spinAngleRad,
@@ -855,10 +885,41 @@ export function simulateTrajectory(config) {
     }
   }
 
-  // Receiver's interception point (after the first bounce) for chained rallies.
+  // Receiver's interception point for chained rallies. By default the receiver lets the
+  // ball bounce and takes it near the baseline. `config.receive` can ask for a volley
+  // ({ mode: 'volley', depth }) or for a ball taken inside the court ({ mode: 'bounce', depth }),
+  // depth = receiver's distance from the net (m).
   let interceptPoint = null;
+  const receive = config.receive || null;
   const postBouncePts = points.filter((p) => p.phase === 1 && p.localX > 2.5);
-  if (postBouncePts.length > 4) {
+  if (receive && receive.mode === 'volley' && !hitNet) {
+    const contactPt = points.find((p) => p.phase === 0 && p.localX >= receive.depth);
+    if (contactPt && contactPt.z > 0.2) {
+      interceptPoint = { t: contactPt.t, worldX: contactPt.x, worldY: contactPt.y, z: contactPt.z, volley: true, ...handoffFromPoint(contactPt, side) };
+      if (config.stopAtIntercept === true) {
+        const cutIdx = points.indexOf(contactPt);
+        if (cutIdx > 0) points.length = cutIdx + 1;
+        secondBounce = null;
+      }
+    }
+  } else if (receive && receive.mode === 'bounce' && postBouncePts.length > 2) {
+    let contactPt = null;
+    let best = 999;
+    for (const p of postBouncePts) {
+      // near the requested depth, preferring a comfortable contact height (~0.95 m)
+      const d = Math.abs(p.localX - receive.depth) + 0.6 * Math.abs(p.z - 0.95) + (p.z < 0.4 || p.z > 1.6 ? 2 : 0);
+      if (d < best) {
+        best = d;
+        contactPt = p;
+      }
+    }
+    interceptPoint = { t: contactPt.t, worldX: contactPt.x, worldY: contactPt.y, z: contactPt.z, ...handoffFromPoint(contactPt, side) };
+    if (firstBounce && firstBounce.isIn && config.stopAtIntercept === true) {
+      const cutIdx = points.indexOf(contactPt);
+      if (cutIdx > 0) points.length = cutIdx + 1;
+      secondBounce = null;
+    }
+  } else if (postBouncePts.length > 4) {
     // Prefer a point after the post-bounce apex where the ball descends into a comfortable strike zone (~1.04 m).
     let bestPt = postBouncePts[Math.floor(postBouncePts.length * 0.68)];
     let bestScore = 999;
@@ -880,14 +941,16 @@ export function simulateTrajectory(config) {
     const rawInAngle = (Math.atan2(bestPt.vz, Math.max(0.1, horizSpd)) * 180) / Math.PI;
     // Gameplay clamp: the receiver takes the ball in a controlled strike window.
     const clampedInAngle = Math.max(-13, Math.min(-5, rawInAngle < -2 ? rawInAngle : -9));
-    const spinSign = bestPt.localWy >= 0 ? 1 : -1;
+    // Topspin component of the ball as it reaches the receiver (the bounce model already
+    // includes the spin lost to the normal-force offset), limited to the slider range.
     const realisticPostBounceRpm = Math.max(
-      -2200,
-      Math.min(2400, Math.round((spinSign * Math.min(2350, bestPt.rpm * 0.62)) / 50) * 50)
+      -4500,
+      Math.min(5000, handoffFromPoint(bestPt, side).nextIncomingSpinRpm)
     );
 
-    const nextHitX = Math.round(Math.max(-12.9, Math.min(-9.8, -bestPt.localX)) * 20) / 20;
-    const nextHitY = Math.round(Math.max(-3.8, Math.min(3.8, -bestPt.localY)) * 20) / 20;
+    // A wide ball pulls the receiver outside the sideline (up to ~1 m past it)
+    const nextHitX = Math.round(Math.max(-14.0, Math.min(-9.8, -bestPt.localX)) * 20) / 20;
+    const nextHitY = Math.round(Math.max(-5.1, Math.min(5.1, -bestPt.localY)) * 20) / 20;
     const nextHitZ = Math.round(Math.max(0.92, Math.min(1.18, bestPt.z)) * 50) / 50;
 
     // Trajectory point where the ball reaches the receiver's racket depth (-nextHitX)
@@ -967,16 +1030,31 @@ export function computeCourtBounce(vx, vy, vz, wx, wy, wz, surface) {
   let wyOut = wy;
   const wzOut = wz * MODEL_ASSUMPTIONS.bounce.sidespinRetention.value;
 
-  if (vcMag > 1e-5) {
-    const gripDeltaV = ((1 + eTangential) / (1 + 1 / alpha)) * vcMag;
-    const slidingMaxDeltaV = mu * (1 + cor) * Math.abs(vz);
-    const deltaV = Math.min(gripDeltaV, slidingMaxDeltaV);
-    const dvx = -deltaV * (vcx / vcMag);
-    const dvy = -deltaV * (vcy / vcMag);
-    vxOut = vx + dvx;
-    vyOut = vy + dvy;
-    wxOut = wx + dvy / (alpha * R);
-    wyOut = wy - dvx / (alpha * R);
+  // Normal impulse (per unit mass) and its lever arm D ahead of the centre, along the
+  // direction of horizontal travel (MODEL_ASSUMPTIONS.bounce.normalOffset)
+  const Jn = (1 + cor) * Math.abs(vz);
+  const vh = Math.hypot(vx, vy);
+  const ux = vh > 0.05 ? vx / vh : 0;
+  const uy = vh > 0.05 ? vy / vh : 0;
+  const D = vh > 0.05 ? Math.min(0.4 * R, MODEL_ASSUMPTIONS.bounce.normalOffset.kSeconds * Math.abs(vz)) : 0;
+  const offset = (D * Jn) / (alpha * R); // extra forward slip at the contact point from that torque
+
+  // Tangential impulse that would leave the contact point with velocity -eT * (its incoming value);
+  // if it needs more than mu * Jn, the ball slides for the whole bounce instead.
+  const k = 1 + 1 / alpha;
+  let Jx = ((1 + eTangential) * vcx + offset * ux) / k;
+  let Jy = ((1 + eTangential) * vcy + offset * uy) / k;
+  const Jmag = Math.hypot(Jx, Jy);
+  const Jmax = mu * Jn;
+  if (Jmag > Jmax && Jmag > 1e-9) {
+    Jx *= Jmax / Jmag;
+    Jy *= Jmax / Jmag;
+  }
+  if (vcMag > 1e-5 || D > 0) {
+    vxOut = vx - Jx;
+    vyOut = vy - Jy;
+    wxOut = wx - Jy / (alpha * R) + (D * Jn * uy) / (alpha * R * R);
+    wyOut = wy + Jx / (alpha * R) - (D * Jn * ux) / (alpha * R * R);
   }
 
   return { vx: vxOut, vy: vyOut, vz: vzOut, wx: wxOut, wy: wyOut, wz: wzOut };
@@ -1102,7 +1180,9 @@ export function chainRallyTurns(turns, startIdx = 0, env = {}) {
     turn.launchAngleDeg = impact.launchAngleDeg;
     turn.topspinRpm = impact.topspinRpm;
 
-    const sim = simulateTrajectory({ ...turn, ...env });
+    const sim = simulateTrajectory({ ...turn, ...env, receive: turns[i + 1]?.receive });
+    // Kept for drawing the rally (non-enumerable so it never ends up in exported JSON)
+    Object.defineProperty(turn, 'flight', { value: sim, writable: true, configurable: true, enumerable: false });
     turn.callCode = sim.firstBounce ? (sim.firstBounce.isIn ? 'IN' : 'OUT') : 'OUT';
     turn.interceptPoint = sim.interceptPoint;
 
