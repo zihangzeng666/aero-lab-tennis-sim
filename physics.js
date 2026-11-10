@@ -41,9 +41,13 @@ export const ITF_COURT = {
 /**
  * Court surfaces. `cor` = vertical coefficient of restitution of the bounce,
  * `mu` = sliding friction coefficient, `eTangential` = tangential restitution
- * once the ball grips. Values are ASSUMED (chosen to give each surface its
- * usual slow / medium / fast character); they are not measurements of a
- * particular court. See courtPaceIndex() and the validation page.
+ * once the ball grips. These are ASSUMED values, not measurements of a
+ * particular court:
+ *   - `cor` is calibrated so the ITF drop test (254 cm drop, 135–147 cm
+ *     rebound, i.e. COR ≈ 0.76–0.79 including drag) lands inside the band for
+ *     every surface, with clay > hard > grass in bounce height.
+ *   - `mu` and `eTangential` set the slow / medium / fast character, checked
+ *     with courtPaceIndex() on the validation page.
  */
 export const COURT_SURFACES = {
   hard: {
@@ -58,7 +62,7 @@ export const COURT_SURFACES = {
   clay: {
     nameZh: '红土 (Clay Court)',
     nameEn: 'Clay Court',
-    cor: 0.82,
+    cor: 0.785,
     mu: 0.80,
     eTangential: 0.22,
     courtColor: 0xb8522a,
@@ -67,7 +71,7 @@ export const COURT_SURFACES = {
   grass: {
     nameZh: '草地 (Grass Court)',
     nameEn: 'Grass Court',
-    cor: 0.73,
+    cor: 0.765,
     mu: 0.56,
     eTangential: 0.10,
     courtColor: 0x2d6a3e,

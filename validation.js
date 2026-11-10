@@ -10,8 +10,8 @@ import {
   computeRacketBallImpact,
   aeroCoefficients,
   courtPaceIndex
-} from './physics.js?v=11';
-import { SHOT_PRESETS } from './presets.js?v=11';
+} from './physics.js?v=12';
+import { SHOT_PRESETS } from './presets.js?v=12';
 
 const R = ITF_COURT.ballRadius;
 const G = 9.80665;
@@ -280,16 +280,11 @@ const dropRows = Object.entries(COURT_SURFACES).map(([k, s]) => {
 });
 $('dropTable').innerHTML = table(['surface', 'model COR', 'rebound (cm)', 'ITF band (cm)', ''], dropRows, [1, 2]);
 const dropHeights = Object.fromEntries(Object.keys(COURT_SURFACES).map((k) => [k, dropTest(k)]));
-const above = Object.entries(dropHeights).filter(([, h]) => h > 147).map(([k]) => COURT_SURFACES[k].nameZh);
-const below = Object.entries(dropHeights).filter(([, h]) => h < 135).map(([k]) => COURT_SURFACES[k].nameZh);
+const outOfBand = Object.entries(dropHeights).filter(([, h]) => h < 135 || h > 147).map(([k]) => COURT_SURFACES[k].nameZh);
 $('dropNote').textContent =
-  '解读：' +
-  (above.length
-    ? `${above.join('、')}高于刚性基座的上限。场地比花岗岩软，竖直落球时反弹理应不高于刚性基座，所以这一 COR 偏高。` +
-      '不过文献中的场地 COR 多在斜向低法向速度下测得（COR 随冲击速度降低而升高），两种测法不能直接比较。'
-    : '') +
-  (below.length ? `${below.join('、')}低于下限，与草地较软、反弹低的特点一致。` : '') +
-  '模型的 COR 是常数，不随冲击速度变化——这是已知局限，见 README。';
+  (outOfBand.length ? `超出范围：${outOfBand.join('、')}。` : '三种场地的竖直 COR 都已标定到 ITF 反弹带内（约 0.76–0.79），并保持红土 > 硬地 > 草地的反弹高度顺序。') +
+  '注意：这是“循环检验”——COR 是按这个测试标定的，所以它只说明数值合理，不算独立验证。' +
+  '场地快慢的区别主要来自摩擦系数 μ（见下表）。模型的 COR 是常数，不随冲击速度变化，这是已知局限。';
 
 const cpiRows = Object.entries(COURT_SURFACES).map(([k, s]) => {
   const c = courtPaceIndex(s);

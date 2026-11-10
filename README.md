@@ -24,7 +24,7 @@ An interactive 3D simulator for tennis ball flight. Change the swing and the inc
 | Air density | Ideal gas + ISA pressure lapse from temperature and altitude (20 °C, sea level → 1.204 kg/m³) | standard |
 | Wind | Head/tail and cross wind, constant in space and time | — |
 | Racket impact | Rigid oblique impact in the vertical plane: v_out,n = (1+e_A)·v_racket,n + e_A·v_in,n; contact patch grips (e_T) or slides (friction 0.48) | Brody, Cross & Lindsey (2002); e_A ≈ 0.4 near the centre |
-| Court bounce | Vertical COR + slide-or-grip tangential impulse, I = 0.55·mR² | Cross; surface values are assumptions |
+| Court bounce | Vertical COR + slide-or-grip tangential impulse, I = 0.55·mR² | Cross; COR calibrated to the ITF drop-test band (0.765–0.785), μ and e_T are assumptions |
 | Line calls | Lines belong to the court; 10 cm baseline, 5 cm other lines; 2.2 cm mark half-width | ITF court dimensions |
 
 Every tunable constant lives in `MODEL_ASSUMPTIONS` in [physics.js](physics.js) with a `source` field that says whether it is from the literature or an assumption.
@@ -44,7 +44,7 @@ Player B hits in the mirrored frame: world `(x, y) = (−x_local, −y_local)`. 
 - The racket impact is solved in the **vertical plane only**. Horizontal aim is passed straight through, sidespin is a manual input (not produced by face angle or the sideways part of the swing), and the topspin axis is always horizontal.
 - e_A depends only on string tension (clamped to 0.36–0.48). Impact location, swing weight and incoming speed do not affect it, so the model always represents a centre hit. The sweet-spot graphic is illustrative.
 - Dwell time and string-bed deflection are **empirical estimates** (linear formulas with limits), shown with "≈" in the UI.
-- The court's vertical COR is constant; real COR falls as impact speed rises. In the ITF drop test (see validation page) the hard-court value sits inside the 135–147 cm band, clay sits above it and grass below it.
+- The court's vertical COR is constant; real COR falls as impact speed rises. COR values are calibrated so every surface passes the ITF drop test (254 cm → 135–147 cm), so that check is a calibration, not independent validation. Surface pace differences come mainly from the friction coefficient μ.
 - Side-spin retention on the bounce (85 %), net-cord factors and the mark half-width are assumptions.
 - C_D is for a new ball; felt wear and humidity are ignored.
 - In rally mode the receiver's contact point and incoming angle are clamped to a playable window so rallies can continue. That part is gameplay, not physics.
@@ -56,7 +56,7 @@ Player B hits in the mirrored frame: world `(x, y) = (−x_local, −y_local)`. 
 1. **Time-step convergence**: landing-point error vs Δt for three shots; observed order ≈ 4.0, error at the default 2 ms step ≈ 2·10⁻¹¹ m.
 2. **Analytic limit**: with air density 0 the landing time and point match the parabola to ~10⁻¹³.
 3. **Aerodynamic coefficients** against the in-flight C_D measured by Cross & Lindsey (2014).
-4. **Court bounce**: ITF ball drop test per surface, and a Court Pace Index check that clay < hard < grass.
+4. **Court bounce**: ITF ball drop test per surface (all three in band after calibration), and a Court Pace Index check that clay < hard < grass.
 5. **Racket e_A** vs string tension, compared with the ~0.4 centre value in the literature.
 
 Still to do: point-by-point comparison of C_L with wind-tunnel data, and a check against published serve speed-loss or landing statistics.

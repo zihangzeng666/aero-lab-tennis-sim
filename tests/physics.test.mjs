@@ -200,3 +200,17 @@ test('samplePointAtTime interpolates uneven point spacing', () => {
   assert.equal(samplePointAtTime(pts, -1).x, 0);
   assert.equal(samplePointAtTime(pts, 9).x, 4);
 });
+
+test('every surface passes the ITF drop test (254 cm drop -> 135–147 cm rebound)', () => {
+  const heights = {};
+  for (const key of Object.keys(COURT_SURFACES)) {
+    const sim = simulateTrajectory({
+      hitX: -6, hitY: 0, hitZ: 2.54 + R, speedKmh: 0, launchAngleDeg: 0, aimAngleDeg: 0,
+      topspinRpm: 0, sidespinRpm: 0, surfaceKey: key
+    });
+    const apex = Math.max(...sim.points.filter((p) => p.phase === 1).map((p) => p.z));
+    heights[key] = (apex - R) * 100;
+    assert.ok(heights[key] >= 135 && heights[key] <= 147, `${key}: ${heights[key].toFixed(1)} cm`);
+  }
+  assert.ok(heights.clay > heights.hard && heights.hard > heights.grass, JSON.stringify(heights));
+});
