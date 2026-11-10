@@ -836,69 +836,143 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* =========================================================================
-   Phone (< 768px): native-app layout
-   - the 3D court is pinned to the top 45dvh (sticky) so trajectories stay in view
-     while a finger drags a slider below it
-   - everything else scrolls as one panel; the playback bar is pinned to the
-     bottom and clears the home indicator
+   Phone (< 768px): native-app shell
+   - the 3D court fills the screen between a one-row top bar and a bottom sheet
+   - the sheet snaps to peek (playback only), half and full; drag or tap the handle
+   - fullscreen hides everything but the court and two floating buttons
+   The app moves the playback bar, telemetry, view toolbar and control panel
+   into #mobileSheet at this width (see _initMobileShell in app.js).
    ========================================================================= */
-@media (max-width: 767px) {
-  body { background: var(--panel); }
-  .app-layout {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    height: 100dvh;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    background: var(--panel);
-  }
-  .main-area { display: contents; } /* lets the viewport stick across the whole scroll */
+.m-sheet, .m-fab, .m-immersive-bar { display: none; }
 
-  .topbar { order: 1; padding-top: calc(8px + env(safe-area-inset-top, 0px)); border-bottom: 1px solid var(--rule); }
-  .viewport-wrapper {
-    order: 2;
-    position: sticky;
+@media (max-width: 767px) {
+  body { background: var(--canvas); }
+  .app-layout { display: block; height: 100dvh; overflow: hidden; background: var(--canvas); }
+  .main-area { display: block; }
+
+  /* One-row top bar: mode switch only (settings live at the bottom of the sheet) */
+  .topbar {
+    position: fixed;
     top: 0;
-    z-index: 20;
-    flex: none;
-    height: 45dvh;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    flex-wrap: nowrap;
+    gap: 0;
+    padding: calc(6px + env(safe-area-inset-top, 0px)) 8px 6px;
     border-bottom: 1px solid var(--rule);
   }
-  body.mobile-3d-expanded .viewport-wrapper { height: 72dvh; }
-  .view-toolbar { order: 3; flex: none; border-bottom: 1px solid var(--rule); }
-  .telemetry-module { order: 4; flex: none; border-bottom: 1px solid var(--rule); }
-  .tactical-hud-banner { order: 5; flex: none; }
-  .sidebar { order: 6; flex: none; overflow: visible; border-top: none; min-height: auto; }
-  .scrubber-bar {
-    order: 7;
-    position: sticky;
-    bottom: 0;
-    z-index: 20;
-    flex: none;
-    border-top: 1px solid var(--rule);
-    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  .topbar-brand { display: none; }
+  .mode-switch-bar { order: 0; width: 100%; margin: 0; }
+  .mode-switch-btn { flex: 1; height: 40px; min-height: 40px; padding: 0 4px; font-size: 13.5px; }
+
+  /* Court: everything between the top bar and the sheet */
+  .viewport-wrapper {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: var(--m-top, 56px);
+    bottom: var(--sheet-h, 50dvh);
+    z-index: 1;
   }
-  /* Parameter tabs stick just under the court so the active tab stays reachable */
-  .nav-tabs { top: 45dvh; z-index: 15; }
-  body.mobile-3d-expanded .nav-tabs { top: 72dvh; }
-
-  .tactical-hud-banner { display: none !important; }
-  .tactical-hud-banner[style*="flex"] { display: flex !important; } /* docked, so it no longer covers the court */
   .viewport-corner { display: none; }
-  .sidebar-footer { padding-bottom: 16px; }
 
-  /* 44px touch targets */
+  /* Bottom sheet */
+  .m-sheet:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 25;
+    height: var(--sheet-h, 50dvh);
+    background: var(--panel);
+    border-top: 1px solid var(--edge);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    transition: height 220ms var(--ease);
+  }
+  .m-sheet.dragging { transition: none; }
+  .m-sheet-handle {
+    flex: none;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    touch-action: none;
+    cursor: grab;
+    user-select: none;
+  }
+  .m-sheet-handle span { width: 40px; height: 4px; border-radius: 2px; background: var(--edge); }
+  .m-sheet-handle:active span, .m-sheet.dragging .m-sheet-handle span { background: var(--ink-2); }
+  .m-sheet-peek { flex: none; }
+  .m-sheet-peek .scrubber-bar { padding: 0 12px 8px; border: none; }
+  .m-sheet-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    border-top: 1px solid var(--rule);
+  }
+  .m-sheet[data-snap="peek"] .m-sheet-body { visibility: hidden; }
+
+  /* Sheet content */
+  .m-sheet-body .telemetry-module { border-bottom: 1px solid var(--rule); }
+  .m-sheet-body .view-toolbar { border-bottom: 1px solid var(--rule); flex-wrap: wrap; row-gap: 4px; }
+  .m-sheet-body .cam-strip { flex: 1 1 100%; }
+  .m-sheet-body .cam-btn { flex: 1; padding: 0 6px; }
+  .m-sheet-body .layer-strip { gap: 4px 14px; }
+  .m-sheet-body .layer-strip .toggle-label { display: inline-flex; }
+  .m-sheet-body .mobile-sheet-toggle { display: none; }
+  .m-sheet-body .legend-strip { display: none; }
+  .m-sheet-body .sidebar { overflow: visible; min-height: auto; border: none; }
+  .m-sheet-body .nav-tabs { top: 0; }
+  .m-sheet-body .tactical-hud-banner { display: none !important; }
+  .m-sheet-body .tactical-hud-banner[style*="flex"] { display: flex !important; border-bottom: 1px solid var(--rule); }
+  .sidebar-footer { flex-direction: column; align-items: stretch; gap: 10px; padding-bottom: 24px; }
+  .sidebar-footer .unit-item, .sidebar-footer .m-settings-row { justify-content: space-between; }
+  .m-settings-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .m-settings-row .ghost-btn { flex: 1; }
+
+  /* Floating court buttons */
+  .m-fab {
+    display: inline-grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-ctl);
+    background: var(--panel);
+    color: var(--ink);
+    touch-action: manipulation;
+    transition: transform 80ms var(--ease);
+  }
+  .m-fab:active { transform: scale(0.94); }
+  .m-fab-enter { position: absolute; top: 8px; right: 8px; z-index: 5; }
+
+  /* Fullscreen: only the court */
+  body.m-immersive .topbar, body.m-immersive .m-sheet { display: none !important; }
+  body.m-immersive .viewport-wrapper { top: 0; bottom: 0; }
+  body.m-immersive .m-fab-enter { display: none; }
+  body.m-immersive .m-immersive-bar {
+    display: flex;
+    gap: 8px;
+    position: absolute;
+    right: calc(8px + env(safe-area-inset-right, 0px));
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    z-index: 5;
+  }
+
+  /* 44px touch targets everywhere in the sheet */
   input[type="range"] { height: 44px; }
   input[type="range"]::-webkit-slider-thumb { width: 14px; height: 28px; margin-top: -13px; }
   .mini-action-btn, .ghost-btn, .secondary-btn, .play-btn, .cam-btn, .seg-btn, .stroke-btn, .tactical-mode-btn,
-  .mode-switch-btn, .mobile-sheet-toggle, .nav-tab, .turn-pill, .tel-action-btn, select { min-height: 44px; }
+  .nav-tab, .turn-pill, .tel-action-btn, .toggle-label, select { min-height: 44px; }
   .icon-btn { min-width: 44px; }
-  .toggle-label { min-height: 44px; }
   .slider-group { margin-bottom: 6px; }
   .slider-header { padding-top: 6px; } /* label row: a scroll-safe strip between slider hit areas */
-
-  /* iOS zooms into inputs under 16px */
+  .scrubber-controls { flex-wrap: wrap; }
+  .timeline-slider-wrap { flex: 1 1 100%; margin-left: 0; }
   select, textarea { font-size: 16px; }
 }
 

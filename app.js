@@ -14,15 +14,15 @@ import {
   samplePointAtTime,
   airDensityFromConditions,
   chainRallyTurns
-} from './physics.js?v=29';
+} from './physics.js?v=31';
 import {
   SHOT_PRESETS,
   INCOMING_PRESETS,
   EXAMPLE_RALLIES,
   TACTICAL_LESSONS,
   evaluateTacticalAttempt
-} from './presets.js?v=29';
-import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=29';
+} from './presets.js?v=31';
+import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=31';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;
@@ -397,12 +397,13 @@ class TennisSimApp {
     this._init3D();
     this._populatePresetSelects();
     this._bindControls();
+    this._initMobileShell();
     this._initLoadingScreen();
     this._applyLanguageUI();
     // Initialize in Default Mode: Solo Ball Speed & Biomechanics Lab
     this.setAppMode('solo');
     this.applyPreset('alcaraz_fh');
-    this.setTheme(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
+    this.setTheme(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
     this._startPlaybackLoop();
   }
 
@@ -495,10 +496,178 @@ class TennisSimApp {
     }
   }
 
+  /**
+   * Phone shell (< 768px): the court fills the screen and the controls live in a bottom
+   * sheet with three snap heights. Existing elements are moved (not copied) so every
+   * event binding keeps working; they go back to their desktop places on wider screens.
+   */
+  _initMobileShell() {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const root = document.documentElement;
+    const sheet = document.getElementById('mobileSheet');
+    const handle = document.getElementById('mobileSheetHandle');
+    const peek = document.getElementById('mobileSheetPeek');
+    const body = document.getElementById('mobileSheetBody');
+    const topbar = document.querySelector('.topbar');
+    const footer = document.querySelector('.sidebar-footer');
+    if (!sheet || !handle || !peek || !body || !topbar || !footer) return;
+
+    const settingsRow = document.createElement('div');
+    settingsRow.className = 'm-settings-row';
+    const moves = [
+      [document.querySelector('.scrubber-bar'), peek],
+      [document.getElementById('interactiveHudLeft'), body],
+      [document.getElementById('tacticalHudBanner'), body],
+      [document.querySelector('.view-toolbar'), body],
+      [document.querySelector('.sidebar'), body],
+      [document.getElementById('themeSwitchGroup'), settingsRow],
+      [document.getElementById('langSwitchGroup'), settingsRow],
+      [document.querySelector('.topbar-actions a.ghost-btn'), settingsRow],
+      [document.getElementById('btnReopenWelcome'), settingsRow]
+    ].filter(([node]) => node);
+    const homes = new Map();
+
+    const safeBottom = () => {
+      const probe = document.createElement('div');
+      probe.style.cssText = 'position:fixed;visibility:hidden;padding-bottom:env(safe-area-inset-bottom,0px)';
+      document.body.appendChild(probe);
+      const v = parseFloat(getComputedStyle(probe).paddingBottom) || 0;
+      probe.remove();
+      return v;
+    };
+    const viewportH = () => (window.visualViewport ? window.visualViewport.height : window.innerHeight);
+    const snapPx = (name) => {
+      const vh = viewportH();
+      const top = topbar.offsetHeight;
+      if (name === 'peek') return handle.offsetHeight + peek.offsetHeight + safeBottom() + 1;
+      if (name === 'full') return Math.round(vh - top);
+      return Math.round(vh * 0.52);
+    };
+    const setSheetHeight = (px) => {
+      root.style.setProperty('--sheet-h', `${Math.round(px)}px`);
+    };
+    this._setSheetSnap = (name) => {
+      this._sheetSnap = name;
+      sheet.dataset.snap = name;
+      setSheetHeight(snapPx(name));
+    };
+    const syncTop = () => root.style.setProperty('--m-top', `${topbar.offsetHeight}px`);
+
+    const enter = () => {
+      moves.forEach(([node, target]) => {
+        if (!homes.has(node)) homes.set(node, { parent: node.parentNode, next: node.nextSibling });
+        target.appendChild(node);
+      });
+      footer.appendChild(settingsRow);
+      sheet.hidden = false;
+      document.body.classList.add('m-shell');
+      syncTop();
+      this._setSheetSnap(this._sheetSnap || 'half');
+    };
+    const leave = () => {
+      this.toggleImmersive(false);
+      [...moves].reverse().forEach(([node]) => {
+        const home = homes.get(node);
+        if (home) home.parent.insertBefore(node, home.next);
+      });
+      settingsRow.remove();
+      sheet.hidden = true;
+      document.body.classList.remove('m-shell');
+      root.style.removeProperty('--sheet-h');
+      root.style.removeProperty('--m-top');
+    };
+
+    // Drag the handle; release snaps to the nearest height (a quick flick goes one step further)
+    const order = ['peek', 'half', 'full'];
+    let drag = null;
+    handle.addEventListener('pointerdown', (e) => {
+      drag = { y: e.clientY, h: sheet.getBoundingClientRect().height, t: performance.now(), moved: false, lastY: e.clientY, lastT: performance.now(), v: 0 };
+      try {
+        handle.setPointerCapture(e.pointerId);
+      } catch (err) {
+        /* synthetic or already-released pointer: dragging still works while over the handle */
+      }
+      sheet.classList.add('dragging');
+    });
+    handle.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const dy = e.clientY - drag.y;
+      if (Math.abs(dy) > 4) drag.moved = true;
+      const now = performance.now();
+      drag.v = (e.clientY - drag.lastY) / Math.max(1, now - drag.lastT);
+      drag.lastY = e.clientY;
+      drag.lastT = now;
+      setSheetHeight(Math.min(snapPx('full'), Math.max(snapPx('peek'), drag.h - dy)));
+    });
+    const endDrag = () => {
+      if (!drag) return;
+      sheet.classList.remove('dragging');
+      const current = this._sheetSnap || 'half';
+      let next = current;
+      if (!drag.moved) {
+        next = current === 'peek' ? 'half' : current === 'half' ? 'full' : 'half';
+      } else {
+        const h = sheet.getBoundingClientRect().height;
+        if (Math.abs(drag.v) > 0.6) {
+          const i = order.indexOf(current);
+          next = order[Math.max(0, Math.min(2, i + (drag.v < 0 ? 1 : -1)))];
+        } else {
+          next = order.reduce((best, n) => (Math.abs(snapPx(n) - h) < Math.abs(snapPx(best) - h) ? n : best), 'half');
+        }
+      }
+      drag = null;
+      this._setSheetSnap(next);
+    };
+    handle.addEventListener('pointerup', endDrag);
+    handle.addEventListener('pointercancel', endDrag);
+    handle.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      const current = this._sheetSnap || 'half';
+      this._setSheetSnap(current === 'peek' ? 'half' : current === 'half' ? 'full' : 'peek');
+    });
+
+    // Fullscreen court
+    document.getElementById('btnImmersive')?.addEventListener('click', () => this.toggleImmersive(true));
+    document.getElementById('btnImmersiveExit')?.addEventListener('click', () => this.toggleImmersive(false));
+    document.getElementById('btnImmersivePlay')?.addEventListener('click', () => {
+      document.getElementById('btnPlayPause')?.click();
+    });
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement && document.body.classList.contains('m-immersive')) this.toggleImmersive(false);
+    });
+
+    const onResize = () => {
+      if (!mq.matches) return;
+      syncTop();
+      if (this._sheetSnap) this._setSheetSnap(this._sheetSnap);
+    };
+    window.addEventListener('resize', onResize);
+    window.visualViewport?.addEventListener('resize', onResize);
+    mq.addEventListener('change', (e) => (e.matches ? enter() : leave()));
+    if (mq.matches) enter();
+  }
+
+  /** Phone fullscreen: hide the top bar and the sheet; use the Fullscreen API where the browser has it. */
+  toggleImmersive(on) {
+    const body = document.body;
+    if (on === body.classList.contains('m-immersive')) return;
+    body.classList.toggle('m-immersive', on);
+    try {
+      if (on && document.documentElement.requestFullscreen && !document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else if (!on && document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+    } catch (e) {
+      /* iPhone Safari has no element fullscreen: the in-app fullscreen still applies */
+    }
+    this._updatePlayButtonUI();
+  }
+
   setTheme(theme) {
     const t = theme === 'dark' ? 'dark' : 'light';
-    if (t === 'dark') document.documentElement.dataset.theme = 'dark';
-    else delete document.documentElement.dataset.theme;
+    document.documentElement.dataset.theme = t;
     try {
       localStorage.setItem('aerolab-theme', t);
     } catch (e) {
@@ -2206,6 +2375,12 @@ class TennisSimApp {
   }
 
   _updatePlayButtonUI() {
+    const fab = document.getElementById('btnImmersivePlay');
+    if (fab) {
+      fab.innerHTML = this.isPlaying
+        ? '<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M5 3h3v12H5zM10 3h3v12h-3z" fill="currentColor"/></svg>'
+        : '<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M5 3l10 6-10 6z" fill="currentColor"/></svg>';
+    }
     const btn = document.getElementById('btnPlayPause');
     if (!btn) return;
     if (this.lang === 'zh') {
