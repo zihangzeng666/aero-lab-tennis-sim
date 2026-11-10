@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=16';
+import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=19';
 
 // Net profile drawn with singles sticks in place (matches the physics for singles play):
 // 0.914 m at the centre rising to 1.07 m at the sticks, then level out to the posts.
@@ -70,7 +70,7 @@ export class TennisScene3D {
     this.container = containerEl;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0xe6dfd1);
-    this.scene.fog = new THREE.FogExp2(0xe6dfd1, 0.0052);
+    this.scene.fog = new THREE.FogExp2(0xe6dfd1, 0.0085);
 
     const w = containerEl.clientWidth || 960;
     const h = containerEl.clientHeight || 600;
@@ -307,12 +307,12 @@ export class TennisScene3D {
     this.scene.add(this.courtGroup);
 
     // Outer architectural stadium floor
-    const floorGeo = new THREE.PlaneGeometry(90, 64);
+    const floorGeo = new THREE.PlaneGeometry(120, 90);
     floorGeo.rotateX(-Math.PI / 2);
     const floorMat = new THREE.MeshStandardMaterial({
-      color: 0xcbd5e1,
-      roughness: 0.92,
-      metalness: 0.02
+      color: 0x8d9089,
+      roughness: 0.95,
+      metalness: 0.0
     });
     const floorMesh = new THREE.Mesh(floorGeo, floorMat);
     floorMesh.position.y = -0.014;
@@ -331,13 +331,6 @@ export class TennisScene3D {
     surroundMesh.position.y = -0.005;
     surroundMesh.receiveShadow = true;
     this.courtGroup.add(surroundMesh);
-
-    // Subtle calibration grid outside the apron
-    const grid = new THREE.GridHelper(38, 38, 0x64748b, 0x94a3b8);
-    grid.position.y = -0.003;
-    grid.material.transparent = true;
-    grid.material.opacity = 0.16;
-    this.courtGroup.add(grid);
 
     // Main ITF Playing Surface (23.77m x 10.97m)
     const courtGeo = new THREE.PlaneGeometry(ITF_COURT.length, ITF_COURT.doublesWidth);
@@ -402,10 +395,11 @@ export class TennisScene3D {
     this.courtGroup.add(archGroup);
 
     const wallMat = new THREE.MeshStandardMaterial({
-      color: 0x0f172a,
-      roughness: 0.45,
-      metalness: 0.25
+      color: 0x14213d,
+      roughness: 0.55,
+      metalness: 0.15
     });
+    this.venueWallMat = wallMat;
     const trimMat = new THREE.MeshStandardMaterial({
       color: 0xf8fafc,
       roughness: 0.35,
@@ -457,19 +451,11 @@ export class TennisScene3D {
     const signCanvas = document.createElement('canvas');
     signCanvas.width = 1024;
     signCanvas.height = 128;
-    const sctx = signCanvas.getContext('2d');
-    sctx.fillStyle = '#0f291e';
-    sctx.fillRect(0, 0, 1024, 128);
-    sctx.strokeStyle = '#c5a876';
-    sctx.lineWidth = 4;
-    sctx.strokeRect(8, 8, 1008, 112);
-    sctx.fillStyle = '#f5efe2';
-    sctx.font = '700 40px "JetBrains Mono", "Inter", sans-serif';
-    sctx.textAlign = 'center';
-    sctx.textBaseline = 'middle';
-    sctx.fillText('AERO-LAB  ·  MADE BY JASON ZENG', 512, 64);
+    this._signCanvas = signCanvas;
+    this._drawVenueSign('#14213d');
 
     const signTex = new THREE.CanvasTexture(signCanvas);
+    this._signTex = signTex;
     signTex.colorSpace = THREE.SRGBColorSpace;
     const signMat = new THREE.MeshBasicMaterial({ map: signTex });
     const backSignGeo = new THREE.PlaneGeometry(9.6, 0.54);
@@ -524,6 +510,190 @@ export class TennisScene3D {
       pod.position.set(px, py, pz);
       archGroup.add(pod);
     });
+
+    this._initStands();
+    this._applyVenueTheme('hard');
+  }
+
+  _drawVenueSign(bgHex) {
+    const sctx = this._signCanvas.getContext('2d');
+    sctx.fillStyle = bgHex;
+    sctx.fillRect(0, 0, 1024, 128);
+    sctx.strokeStyle = 'rgba(232, 222, 200, 0.55)';
+    sctx.lineWidth = 3;
+    sctx.strokeRect(10, 10, 1004, 108);
+    sctx.fillStyle = '#f2ece0';
+    sctx.font = '600 38px "JetBrains Mono", "Inter", sans-serif';
+    sctx.textAlign = 'center';
+    sctx.textBaseline = 'middle';
+    sctx.fillText('AERO-LAB  ·  MADE BY JASON ZENG', 512, 64);
+    if (this._signTex) this._signTex.needsUpdate = true;
+  }
+
+  /**
+   * Low, tiered spectator stands on all four sides with an instanced seated crowd.
+   * Deliberately muted (desaturated colours, no shadows, fog) so the court stays the focus.
+   */
+  _initStands() {
+    const standGroup = new THREE.Group();
+    this.standGroup = standGroup;
+    this.courtGroup.add(standGroup);
+
+    const ROWS = 9;
+    const ROW_DEPTH = 0.8;
+    const ROW_RISE = 0.4;
+    const BASE_H = 1.15;
+    const SEAT_PITCH = 0.62;
+
+    const concreteMat = new THREE.MeshLambertMaterial({ color: 0x9e998f });
+    const concreteDarkMat = new THREE.MeshLambertMaterial({ color: 0x938e84 });
+    this.standAccentMat = new THREE.MeshLambertMaterial({ color: 0x1f2d47 });
+    const trimMat = new THREE.MeshLambertMaterial({ color: 0xcfc9bc });
+
+    // Each stand: front edge position, outward direction and length along the court.
+    // Three.js axes: x = along the court, z = across (court y is -z).
+    // The near sideline stand is split to leave a camera bay for the "side" view.
+    const stands = [
+      { axis: 'z', sign: 1, front: 11.2, from: -17.6, to: -4.6 },
+      { axis: 'z', sign: 1, front: 11.2, from: 4.6, to: 17.6 },
+      { axis: 'z', sign: -1, front: 11.2, from: -17.6, to: 17.6 },
+      { axis: 'x', sign: 1, front: 20.5, from: -8.6, to: 8.6 },
+      { axis: 'x', sign: -1, front: 20.5, from: -8.6, to: 8.6 }
+    ];
+
+    const seatSpots = [];
+    stands.forEach((st) => {
+      const length = st.to - st.from;
+      const mid = (st.from + st.to) / 2;
+      const place = (mesh, along, out, y) => {
+        if (st.axis === 'z') mesh.position.set(along, y, st.sign * out);
+        else {
+          mesh.position.set(st.sign * out, y, along);
+          mesh.rotation.y = Math.PI / 2;
+        }
+      };
+
+      // Stepped concrete rows
+      for (let i = 0; i < ROWS; i++) {
+        const top = BASE_H + i * ROW_RISE;
+        const row = new THREE.Mesh(
+          new THREE.BoxGeometry(length, top, ROW_DEPTH),
+          i % 2 ? concreteDarkMat : concreteMat
+        );
+        place(row, mid, st.front + (i + 0.5) * ROW_DEPTH, top / 2);
+        standGroup.add(row);
+
+        for (let a = st.from + SEAT_PITCH / 2; a < st.to; a += SEAT_PITCH) {
+          seatSpots.push({ st, along: a, out: st.front + (i + 0.55) * ROW_DEPTH, y: top, row: i });
+        }
+      }
+
+      // Dark hoarding along the front of the stand, with a light coping line
+      const hoard = new THREE.Mesh(new THREE.BoxGeometry(length, BASE_H + 0.05, 0.08), this.standAccentMat);
+      place(hoard, mid, st.front - 0.04, (BASE_H + 0.05) / 2);
+      const coping = new THREE.Mesh(new THREE.BoxGeometry(length, 0.04, 0.12), trimMat);
+      place(coping, mid, st.front - 0.04, BASE_H + 0.07);
+
+      // Back wall / fascia closing the top of the stand
+      const backTop = BASE_H + ROWS * ROW_RISE + 0.8;
+      const back = new THREE.Mesh(new THREE.BoxGeometry(length, backTop, 0.25), this.standAccentMat);
+      place(back, mid, st.front + ROWS * ROW_DEPTH + 0.12, backTop / 2);
+      const backTrim = new THREE.Mesh(new THREE.BoxGeometry(length, 0.06, 0.3), trimMat);
+      place(backTrim, mid, st.front + ROWS * ROW_DEPTH + 0.12, backTop + 0.03);
+      standGroup.add(hoard, coping, back, backTrim);
+    });
+
+    // Deterministic pseudo-random so the crowd looks the same on every load
+    let seed = 1337;
+    const rand = () => {
+      seed = (seed * 16807) % 2147483647;
+      return (seed - 1) / 2147483646;
+    };
+
+    const crowdPalette = [
+      0xe9e5dc, 0xd8d0c0, 0xc9bda8, 0xf1eee7, 0x3b4656, 0x56616e, 0x8a96a3, 0xa9b4bd,
+      0x7b8a74, 0x9c8c78, 0xb7776b, 0xd8bf98, 0x2f3944, 0x6e6259, 0xc3cfd6, 0x8f7f9a
+    ];
+    const skinPalette = [0xe7c3a1, 0xd8a982, 0xc28e6a, 0x9c6b4c, 0xf0d2b6, 0x7b5139];
+
+    const spots = seatSpots;
+    const occupied = spots.filter(() => rand() < 0.72);
+
+    const seatGeo = new THREE.BoxGeometry(0.46, 0.12, 0.42);
+    this.seatMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+    const seats = new THREE.InstancedMesh(seatGeo, this.seatMat, spots.length);
+    const bodyGeo = new THREE.BoxGeometry(0.42, 0.52, 0.28);
+    bodyGeo.translate(0, 0.26, 0);
+    const bodies = new THREE.InstancedMesh(bodyGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }), occupied.length);
+    const headGeo = new THREE.SphereGeometry(0.105, 10, 8);
+    const heads = new THREE.InstancedMesh(headGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }), occupied.length);
+
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const v = new THREE.Vector3();
+    const sc = new THREE.Vector3();
+    const col = new THREE.Color();
+    const stone = new THREE.Color(0x8c877d);
+    const toWorld = (p, along, out) =>
+      p.st.axis === 'z' ? v.set(along, 0, p.st.sign * out) : v.set(p.st.sign * out, 0, along);
+    const yaw = (p) => (p.st.axis === 'z' ? 0 : Math.PI / 2);
+
+    spots.forEach((p, i) => {
+      toWorld(p, p.along, p.out);
+      v.y = p.y + 0.06;
+      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw(p));
+      m.compose(v, q, sc.set(1, 1, 1));
+      seats.setMatrixAt(i, m);
+    });
+    this._seatCount = spots.length;
+    this.seatInstances = seats;
+
+    occupied.forEach((p, i) => {
+      const jitter = (rand() - 0.5) * 0.12;
+      const lean = (rand() - 0.5) * 0.08;
+      const s = 0.9 + rand() * 0.2;
+      toWorld(p, p.along + jitter, p.out + lean);
+      v.y = p.y + 0.12;
+      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw(p) + (rand() - 0.5) * 0.3);
+      m.compose(v, q, sc.set(s, s * (0.92 + rand() * 0.16), s));
+      bodies.setMatrixAt(i, m);
+      bodies.setColorAt(i, col.setHex(crowdPalette[Math.floor(rand() * crowdPalette.length)]).lerp(stone, 0.6));
+
+      v.y = p.y + 0.12 + 0.52 * s * 1.0 + 0.11 * s;
+      m.compose(v, q, sc.set(s, s, s));
+      heads.setMatrixAt(i, m);
+      heads.setColorAt(i, col.setHex(skinPalette[Math.floor(rand() * skinPalette.length)]).lerp(stone, 0.45));
+    });
+
+    [seats, bodies, heads].forEach((im) => {
+      im.castShadow = false;
+      im.receiveShadow = false;
+      im.instanceMatrix.needsUpdate = true;
+      if (im.instanceColor) im.instanceColor.needsUpdate = true;
+      standGroup.add(im);
+    });
+  }
+
+  /** Re-tints walls, hoardings, seats and signs to suit the court surface. */
+  _applyVenueTheme(surfaceKey) {
+    const themes = {
+      hard: { wall: 0x14213d, accent: 0x1f2d47, seat: 0x2c4a73, sign: '#14213d' },
+      clay: { wall: 0x1d3a2e, accent: 0x22402f, seat: 0x2f5a44, sign: '#1d3a2e' },
+      grass: { wall: 0x1f3a2b, accent: 0x243f2f, seat: 0x3e5b3f, sign: '#1f3a2b' }
+    };
+    const t = themes[surfaceKey] || themes.hard;
+    if (this.venueWallMat) this.venueWallMat.color.setHex(t.wall);
+    if (this.standAccentMat) this.standAccentMat.color.setHex(t.accent);
+    if (this.seatInstances) {
+      const c = new THREE.Color();
+      for (let i = 0; i < this._seatCount; i++) {
+        // slight per-seat variation keeps the empty seats from looking flat
+        const k = 0.9 + ((i * 7919) % 17) / 170;
+        this.seatInstances.setColorAt(i, c.setHex(t.seat).multiplyScalar(k));
+      }
+      this.seatInstances.instanceColor.needsUpdate = true;
+    }
+    if (this._signCanvas) this._drawVenueSign(t.sign);
   }
 
   _initNet() {
@@ -1318,11 +1488,16 @@ export class TennisScene3D {
     }
   }
 
+  setStandsVisible(visible) {
+    if (this.standGroup) this.standGroup.visible = visible;
+  }
+
   setCourtSurface(surfaceKey) {
     this.courtMat.map = this._createCourtTexture(surfaceKey, true);
     this.courtMat.needsUpdate = true;
     this.surroundMat.map = this._createCourtTexture(surfaceKey, false);
     this.surroundMat.needsUpdate = true;
+    this._applyVenueTheme(surfaceKey);
   }
 
   setTargetZone(courtMode, side = 'A') {
@@ -1531,72 +1706,217 @@ export class TennisScene3D {
       }
     }
 
+    // Racket-head path: smooth keyframe spline (see _swingPathPosition). The polynomial
+    // positions above are superseded; their rotations are kept.
+    let kind = 'fh';
+    if (isOverhead) kind = 'serve';
+    else if (isBackhand) kind = swingPathDeg < -3 ? 'bh_slice' : strokeType === 'bh1' ? 'bh1' : 'bh2';
+    else if (swingPathDeg < -3) kind = 'fh_slice';
+    pos.copy(this._swingPathPosition(s, swingRad, kind));
+
     const euler = new THREE.Euler(rotX, rotY, rotZ, 'ZYX');
     const quat = new THREE.Quaternion().setFromEuler(euler);
     return { pos, quat };
   }
 
-  _rebuildSwingTrailRibbon(rig, swingPathDeg, faceAngleDeg, hitZ, strokeType = 'fh') {
+  /**
+   * Racket sweet-spot path in the contact-pivot frame (x toward the target, y up,
+   * z to the hitter's right), as a cubic Hermite spline through stroke keyframes.
+   * Guarantees: passes through the contact point at tau = 0 with its tangent exactly
+   * along the swing-path angle, and the head speed peaks at contact.
+   */
+  _swingPathPosition(tau, swingRad, kind) {
+    const d = [Math.cos(swingRad), Math.sin(swingRad), 0];
+    const along = (k, off = [0, 0, 0]) => [k * d[0] + off[0], k * d[1] + off[1], k * d[2] + off[2]];
+    const CONTACT_SPEED = 9.0; // m/s, visual (real head speed is ~25 m/s; slowed so it reads on screen)
+
+    // [t, position] keyframes; contact is at t = 0
+    // Keyframes are kept inside the player's reach (checked against the arm-reach clamp),
+    // so the rendered racket follows this path instead of being pulled off it.
+    const paths = {
+      fh: [
+        [-0.35, [-0.55, 0.30, -0.10]],   // unit turn, racket up and back
+        [-0.22, [-0.78, -0.02, 0.04]],   // loop drops behind
+        [-0.11, along(-0.48, [-0.06, 0.10, 0.02])], // slot: below and behind the ball
+        [0, [0, 0, 0]],
+        [0.08, along(0.30, [0.01, 0.15, -0.12])],   // extend through the ball
+        [0.22, [0.05, 0.55, -0.62]],     // wrap across the body
+        [0.42, [-0.30, 0.62, -0.88]]     // finish over the left shoulder
+      ],
+      fh_slice: [
+        [-0.35, [-0.50, 0.42, 0.02]],    // high takeback, open face
+        [-0.20, [-0.70, 0.30, 0.06]],
+        [-0.11, along(-0.58, [0, 0.03, 0.03])],
+        [0, [0, 0, 0]],
+        [0.09, [0.16, 0.0, -0.10]],      // short, low extension
+        [0.24, [0.20, 0.05, -0.32]],
+        [0.42, [0.12, 0.12, -0.50]]
+      ],
+      bh2: [
+        [-0.35, [-0.60, 0.20, 0.12]],
+        [-0.22, [-0.58, 0.06, 0.09]],
+        [-0.11, along(-0.36, [-0.05, 0.15, 0.06])],
+        [0, [0, 0, 0]],
+        [0.08, along(0.28, [0.01, 0.16, 0.14])],
+        [0.22, [0.02, 0.52, 0.60]],
+        [0.42, [-0.26, 0.60, 0.86]]      // finish over the right shoulder
+      ],
+      bh1: [
+        [-0.35, [-0.70, 0.24, 0.10]],
+        [-0.22, [-0.62, 0.07, 0.09]],
+        [-0.11, along(-0.36, [-0.05, 0.11, 0.08])],
+        [0, [0, 0, 0]],
+        [0.09, along(0.36, [0.03, 0.15, 0.10])],
+        [0.25, [0.10, 0.72, 0.50]],
+        [0.42, [-0.02, 0.86, 0.66]]      // high, open finish
+      ],
+      bh_slice: [
+        [-0.35, [-0.55, 0.40, 0.04]],
+        [-0.20, [-0.67, 0.32, 0.04]],
+        [-0.11, along(-0.50, [-0.03, 0.09, 0.01])],
+        [0, [0, 0, 0]],
+        [0.09, [0.16, 0.0, 0.12]],
+        [0.24, [0.20, 0.06, 0.33]],
+        [0.42, [0.12, 0.16, 0.45]]
+      ],
+      serve: [
+        [-0.35, [-0.46, -0.78, 0.11]],   // trophy position
+        [-0.22, [-0.48, -0.98, 0.06]],   // racket drop behind the back
+        [-0.10, [-0.42, -0.42, 0.02]],   // swing up
+        [0, [0, 0, 0]],
+        [0.10, along(0.42, [0, -0.22, -0.08])], // pronation, through and down
+        [0.24, [0.32, -0.96, -0.40]],
+        [0.42, [0.02, -1.40, -0.43]]     // finish by the left hip
+      ]
+    };
+    const keys = paths[kind] || paths.fh;
+    const n = keys.length;
+
+    // Tangents: Catmull-Rom (non-uniform), eased at the ends, fixed along the swing path at contact
+    const vel = keys.map((k, i) => {
+      if (k[0] === 0) return d.map((c) => c * CONTACT_SPEED);
+      const a = keys[Math.max(0, i - 1)];
+      const b = keys[Math.min(n - 1, i + 1)];
+      const ease = i === 0 || i === n - 1 ? 0.35 : 1;
+      return [0, 1, 2].map((j) => ((b[1][j] - a[1][j]) / (b[0] - a[0])) * ease);
+    });
+
+    const t = THREE.MathUtils.clamp(tau, keys[0][0], keys[n - 1][0]);
+    let i = 0;
+    while (i < n - 2 && t > keys[i + 1][0]) i++;
+    const [t0, p0] = keys[i];
+    const [t1, p1] = keys[i + 1];
+    const h = t1 - t0;
+    const u = (t - t0) / h;
+    const u2 = u * u;
+    const u3 = u2 * u;
+    const h00 = 2 * u3 - 3 * u2 + 1;
+    const h10 = u3 - 2 * u2 + u;
+    const h01 = -2 * u3 + 3 * u2;
+    const h11 = u3 - u2;
+    const v0 = vel[i];
+    const v1 = vel[i + 1];
+    return new THREE.Vector3(
+      h00 * p0[0] + h10 * h * v0[0] + h01 * p1[0] + h11 * h * v1[0],
+      h00 * p0[1] + h10 * h * v0[1] + h01 * p1[1] + h11 * h * v1[1],
+      h00 * p0[2] + h10 * h * v0[2] + h01 * p1[2] + h11 * h * v1[2]
+    );
+  }
+
+  /**
+   * Swing trail from sampled racket poses ([tau, position, quaternion] in the contact-pivot frame).
+   * Fades in toward contact and out after it; colour runs takeback (slate) -> contact (ball yellow)
+   * -> follow-through (green). Three faint racket-head outlines mark slot, contact and finish.
+   */
+  _rebuildSwingTrailRibbon(rig, samples) {
     while (rig.swingTrailGroup.children.length > 0) {
       const c = rig.swingTrailGroup.children[0];
       if (c.geometry) c.geometry.dispose();
       if (c.material) c.material.dispose();
       rig.swingTrailGroup.remove(c);
     }
+    if (!samples || samples.length < 2) return;
 
-    const samples = 44;
-    const centerPts = [];
+    const cTake = new THREE.Color(0x7c8ea6);
+    const cHit = new THREE.Color(0xd4e157);
+    const cFollow = new THREE.Color(0x2f9e6a);
+    const colourAt = (tau) =>
+      tau < 0
+        ? new THREE.Color().lerpColors(cHit, cTake, Math.min(1, -tau / 0.2))
+        : new THREE.Color().lerpColors(cHit, cFollow, Math.min(1, tau / 0.2));
+    const alphaAt = (tau, peak, floor) => floor + (peak - floor) * Math.exp(-Math.pow(tau / 0.13, 2));
+
     const ribbonPositions = [];
     const ribbonColors = [];
     const ribbonIndices = [];
+    const linePositions = [];
+    const lineColors = [];
 
-    for (let i = 0; i <= samples; i++) {
-      const tau = -0.34 + (i / samples) * (0.34 + 0.38);
-      const pose = this._evaluateSwingPoseAtTime(tau, swingPathDeg, faceAngleDeg, hitZ, strokeType);
-      centerPts.push(pose.pos.clone());
-
-      const topOffset = new THREE.Vector3(0, 0.11, 0).applyQuaternion(pose.quat);
-      const botOffset = new THREE.Vector3(0, -0.11, 0).applyQuaternion(pose.quat);
-      const pTop = pose.pos.clone().add(topOffset);
-      const pBot = pose.pos.clone().add(botOffset);
-
-      ribbonPositions.push(pBot.x, pBot.y, pBot.z, pTop.x, pTop.y, pTop.z);
-
-      const distFromImpact = Math.abs(tau);
-      const c = new THREE.Color().lerpColors(
-        new THREE.Color(0x84cc16),
-        new THREE.Color(0xe11d48),
-        Math.min(1, distFromImpact * 3.8)
-      );
-      ribbonColors.push(c.r, c.g, c.b, c.r, c.g, c.b);
-    }
-
-    for (let i = 0; i < samples; i++) {
+    samples.forEach(([tau, pos, quat]) => {
+      const top = new THREE.Vector3(0, 0.1, 0).applyQuaternion(quat).add(pos);
+      const bot = new THREE.Vector3(0, -0.1, 0).applyQuaternion(quat).add(pos);
+      ribbonPositions.push(bot.x, bot.y, bot.z, top.x, top.y, top.z);
+      const c = colourAt(tau);
+      const a = alphaAt(tau, 0.42, 0.12);
+      ribbonColors.push(c.r, c.g, c.b, a, c.r, c.g, c.b, a);
+      linePositions.push(pos.x, pos.y, pos.z);
+      lineColors.push(c.r, c.g, c.b, alphaAt(tau, 1.0, 0.5));
+    });
+    for (let i = 0; i < samples.length - 1; i++) {
       const b0 = 2 * i;
-      const t0 = 2 * i + 1;
-      const b1 = 2 * (i + 1);
-      const t1 = 2 * (i + 1) + 1;
+      const t0 = b0 + 1;
+      const b1 = b0 + 2;
+      const t1 = b0 + 3;
       ribbonIndices.push(b0, t0, b1, t0, t1, b1);
     }
 
     const ribGeo = new THREE.BufferGeometry();
     ribGeo.setAttribute('position', new THREE.Float32BufferAttribute(ribbonPositions, 3));
-    ribGeo.setAttribute('color', new THREE.Float32BufferAttribute(ribbonColors, 3));
+    ribGeo.setAttribute('color', new THREE.Float32BufferAttribute(ribbonColors, 4));
     ribGeo.setIndex(ribbonIndices);
-    ribGeo.computeVertexNormals();
-
     const ribMat = new THREE.MeshBasicMaterial({
       vertexColors: true,
       side: THREE.DoubleSide,
       transparent: true,
-      opacity: 0.22,
       depthWrite: false
     });
     rig.swingTrailGroup.add(new THREE.Mesh(ribGeo, ribMat));
 
-    const lineGeo = new THREE.BufferGeometry().setFromPoints(centerPts);
-    const lineMat = new THREE.LineBasicMaterial({ color: 0xe11d48, transparent: true, opacity: 0.85 });
+    const lineGeo = new THREE.BufferGeometry();
+    lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+    lineGeo.setAttribute('color', new THREE.Float32BufferAttribute(lineColors, 4));
+    const lineMat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false });
     rig.swingTrailGroup.add(new THREE.Line(lineGeo, lineMat));
+
+    // Racket-head outlines at slot (tau = -0.11), contact (0) and finish (end of trail)
+    const hoop = new THREE.EllipseCurve(0, 0, 0.125, 0.165, 0, Math.PI * 2).getPoints(40);
+    const hoopPts = hoop.map((p) => new THREE.Vector3(0, p.x, p.y + 0.01));
+    const nearest = (target) =>
+      samples.reduce((best, smp) => (Math.abs(smp[0] - target) < Math.abs(best[0] - target) ? smp : best));
+    [
+      [nearest(-0.11), 0x7c8ea6, 0.4],
+      [nearest(0), 0xd4e157, 0.9],
+      [samples[samples.length - 1], 0x2f9e6a, 0.35]
+    ].forEach(([[, pos, quat], color, opacity]) => {
+      const g = new THREE.BufferGeometry().setFromPoints(hoopPts);
+      const m = new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthWrite: false });
+      const loop = new THREE.LineLoop(g, m);
+      loop.position.copy(pos);
+      loop.quaternion.copy(quat);
+      rig.swingTrailGroup.add(loop);
+    });
+  }
+
+  /** Samples the racket pose the player actually reaches (including arm-reach clamping). */
+  _sampleRenderedSwing(rig, localParams) {
+    const samples = [];
+    const N = 56;
+    for (let i = 0; i <= N; i++) {
+      const tau = -0.35 + (i / N) * 0.77;
+      this._updateSinglePlayerPose(rig, localParams, tau, false, 0, true);
+      samples.push([tau, rig.racketGroup.position.clone(), rig.racketGroup.quaternion.clone()]);
+    }
+    return samples;
   }
 
   /**
@@ -1633,7 +1953,7 @@ export class TennisScene3D {
   /**
    * Updates one articulated player rig (`this.playerA` or `this.playerB`) in its canonical local coordinates.
    */
-  _updateSinglePlayerPose(rig, localParams, tau, showTrail = true, runningStridePhase = 0) {
+  _updateSinglePlayerPose(rig, localParams, tau, showTrail = true, runningStridePhase = 0, sampling = false) {
     const {
       hitX = -11.9,
       hitY = -1.8,
@@ -1656,11 +1976,14 @@ export class TennisScene3D {
     rig.contactFloorRing.visible = showTrail;
     rig.faceNormalArrow.visible = showTrail && this.showVectors;
 
-    if (showTrail) {
-      const trailKey = `${swingPathDeg.toFixed(1)}_${faceAngleDeg.toFixed(1)}_${strokeType}`;
+    if (showTrail && !sampling) {
+      const trailKey = `${swingPathDeg.toFixed(1)}_${faceAngleDeg.toFixed(1)}_${strokeType}_${hitZ.toFixed(2)}`;
       if (rig._lastTrailKey !== trailKey) {
         rig._lastTrailKey = trailKey;
-        this._rebuildSwingTrailRibbon(rig, swingPathDeg, faceAngleDeg, hitZ, strokeType);
+        this._rebuildSwingTrailRibbon(rig, this._sampleRenderedSwing(rig, localParams));
+        // Sampling left the rig at the last sample; pose it again for the current time.
+        this._updateSinglePlayerPose(rig, localParams, tau, showTrail, runningStridePhase);
+        return;
       }
     }
 

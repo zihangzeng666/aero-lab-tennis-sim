@@ -14,15 +14,15 @@ import {
   samplePointAtTime,
   airDensityFromConditions,
   chainRallyTurns
-} from './physics.js?v=16';
+} from './physics.js?v=19';
 import {
   SHOT_PRESETS,
   INCOMING_PRESETS,
   EXAMPLE_RALLIES,
   TACTICAL_LESSONS,
   evaluateTacticalAttempt
-} from './presets.js?v=16';
-import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=16';
+} from './presets.js?v=19';
+import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=19';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;
@@ -129,6 +129,7 @@ const I18N = {
     chkVectors: '物理矢量',
     chkGhost: '无旋对比',
     chkTrueScale: '真实球径',
+    chkStands: '观众席',
     legIncoming: '来球',
     legPreBounce: '飞行',
     legPostBounce: '反弹',
@@ -265,6 +266,7 @@ const I18N = {
     chkVectors: 'Vectors',
     chkGhost: 'No-Spin',
     chkTrueScale: '1:1 Ball',
+    chkStands: 'Stands',
     legIncoming: 'Incoming',
     legPreBounce: 'Flight',
     legPostBounce: 'Rebound',
@@ -1478,6 +1480,10 @@ class TennisSimApp {
       btn.addEventListener('click', () => {
         const cam = btn.getAttribute('data-cam');
         this.scene3d.setCameraPreset(cam, this.simResult, this.state);
+        const standsOn = cam === 'side' ? false : this.showStandsPref;
+        this.scene3d.setStandsVisible(standsOn);
+        const standsBox = document.getElementById('toggleStands');
+        if (standsBox) standsBox.checked = standsOn;
         document.querySelectorAll('[data-cam]').forEach((b) => b.classList.toggle('active', b === btn));
       });
     });
@@ -1495,6 +1501,13 @@ class TennisSimApp {
     document.getElementById('toggleTrueScale')?.addEventListener('change', (e) => {
       this.scene3d.setBallVisualScale(e.target.checked ? 1.0 : 2.0);
       this.updateScrubberFrame();
+    });
+
+    // Stands: user preference; the side camera hides them temporarily so the profile stays clear
+    this.showStandsPref = true;
+    document.getElementById('toggleStands')?.addEventListener('change', (e) => {
+      this.showStandsPref = e.target.checked;
+      this.scene3d.setStandsVisible(e.target.checked);
     });
 
     // 10. Scrubber & Rally Playback Controls
