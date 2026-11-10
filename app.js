@@ -15,7 +15,7 @@ import {
   airDensityFromConditions,
   chainRallyTurns,
   handoffFromPoint
-} from './physics.js?v=45';
+} from './physics.js?v=46';
 import {
   SHOT_PRESETS,
   INCOMING_PRESETS,
@@ -23,11 +23,11 @@ import {
   TACTICAL_LESSONS,
   evaluateTacticalAttempt,
   describeTacticalGoal
-} from './presets.js?v=45';
-import { TennisScene3D } from './scene3d.js?v=45';
-import { RacketDiagram } from './racketDiagram.js?v=45';
-import { LessonMap } from './lessonMap.js?v=45';
-import { TacticsBoard } from './tacticsBoard.js?v=45';
+} from './presets.js?v=46';
+import { TennisScene3D } from './scene3d.js?v=46';
+import { RacketDiagram } from './racketDiagram.js?v=46';
+import { LessonMap } from './lessonMap.js?v=46';
+import { TacticsBoard } from './tacticsBoard.js?v=46';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;
@@ -2172,6 +2172,12 @@ class TennisSimApp {
     this.setStrokeType(strokeType, true);
 
     if (this.appMode === 'solo') {
+      // a preset is always played by the near-side player
+      if (this.state.side === 'B') {
+        this.scene3d.fadeOutRig('B');
+        this.state.side = 'A';
+      }
+      this._handoffStack = [];
       const playerTitleZh = p.labelZh.split('·')[0].trim();
       const playerTitleEn = p.labelEn.split('·')[0].trim();
       this.rallyMeta.playerAZh = playerTitleZh;
@@ -2457,10 +2463,12 @@ class TennisSimApp {
   handoffAtCurrentTime() {
     const pt = this._framePoint;
     if (!this._canHandoff(pt)) return;
-    const h = handoffFromPoint(pt, 'A');
+    const fromSide = this.state.side === 'B' ? 'B' : 'A';
+    const h = handoffFromPoint(pt, fromSide);
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     this._handoffStack = [...(this._handoffStack || []), { ...this.state }].slice(-12);
     Object.assign(this.state, {
+      side: h.nextSide,
       hitX: clamp(h.nextHitX, -19, -0.3),
       hitY: clamp(h.nextHitY, -5.4, 5.4),
       hitZ: clamp(h.nextHitZ, 0.25, 2.9),
@@ -2468,22 +2476,38 @@ class TennisSimApp {
       incomingAngleDeg: clamp(h.nextIncomingAngleDeg, -40, 35),
       incomingSpinRpm: clamp(h.nextIncomingSpinRpm, -4500, 5000)
     });
-    this.recomputeSimulation({ source: 'racket' });
-    this.currentTime = WINDUP_START_TIME;
-    this.isPlaying = true;
-    this._updatePlayButtonUI();
-    this.updateScrubberFrame();
+    if (h.nextSide === 'B' && !this._soloOpponentNamed) {
+      this.rallyMeta.playerBZh = '对手';
+      this.rallyMeta.playerBEn = 'Opponent';
+      this._soloOpponentNamed = true;
+    }
+    // Forehand or backhand from where the ball is (right-hander: backhand on the left)
+    const stroke = this.state.hitY > 0.25 ? (this.state.strokeType === 'bh1' ? 'bh1' : 'bh2') : 'fh';
+    this.setStrokeType(stroke, true);
+    this._switchSoloPlayer(fromSide);
   }
 
   handoffBack() {
     const prev = this._handoffStack?.pop();
     if (!prev) return;
+    const fromSide = this.state.side === 'B' ? 'B' : 'A';
     Object.assign(this.state, prev);
+    this.setStrokeType(this.state.strokeType || 'fh', true);
+    this._switchSoloPlayer(fromSide);
+  }
+
+  /** Shared tail of a handoff: fade the player who just left, replay, and follow with the camera. */
+  _switchSoloPlayer(fromSide) {
+    const toSide = this.state.side === 'B' ? 'B' : 'A';
+    if (fromSide !== toSide) this.scene3d.fadeOutRig(fromSide);
+    this.scene3d.setTargetZone(this.state.courtMode, toSide);
     this.recomputeSimulation({ source: 'racket' });
     this.currentTime = WINDUP_START_TIME;
     this.isPlaying = true;
     this._updatePlayButtonUI();
     this.updateScrubberFrame();
+    const cam = document.querySelector('[data-cam].active')?.getAttribute('data-cam') || 'broadcast';
+    this.scene3d.setCameraPreset(cam, this.simResult, this.state, { animate: true });
   }
 
   /**

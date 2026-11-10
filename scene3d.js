@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=45';
+import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=46';
 
 // Net profile drawn with singles sticks in place (matches the physics for singles play):
 // 0.914 m at the centre rising to 1.07 m at the sticks, then level out to the posts.
@@ -120,6 +120,9 @@ export class TennisScene3D {
     // especially on touch screens where a short swipe covers a large angle.
     const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
     this.controls.rotateSpeed = coarse ? 0.38 : 0.5;
+    this.controls.addEventListener('start', () => {
+      this._camTween = null;
+    });
     this.controls.zoomSpeed = 0.6;
     this.controls.panSpeed = 0.6;
     this.controls.maxPolarAngle = Math.PI / 2 - 0.012;
@@ -1633,6 +1636,71 @@ export class TennisScene3D {
     }
   }
 
+  /**
+   * Fades a player out where they stand (used when the ball is handed to the other player).
+   * Materials are cloned for the fade so the other rig, which may share them, is untouched.
+   */
+  fadeOutRig(side, ms = 1100) {
+    const rig = side === 'B' ? this.playerB : this.playerA;
+    if (!rig || !rig.root) return;
+    if (this._isFading(rig)) this._cancelFade(rig);
+    const swaps = [];
+    rig.root.traverse((o) => {
+      if (!o.isMesh || !o.material) return;
+      const orig = o.material;
+      const clone = Array.isArray(orig) ? orig.map((m) => m.clone()) : orig.clone();
+      for (const m of [].concat(clone)) {
+        m.transparent = true;
+        m.depthWrite = false;
+        m.userData.baseOpacity = m.opacity ?? 1;
+      }
+      swaps.push({ o, orig, clone, castShadow: o.castShadow });
+      o.material = clone;
+      o.castShadow = false;
+    });
+    rig.root.visible = true;
+    this._fades = (this._fades || []).filter((f) => f.rig !== rig);
+    this._fades.push({ rig, swaps, t0: performance.now(), ms });
+  }
+
+  _isFading(rig) {
+    return !!(this._fades && this._fades.some((f) => f.rig === rig));
+  }
+
+  _endFade(f, hide = true) {
+    for (const sw of f.swaps) {
+      sw.o.material = sw.orig;
+      sw.o.castShadow = sw.castShadow;
+      [].concat(sw.clone).forEach((m) => m.dispose());
+    }
+    if (hide) f.rig.root.visible = false;
+    this._fades = this._fades.filter((x) => x !== f);
+  }
+
+  _cancelFade(rig) {
+    const f = this._fades && this._fades.find((x) => x.rig === rig);
+    if (f) this._endFade(f, false);
+  }
+
+  _stepAnimations(now) {
+    if (this._fades && this._fades.length) {
+      for (const f of [...this._fades]) {
+        const k = Math.min(1, (now - f.t0) / f.ms);
+        const e = k * k * (3 - 2 * k);
+        for (const sw of f.swaps) for (const m of [].concat(sw.clone)) m.opacity = m.userData.baseOpacity * (1 - e);
+        if (k >= 1) this._endFade(f, true);
+      }
+    }
+    const tw = this._camTween;
+    if (tw) {
+      const k = Math.min(1, (now - tw.t0) / tw.ms);
+      const e = k * k * (3 - 2 * k);
+      this.camera.position.lerpVectors(tw.fromPos, tw.toPos, e);
+      this.controls.target.lerpVectors(tw.fromTarget, tw.toTarget, e);
+      if (k >= 1) this._camTween = null;
+    }
+  }
+
   setSoloMode(isSolo) {
     this.soloMode = Boolean(isSolo);
     if (this.playerA && this.playerA.root) this.playerA.root.visible = true;
@@ -2756,11 +2824,16 @@ export class TennisScene3D {
    */
   updatePlayerAndRacket(params, currentTime = 0, simResult = null) {
     if (this.soloMode) {
-      this.playerA.root.visible = true;
-      this.playerB.root.visible = false;
-      this.dragTargetRig = this.playerA;
+      // One player at a time; after "hit it from here" that can be the far-side player.
+      const side = params.side === 'B' ? 'B' : 'A';
+      const rig = side === 'B' ? this.playerB : this.playerA;
+      const other = side === 'B' ? this.playerA : this.playerB;
+      if (this._isFading(rig)) this._cancelFade(rig);
+      rig.root.visible = true;
+      other.root.visible = this._isFading(other);
+      this.dragTargetRig = rig;
       const soloTau = THREE.MathUtils.clamp(currentTime, -0.35, 0.42);
-      this._updateSinglePlayerPose(this.playerA, { ...params, side: 'A' }, soloTau, true, 0);
+      this._updateSinglePlayerPose(rig, { ...params, side }, soloTau, true, 0);
       return;
     }
 
@@ -3064,7 +3137,10 @@ export class TennisScene3D {
     this.ballMesh.scale.setScalar(scale);
   }
 
-  setCameraPreset(presetName, simResult, hitParams) {
+  setCameraPreset(presetName, simResult, hitParams, { animate = false } = {}) {
+    const fromPos = this.camera.position.clone();
+    const fromTarget = this.controls.target.clone();
+    this._camTween = null;
     const sign = hitParams.side === 'B' ? -1 : 1;
     const p = physToThree(sign * hitParams.hitX, sign * hitParams.hitY, hitParams.hitZ);
     const strokeType = this._resolveStrokeType(
@@ -3111,11 +3187,24 @@ export class TennisScene3D {
       this.camera.position.set(0, 25.5, 0.01);
       this.controls.target.set(0, 0, 0);
     }
+    if (animate) {
+      // glide from where the camera is now to the preset (stopped if the user grabs the view)
+      this._camTween = {
+        fromPos, fromTarget,
+        toPos: this.camera.position.clone(),
+        toTarget: this.controls.target.clone(),
+        t0: performance.now(),
+        ms: 900
+      };
+      this.camera.position.copy(fromPos);
+      this.controls.target.copy(fromTarget);
+    }
     this.controls.update();
   }
 
   _animateLoop() {
     requestAnimationFrame(() => this._animateLoop());
+    this._stepAnimations(performance.now());
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
   }
