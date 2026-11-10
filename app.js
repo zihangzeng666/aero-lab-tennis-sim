@@ -14,15 +14,15 @@ import {
   samplePointAtTime,
   airDensityFromConditions,
   chainRallyTurns
-} from './physics.js?v=24';
+} from './physics.js?v=25';
 import {
   SHOT_PRESETS,
   INCOMING_PRESETS,
   EXAMPLE_RALLIES,
   TACTICAL_LESSONS,
   evaluateTacticalAttempt
-} from './presets.js?v=24';
-import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=24';
+} from './presets.js?v=25';
+import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=25';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;
@@ -303,6 +303,12 @@ const I18N = {
     btnMobileExpand3D: 'Expand 3D'
   }
 };
+
+/** Reads a colour token from the stylesheet so canvas drawings follow the palette. */
+function cssToken(name, fallback) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
+}
 
 /** Fills the part of a range track left of the thumb (CSS reads --pct). */
 function paintRange(el) {
@@ -2021,8 +2027,12 @@ class TennisSimApp {
 
     const groundY = H - 7;
     const netTopY = groundY - 24;
+    const ink = cssToken('--ink', '#ecefe6');
+    const muted = cssToken('--ink-3', '#86999f');
+    const inC = cssToken('--in', '#63d297');
+    const outC = cssToken('--out', '#ff7a63');
 
-    ctx.strokeStyle = '#a1a1aa';
+    ctx.strokeStyle = muted;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(4, groundY);
@@ -2030,21 +2040,21 @@ class TennisSimApp {
     ctx.stroke();
 
     const netX = W / 2;
-    ctx.strokeStyle = '#27272a';
-    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(netX, groundY);
     ctx.lineTo(netX, netTopY);
     ctx.stroke();
 
-    ctx.fillStyle = '#09090b';
-    ctx.fillRect(netX - 3, netTopY - 2, 6, 4);
+    ctx.fillStyle = ink;
+    ctx.fillRect(netX - 3, netTopY - 2, 6, 3);
 
     if (res.netPassPoint && res.netClearanceM !== null) {
       const clearancePx = Math.max(-20, Math.min(25, res.netClearanceM * 24));
       const ballY = netTopY - clearancePx - 5;
 
-      ctx.strokeStyle = res.hitNet ? '#b91c1c' : '#15803d';
+      ctx.strokeStyle = res.hitNet ? outC : inC;
       ctx.lineWidth = 1.5;
       ctx.setLineDash([2, 2]);
       ctx.beginPath();
@@ -2053,13 +2063,10 @@ class TennisSimApp {
       ctx.stroke();
       ctx.setLineDash([]);
 
-      ctx.fillStyle = res.hitNet ? '#b91c1c' : '#65a30d';
+      ctx.fillStyle = res.hitNet ? outC : cssToken('--accent', '#d9f24a');
       ctx.beginPath();
       ctx.arc(netX, ballY, 5.5, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = '#09090b';
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
     }
   }
 
@@ -2086,19 +2093,13 @@ class TennisSimApp {
     ctx.translate(cx, cy);
     ctx.rotate(this.hudBallPhase);
 
-    const grad = ctx.createRadialGradient(-5, -5, 2, 0, 0, R);
-    grad.addColorStop(0, '#ecfccb');
-    grad.addColorStop(0.5, '#a3e635');
-    grad.addColorStop(1, '#4d7c0f');
-    ctx.fillStyle = grad;
+    // Flat optic-yellow ball with chalk seams (no gradient)
+    ctx.fillStyle = cssToken('--accent', '#d9f24a');
     ctx.beginPath();
     ctx.arc(0, 0, R, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = '#18181b';
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
 
-    ctx.strokeStyle = '#ffffff';
+    ctx.strokeStyle = cssToken('--panel', '#10212a');
     ctx.lineWidth = 2.8;
     ctx.beginPath();
     ctx.arc(-R * 0.58, 0, R * 0.65, -0.85, 0.85);
@@ -2110,7 +2111,7 @@ class TennisSimApp {
 
     if (Math.abs(rpm) > 20) {
       const isTop = rpm > 0;
-      ctx.strokeStyle = isTop ? '#e11d48' : '#0284c7';
+      ctx.strokeStyle = isTop ? cssToken('--rose', '#ff8f7c') : cssToken('--blue', '#7cbcff');
       ctx.lineWidth = 2.2;
       ctx.beginPath();
       if (isTop) {

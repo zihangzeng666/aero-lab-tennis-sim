@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=24';
+import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=25';
 
 // Net profile drawn with singles sticks in place (matches the physics for singles play):
 // 0.914 m at the centre rising to 1.07 m at the sticks, then level out to the posts.
@@ -2907,7 +2907,7 @@ export class RacketImpact3DStudio {
   constructor(canvasEl) {
     this.canvas = canvasEl;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xf3ede1);
+    this.scene.background = new THREE.Color(0x172c37); // matches --panel-2
 
     const w = canvasEl.clientWidth || 356;
     const h = canvasEl.clientHeight || 190;
@@ -2965,7 +2965,7 @@ export class RacketImpact3DStudio {
     this.scene.add(rimLight);
 
     // Subtle 3D Studio Floor Grid & Horizontal Datum Circle
-    const grid = new THREE.GridHelper(1.2, 14, 0xc7bca8, 0xe2dacb);
+    const grid = new THREE.GridHelper(1.2, 14, 0x58707c, 0x2a4350);
     grid.position.y = -0.19;
     this.scene.add(grid);
 
