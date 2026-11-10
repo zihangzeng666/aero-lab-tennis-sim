@@ -9,7 +9,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=26" />
+  <script>
+    try {
+      if (localStorage.getItem('aerolab-theme') === 'dark') document.documentElement.dataset.theme = 'dark';
+    } catch (e) {}
+  </script>
+  <link rel="stylesheet" href="./styles.css?v=28" />
   <script type="importmap">
     {
       "imports": {
@@ -127,6 +132,10 @@
       <div class="topbar-actions header-right-controls">
         <a class="ghost-btn" href="./validation.html" data-i18n="btnValidation">验证</a>
         <button class="ghost-btn" id="btnReopenWelcome" data-i18n="btnWelcomePage">启动页</button>
+        <div class="seg-control" id="themeSwitchGroup" role="group" aria-label="Theme">
+          <button class="seg-btn active" data-theme-choice="light" data-i18n="themeLight">浅色</button>
+          <button class="seg-btn" data-theme-choice="dark" data-i18n="themeDark">深色</button>
+        </div>
         <div class="seg-control" id="langSwitchGroup">
           <button class="seg-btn active" data-lang="zh">中</button>
           <button class="seg-btn" data-lang="en">EN</button>
@@ -584,10 +593,10 @@
           <button class="mobile-sheet-toggle" id="btnMobileExpand3D" data-i18n="btnMobileExpand3D">全屏球场</button>
         </div>
         <div class="legend-strip" aria-label="Legend">
-          <div class="legend-item"><span class="legend-swatch" style="background: #d97706;"></span><span data-i18n="legIncoming">来球</span></div>
-          <div class="legend-item"><span class="legend-swatch" style="background: #65a30d;"></span><span data-i18n="legPreBounce">飞行</span></div>
-          <div class="legend-item"><span class="legend-swatch" style="background: #0284c7;"></span><span data-i18n="legPostBounce">反弹</span></div>
-          <div class="legend-item"><span class="legend-swatch" style="background: #be123c;"></span><span data-i18n="legMagnus">马格努斯力</span></div>
+          <div class="legend-item"><span class="legend-swatch legend-swatch-in"></span><span data-i18n="legIncoming">来球</span></div>
+          <div class="legend-item"><span class="legend-swatch legend-swatch-pre"></span><span data-i18n="legPreBounce">飞行</span></div>
+          <div class="legend-item"><span class="legend-swatch legend-swatch-post"></span><span data-i18n="legPostBounce">反弹</span></div>
+          <div class="legend-item"><span class="legend-swatch legend-swatch-magnus"></span><span data-i18n="legMagnus">马格努斯力</span></div>
           <div class="legend-item"><span class="legend-swatch legend-swatch-dash"></span><span data-i18n="legNoSpin">无旋基准</span></div>
         </div>
       </div>
@@ -645,6 +654,6 @@
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=26"></script>
+  <script type="module" src="./app.js?v=28"></script>
 </body>
 </html>

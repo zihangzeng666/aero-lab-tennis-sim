@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=26';
+import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=28';
 
 // Net profile drawn with singles sticks in place (matches the physics for singles play):
 // 0.914 m at the centre rising to 1.07 m at the sticks, then level out to the posts.
@@ -13,6 +13,27 @@ function drawnNetHeightAtY(y) {
   const stickY = ITF_COURT.halfSinglesWidth + ITF_COURT.netPostOffset;
   return Math.abs(y) >= stickY ? ITF_COURT.netHeightPost : getNetHeightAtY(y, true);
 }
+
+// Scene palettes for the light "club" theme and the dark "lab" (diagram) theme.
+const SCENE_THEMES = {
+  light: {
+    background: 0xe6dfd1, fog: 0xe6dfd1, fogDensity: 0.0085, sky: true, floor: 0x8d9089, floorGrid: false,
+    ambient: 0.76, hemi: 0.6, sun: 1.48, fill: 0.42,
+    line: 0xf8fafc, netMesh: [0x09090b, 0.56], netWire: [0x334155, 0.42],
+    concrete: [0x9e998f, 0x938e84], trim: 0xcfc9bc, crowdTint: 0xffffff,
+    traj: { incoming: [0xea580c, 0.68], pre: [0x84cc16, 0x65a30d, 0.45], post: [0x0284c7, 0x0369a1, 0.35], shadow: [0x0f172a, 0.42], ghost: [0x64748b, 0.65] },
+    players: null
+  },
+  dark: {
+    background: 0x141414, fog: 0x141414, fogDensity: 0.012, sky: false, floor: 0x161616, floorGrid: true,
+    ambient: 0.55, hemi: 0.35, sun: 1.05, fill: 0.3,
+    line: 0xd9d6cf, netMesh: [0x000000, 0.22], netWire: [0xa29e96, 0.55],
+    concrete: [0x262626, 0x222222], trim: 0x3a3a3a, crowdTint: 0x3a3a3a,
+    traj: { incoming: [0x8e8a82, 0.6], pre: [0xe07a5f, 0x000000, 0], post: [0xf2b49f, 0x000000, 0], shadow: [0x000000, 0.55], ghost: [0x7cc7a8, 0.85] },
+    // matte mannequins: the motion reads better than the outfit
+    players: { skin: 0xa9a49b, jersey: 0x5a5753, shorts: 0x2e2d2b, light: 0xd8d5ce, sole: 0xe07a5f, cap: 0x2e2d2b, band: 0xe07a5f }
+  }
+};
 
 // Rig limb lengths are ~0.88 of the motion-capture player's (thigh 0.42 vs 0.48 m, forearm 0.27 vs 0.29 m)
 const MOCAP_BODY_SCALE = 0.88;
@@ -72,6 +93,8 @@ export class TennisScene3D {
   constructor(containerEl) {
     this.container = containerEl;
     this.scene = new THREE.Scene();
+    this.theme = 'light';
+    this.surfaceKey = 'hard';
     this.scene.background = new THREE.Color(0xe6dfd1);
     this.scene.fog = new THREE.FogExp2(0xe6dfd1, 0.0085);
 
@@ -230,6 +253,7 @@ export class TennisScene3D {
     this.scene.add(hemi);
 
     const sunLight = new THREE.DirectionalLight(0xfff6e5, 1.48);
+    this.lights = { ambient, hemi, sun: sunLight };
     sunLight.position.set(-10, 24, 14);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 2048;
@@ -247,6 +271,7 @@ export class TennisScene3D {
     const fillLight = new THREE.DirectionalLight(0xe0ecff, 0.42);
     fillLight.position.set(14, 12, -10);
     this.scene.add(fillLight);
+    this.lights.fill = fillLight;
   }
 
   /**
@@ -258,7 +283,17 @@ export class TennisScene3D {
     canvas.height = 512;
     const ctx = canvas.getContext('2d');
 
-    if (surfaceKey === 'clay') {
+    if (this.theme === 'dark') {
+      // Diagram look: dark, low-contrast tint of the surface colour
+      const tints = { hard: ['#1d272d', '#161c20'], clay: ['#2e221d', '#221a17'], grass: ['#1e2820', '#171e19'] };
+      const [inner, outer] = tints[surfaceKey] || tints.hard;
+      ctx.fillStyle = isInnerCourt ? inner : outer;
+      ctx.fillRect(0, 0, 512, 512);
+      for (let i = 0; i < 2500; i++) {
+        ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.018)' : 'rgba(0,0,0,0.05)';
+        ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
+      }
+    } else if (surfaceKey === 'clay') {
       ctx.fillStyle = isInnerCourt ? '#b8522a' : '#943f1f';
       ctx.fillRect(0, 0, 512, 512);
       for (let i = 0; i < 4200; i++) {
@@ -319,6 +354,12 @@ export class TennisScene3D {
       roughness: 0.95,
       metalness: 0.0
     });
+    this.floorMat = floorMat;
+    // Faint measurement grid, shown only in the dark theme
+    this.floorGrid = new THREE.GridHelper(80, 80, 0x2e2e2e, 0x222222);
+    this.floorGrid.position.y = -0.01;
+    this.floorGrid.visible = false;
+    this.courtGroup.add(this.floorGrid);
     const floorMesh = new THREE.Mesh(floorGeo, floorMat);
     floorMesh.position.y = -0.014;
     floorMesh.receiveShadow = true;
@@ -351,6 +392,7 @@ export class TennisScene3D {
 
     // Crisp Anti-Aliased White Court Lines
     const lineMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
+    this.lineMat = lineMat;
     const addLine = (cx, cy, widthX, lengthY) => {
       const g = new THREE.PlaneGeometry(widthX, lengthY);
       g.rotateX(-Math.PI / 2);
@@ -554,6 +596,7 @@ export class TennisScene3D {
     const concreteDarkMat = new THREE.MeshLambertMaterial({ color: 0x938e84 });
     this.standAccentMat = new THREE.MeshLambertMaterial({ color: 0x1f2d47 });
     const trimMat = new THREE.MeshLambertMaterial({ color: 0xcfc9bc });
+    this.standMats = { concrete: concreteMat, concreteDark: concreteDarkMat, trim: trimMat };
 
     // Each stand: front edge position, outward direction and length along the court.
     // Three.js axes: x = along the court, z = across (court y is -z).
@@ -670,6 +713,7 @@ export class TennisScene3D {
       heads.setColorAt(i, col.setHex(skinPalette[Math.floor(rand() * skinPalette.length)]).lerp(stone, 0.45));
     });
 
+    this.crowdMats = [bodies.material, heads.material];
     [seats, bodies, heads].forEach((im) => {
       im.castShadow = false;
       im.receiveShadow = false;
@@ -686,7 +730,10 @@ export class TennisScene3D {
       clay: { wall: 0x1d3a2e, accent: 0x22402f, seat: 0x2f5a44, sign: '#1d3a2e' },
       grass: { wall: 0x1f3a2b, accent: 0x243f2f, seat: 0x3e5b3f, sign: '#1f3a2b' }
     };
-    const t = themes[surfaceKey] || themes.hard;
+    const t =
+      this.theme === 'dark'
+        ? { wall: 0x1f1f1f, accent: 0x1c1c1c, seat: 0x2a2a2a, sign: '#1f1f1f' }
+        : themes[surfaceKey] || themes.hard;
     if (this.venueWallMat) this.venueWallMat.color.setHex(t.wall);
     if (this.standAccentMat) this.standAccentMat.color.setHex(t.accent);
     if (this.seatInstances) {
@@ -771,6 +818,7 @@ export class TennisScene3D {
     this.netGroup.add(new THREE.Mesh(netGeo, netMeshMat));
 
     const wireMat = new THREE.LineBasicMaterial({ color: 0x334155, transparent: true, opacity: 0.42 });
+    this.netMats = { mesh: netMeshMat, wire: wireMat };
     const wirePoints = [];
     for (let i = 0; i <= segments; i++) {
       const y = -postY + (i / segments) * (2 * postY);
@@ -889,6 +937,11 @@ export class TennisScene3D {
     const soleMat = new THREE.MeshStandardMaterial({ color: 0x84cc16, roughness: 0.5 });
     const capMat = new THREE.MeshStandardMaterial({ color: capHex, roughness: 0.45 });
     const sweatbandMat = new THREE.MeshStandardMaterial({ color: bandHex, roughness: 0.5 });
+    rig.mats = {
+      skin: skinMat, jersey: jerseyMat, shorts: shortsMat, collar: collarMat, sock: sockMat,
+      shoe: shoeMat, sole: soleMat, cap: capMat, band: sweatbandMat
+    };
+    rig.matsOriginal = Object.fromEntries(Object.entries(rig.mats).map(([k, m]) => [k, m.color.getHex()]));
 
     const L = this.rigLengths;
 
@@ -1493,11 +1546,55 @@ export class TennisScene3D {
     }
   }
 
+  /** Switches between the light "club" scene and the dark diagram-style "lab" scene. */
+  setTheme(theme) {
+    this.theme = theme === 'dark' ? 'dark' : 'light';
+    const T = SCENE_THEMES[this.theme];
+    this.scene.background.setHex(T.background);
+    this.scene.fog.color.setHex(T.fog);
+    this.scene.fog.density = T.fogDensity;
+    if (this.skyDome) this.skyDome.visible = T.sky;
+    if (this.lights) {
+      this.lights.ambient.intensity = T.ambient;
+      this.lights.hemi.intensity = T.hemi;
+      this.lights.sun.intensity = T.sun;
+      this.lights.fill.intensity = T.fill;
+    }
+    if (this.floorMat) this.floorMat.color.setHex(T.floor);
+    if (this.floorGrid) this.floorGrid.visible = T.floorGrid;
+    if (this.lineMat) this.lineMat.color.setHex(T.line);
+    if (this.netMats) {
+      this.netMats.mesh.color.setHex(T.netMesh[0]);
+      this.netMats.mesh.opacity = T.netMesh[1];
+      this.netMats.wire.color.setHex(T.netWire[0]);
+      this.netMats.wire.opacity = T.netWire[1];
+    }
+    if (this.standMats) {
+      this.standMats.concrete.color.setHex(T.concrete[0]);
+      this.standMats.concreteDark.color.setHex(T.concrete[1]);
+      this.standMats.trim.color.setHex(T.trim);
+    }
+    (this.crowdMats || []).forEach((m) => m.color.setHex(T.crowdTint));
+    [this.playerA, this.playerB].forEach((rig) => {
+      if (!rig || !rig.mats) return;
+      for (const [k, m] of Object.entries(rig.mats)) {
+        let hex = rig.matsOriginal[k];
+        if (T.players) {
+          const P = T.players;
+          hex = { skin: P.skin, jersey: P.jersey, shorts: P.shorts, collar: P.light, sock: P.light, shoe: P.light, sole: P.sole, cap: P.cap, band: P.band }[k] ?? hex;
+        }
+        m.color.setHex(hex);
+      }
+    });
+    this.setCourtSurface(this.surfaceKey);
+  }
+
   setStandsVisible(visible) {
     if (this.standGroup) this.standGroup.visible = visible;
   }
 
   setCourtSurface(surfaceKey) {
+    this.surfaceKey = surfaceKey;
     this.courtMat.map = this._createCourtTexture(surfaceKey, true);
     this.courtMat.needsUpdate = true;
     this.surroundMat.map = this._createCourtTexture(surfaceKey, false);
@@ -2633,10 +2730,11 @@ export class TennisScene3D {
       const inPts = simResult.incomingPreviewPoints.map((p) => physToThree(p.x, p.y, p.z));
       const inCurve = new THREE.CatmullRomCurve3(inPts);
       const inGeo = new THREE.TubeGeometry(inCurve, 28, 0.022, 8, false);
+      const TP = SCENE_THEMES[this.theme].traj;
       const inMat = new THREE.MeshBasicMaterial({
-        color: 0xea580c,
+        color: TP.incoming[0],
         transparent: true,
-        opacity: 0.68
+        opacity: TP.incoming[1]
       });
       this.trajGroup.add(new THREE.Mesh(inGeo, inMat));
     }
@@ -2659,10 +2757,11 @@ export class TennisScene3D {
     if (prePoints.length >= 2) {
       const curve1 = new THREE.CatmullRomCurve3(prePoints);
       const geo1 = new THREE.TubeGeometry(curve1, Math.min(160, prePoints.length), 0.032, 10, false);
+      const [c1, e1, ei1] = SCENE_THEMES[this.theme].traj.pre;
       const mat1 = new THREE.MeshStandardMaterial({
-        color: 0x84cc16,
-        emissive: 0x65a30d,
-        emissiveIntensity: 0.45,
+        color: c1,
+        emissive: e1,
+        emissiveIntensity: ei1,
         roughness: 0.3
       });
       this.trajGroup.add(new THREE.Mesh(geo1, mat1));
@@ -2671,10 +2770,11 @@ export class TennisScene3D {
     if (postPoints.length >= 2) {
       const curve2 = new THREE.CatmullRomCurve3(postPoints);
       const geo2 = new THREE.TubeGeometry(curve2, Math.min(100, postPoints.length), 0.026, 8, false);
+      const [c2, e2, ei2] = SCENE_THEMES[this.theme].traj.post;
       const mat2 = new THREE.MeshStandardMaterial({
-        color: 0x0284c7,
-        emissive: 0x0369a1,
-        emissiveIntensity: 0.35,
+        color: c2,
+        emissive: e2,
+        emissiveIntensity: ei2,
         roughness: 0.3
       });
       this.trajGroup.add(new THREE.Mesh(geo2, mat2));
@@ -2684,9 +2784,9 @@ export class TennisScene3D {
     if (shadowPts.length >= 2) {
       const shadowGeo = new THREE.BufferGeometry().setFromPoints(shadowPts);
       const shadowMat = new THREE.LineBasicMaterial({
-        color: 0x0f172a,
+        color: SCENE_THEMES[this.theme].traj.shadow[0],
         transparent: true,
-        opacity: 0.42
+        opacity: SCENE_THEMES[this.theme].traj.shadow[1]
       });
       this.trajGroup.add(new THREE.Line(shadowGeo, shadowMat));
     }
@@ -2698,11 +2798,11 @@ export class TennisScene3D {
       if (ghostPts.length >= 2) {
         const ghostGeo = new THREE.BufferGeometry().setFromPoints(ghostPts);
         const ghostMat = new THREE.LineDashedMaterial({
-          color: 0x64748b,
+          color: SCENE_THEMES[this.theme].traj.ghost[0],
           dashSize: 0.18,
           gapSize: 0.12,
           transparent: true,
-          opacity: 0.65
+          opacity: SCENE_THEMES[this.theme].traj.ghost[1]
         });
         const ghostLine = new THREE.Line(ghostGeo, ghostMat);
         ghostLine.computeLineDistances();
@@ -2907,7 +3007,7 @@ export class RacketImpact3DStudio {
   constructor(canvasEl) {
     this.canvas = canvasEl;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xf3f0e8); // matches --panel-2
+    this.scene.background = new THREE.Color(0xf3f0e8); // matches --panel-2 (light theme)
 
     const w = canvasEl.clientWidth || 356;
     const h = canvasEl.clientHeight || 190;
@@ -2953,6 +3053,18 @@ export class RacketImpact3DStudio {
     }
   }
 
+  setTheme(theme) {
+    const dark = theme === 'dark';
+    this.scene.background.setHex(dark ? 0x212121 : 0xf3f0e8);
+    if (this.studioGrid) {
+      this.scene.remove(this.studioGrid);
+      this.studioGrid.geometry.dispose();
+      this.studioGrid = new THREE.GridHelper(1.2, 14, dark ? 0x4a4a4a : 0xc7bca8, dark ? 0x2e2e2e : 0xe2dacb);
+      this.studioGrid.position.y = -0.19;
+      this.scene.add(this.studioGrid);
+    }
+  }
+
   _initLightsAndStudioFloor() {
     this.scene.add(new THREE.AmbientLight(0xfaf5eb, 0.92));
 
@@ -2968,6 +3080,7 @@ export class RacketImpact3DStudio {
     const grid = new THREE.GridHelper(1.2, 14, 0xc7bca8, 0xe2dacb);
     grid.position.y = -0.19;
     this.scene.add(grid);
+    this.studioGrid = grid;
 
     const datumRingGeo = new THREE.RingGeometry(0.21, 0.215, 48);
     datumRingGeo.rotateX(-Math.PI / 2);

@@ -34,6 +34,41 @@
   --ease: cubic-bezier(0.23, 1, 0.32, 1);
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  --traj-in: #d97706;
+  --traj-pre: #65a30d;
+  --traj-post: #0284c7;
+  --traj-magnus: #be123c;
+  --traj-ghost: #64748b;
+}
+
+/* Dark "lab" theme: neutral charcoal, chalk text, one muted coral accent, mint second series */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #141414;
+  --panel: #1a1a1a;
+  --panel-2: #222222;
+  --ink: #ebe8e2;           /* 14.2:1 */
+  --ink-2: #bdb9b1;         /*  8.9:1 */
+  --ink-3: #8f8b83;         /*  5.1:1 */
+  --edge: #6f6b65;          /*  3.3:1 */
+  --rule: #303030;
+  --rule-soft: #262626;
+  --accent: #e07a5f;        /* muted coral  5.9:1 */
+  --accent-press: #cc6a50;
+  --accent-ink: #1a1a1a;
+  --court: #7cc7a8;         /* mint: own swing */
+  --borrow: #e07a5f;
+  --ball: #d6e64a;
+  --in: #7cc7a8;
+  --out: #f2665a;
+  --blue: #8fb8f0;
+  --rose: #f0907e;
+  --gold: #e07a5f;
+  --traj-in: #8e8a82;
+  --traj-pre: #e07a5f;
+  --traj-post: #f2b49f;
+  --traj-magnus: #f0907e;
+  --traj-ghost: #7cc7a8;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -545,7 +580,11 @@ input[type="range"]::-moz-range-thumb {
 .legend-strip { display: flex; gap: 12px; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
 .legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-2); white-space: nowrap; }
 .legend-swatch { width: 14px; height: 2px; }
-.legend-swatch-dash { background: repeating-linear-gradient(to right, #64748b 0 3px, transparent 3px 5px); }
+.legend-swatch-in { background: var(--traj-in); }
+.legend-swatch-pre { background: var(--traj-pre); }
+.legend-swatch-post { background: var(--traj-post); }
+.legend-swatch-magnus { background: var(--traj-magnus); }
+.legend-swatch-dash { background: repeating-linear-gradient(to right, var(--traj-ghost) 0 3px, transparent 3px 5px); }
 
 /* ---------- Timeline ---------- */
 .scrubber-bar { grid-area: time; display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; background: var(--panel); }

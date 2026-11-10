@@ -14,15 +14,15 @@ import {
   samplePointAtTime,
   airDensityFromConditions,
   chainRallyTurns
-} from './physics.js?v=26';
+} from './physics.js?v=28';
 import {
   SHOT_PRESETS,
   INCOMING_PRESETS,
   EXAMPLE_RALLIES,
   TACTICAL_LESSONS,
   evaluateTacticalAttempt
-} from './presets.js?v=26';
-import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=26';
+} from './presets.js?v=28';
+import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=28';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;
@@ -129,6 +129,8 @@ const I18N = {
     chkVectors: '物理矢量',
     chkGhost: '无旋对比',
     chkTrueScale: '真实球径',
+    themeLight: '浅色',
+    themeDark: '深色',
     chkStands: '观众席',
     legIncoming: '来球',
     legPreBounce: '飞行',
@@ -266,6 +268,8 @@ const I18N = {
     chkVectors: 'Vectors',
     chkGhost: 'No-Spin',
     chkTrueScale: '1:1 Ball',
+    themeLight: 'Light',
+    themeDark: 'Dark',
     chkStands: 'Stands',
     legIncoming: 'Incoming',
     legPreBounce: 'Flight',
@@ -398,6 +402,7 @@ class TennisSimApp {
     // Initialize in Default Mode: Solo Ball Speed & Biomechanics Lab
     this.setAppMode('solo');
     this.applyPreset('alcaraz_fh');
+    this.setTheme(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
     this._startPlaybackLoop();
   }
 
@@ -488,6 +493,28 @@ class TennisSimApp {
         tacSelect.value = curTac;
       }
     }
+  }
+
+  setTheme(theme) {
+    const t = theme === 'dark' ? 'dark' : 'light';
+    if (t === 'dark') document.documentElement.dataset.theme = 'dark';
+    else delete document.documentElement.dataset.theme;
+    try {
+      localStorage.setItem('aerolab-theme', t);
+    } catch (e) {
+      /* storage unavailable: theme still applies for this visit */
+    }
+    document.querySelectorAll('#themeSwitchGroup [data-theme-choice]').forEach((b) =>
+      b.classList.toggle('active', b.getAttribute('data-theme-choice') === t)
+    );
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', t === 'dark' ? '#1a1a1a' : '#fbfaf7');
+    if (this.scene3d) {
+      this.scene3d.setTheme(t);
+      if (this.simResult) this.scene3d.updateTrajectory(this.simResult, this.ghostSimResult);
+    }
+    if (this.racket3d && this.racket3d.setTheme) this.racket3d.setTheme(t);
+    this.updateScrubberFrame?.();
   }
 
   _applyLanguageUI() {
@@ -1484,6 +1511,11 @@ class TennisSimApp {
     document.getElementById('toggleTrueScale')?.addEventListener('change', (e) => {
       this.scene3d.setBallVisualScale(e.target.checked ? 1.0 : 2.0);
       this.updateScrubberFrame();
+    });
+
+    // Light / dark theme
+    document.querySelectorAll('#themeSwitchGroup [data-theme-choice]').forEach((btn) => {
+      btn.addEventListener('click', () => this.setTheme(btn.getAttribute('data-theme-choice')));
     });
 
     // Stands: user preference; the side camera hides them temporarily so the profile stays clear
