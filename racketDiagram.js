@@ -27,7 +27,7 @@
 // Ranges and steps mirror the sliders in index.html
 const DIALS = {
   faceAngleDeg: { min: -18, max: 32, step: 0.2 },
-  swingPathDeg: { min: -30, max: 42, step: 0.5 },
+  swingPathDeg: { min: -30, max: 45, step: 0.5 },
   aimAngleDeg: { min: -28, max: 28, step: 0.2 },
   racketSpeedKmh: { min: 20, max: 175, step: 0.5 },
   incomingSpeedKmh: { min: 0, max: 200, step: 1 },

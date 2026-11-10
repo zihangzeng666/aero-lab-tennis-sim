@@ -144,7 +144,7 @@ test('every tactical lesson demo solution passes its own challenge', () => {
     const res = evaluateTacticalAttempt(lesson, lesson.challengeTurnIndex, t, sim);
     assert.ok(res && res.passed, `${key}: ${res?.feedbackEn}`);
     // The answer must be reachable with the swing controls (slider ranges in index.html)
-    const ranges = { racketSpeedKmh: [20, 175], swingPathDeg: [-30, 42], faceAngleDeg: [-18, 32], aimAngleDeg: [-28, 28] };
+    const ranges = { racketSpeedKmh: [20, 175], swingPathDeg: [-30, 45], faceAngleDeg: [-18, 32], aimAngleDeg: [-28, 28] };
     for (const [k, [lo, hi]] of Object.entries(ranges)) {
       assert.ok(t[k] >= lo && t[k] <= hi, `${key}: ${k} = ${t[k].toFixed(1)} is outside ${lo}..${hi}`);
     }

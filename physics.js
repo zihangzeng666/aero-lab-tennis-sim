@@ -927,56 +927,41 @@ export function simulateTrajectory(config) {
     for (let i = 1; i < postBouncePts.length; i++) {
       const p = postBouncePts[i];
       if (p.vz <= 0) passedApex = true;
-      const heightErr = Math.abs(p.z - 1.04);
-      const depthBonus = p.localX >= 9.2 && p.localX <= 13.2 ? -0.35 : 0.25;
-      const descentBonus = passedApex ? -0.45 : 0.35;
-      const score = heightErr + depthBonus + descentBonus;
+      // waist height first; a slight preference for a dropping ball and a normal depth
+      const heightErr = Math.abs(p.z - 1.0);
+      const depthPenalty = p.localX >= 8.5 && p.localX <= 13.5 ? 0 : 0.3;
+      const descentBonus = passedApex ? -0.08 : 0.08;
+      const score = heightErr + depthPenalty + descentBonus;
       if (p.z >= 0.58 && p.z <= 1.55 && score < bestScore) {
         bestScore = score;
         bestPt = p;
       }
     }
 
-    const horizSpd = Math.hypot(bestPt.localVx, bestPt.localVy);
-    const rawInAngle = (Math.atan2(bestPt.vz, Math.max(0.1, horizSpd)) * 180) / Math.PI;
-    // Gameplay clamp: the receiver takes the ball in a controlled strike window.
-    const clampedInAngle = Math.max(-13, Math.min(-5, rawInAngle < -2 ? rawInAngle : -9));
-    // Topspin component of the ball as it reaches the receiver (the bounce model already
-    // includes the spin lost to the normal-force offset), limited to the slider range.
-    const realisticPostBounceRpm = Math.max(
-      -4500,
-      Math.min(5000, handoffFromPoint(bestPt, side).nextIncomingSpinRpm)
-    );
-
-    // A wide ball pulls the receiver outside the sideline (up to ~1 m past it)
-    const nextHitX = Math.round(Math.max(-14.0, Math.min(-9.8, -bestPt.localX)) * 20) / 20;
-    const nextHitY = Math.round(Math.max(-5.1, Math.min(5.1, -bestPt.localY)) * 20) / 20;
-    const nextHitZ = Math.round(Math.max(0.92, Math.min(1.18, bestPt.z)) * 50) / 50;
-
-    // Trajectory point where the ball reaches the receiver's racket depth (-nextHitX)
+    // A wide ball pulls the receiver outside the sideline (up to ~1 m past it); deep balls
+    // push them back. Pick the contact depth from the comfortable point, then take the
+    // ball's actual state there, so the next shot starts exactly where this one is met.
+    const contactDepth = Math.max(7.0, Math.min(14.0, bestPt.localX));
     let contactPt = bestPt;
     let minDx = 999;
     for (const p of postBouncePts) {
-      const dx = Math.abs(p.localX - -nextHitX);
+      const dx = Math.abs(p.localX - contactDepth) + (Math.abs(p.localY) > 5.1 ? 3 : 0);
       if (dx < minDx) {
         minDx = dx;
         contactPt = p;
       }
     }
+    const h = handoffFromPoint(contactPt, side);
 
     interceptPoint = {
       t: contactPt.t,
       worldX: contactPt.x,
       worldY: contactPt.y,
       z: contactPt.z,
-      // Hand-off state in the NEXT hitter's canonical frame (rotated 180°):
-      nextSide: side === 'A' ? 'B' : 'A',
-      nextHitX,
-      nextHitY,
-      nextHitZ,
-      nextIncomingSpeedKmh: Math.round(Math.max(42, Math.min(82, bestPt.speedKmh))),
-      nextIncomingAngleDeg: Math.round(clampedInAngle * 2) / 2,
-      nextIncomingSpinRpm: realisticPostBounceRpm
+      ...h,
+      nextIncomingSpeedKmh: Math.max(20, Math.min(200, h.nextIncomingSpeedKmh)),
+      nextIncomingAngleDeg: Math.max(-40, Math.min(35, h.nextIncomingAngleDeg)),
+      nextIncomingSpinRpm: Math.max(-4500, Math.min(5000, h.nextIncomingSpinRpm))
     };
 
     // In rally / tactics mode, stop the flight at the receiver's strings.

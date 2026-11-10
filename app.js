@@ -15,7 +15,7 @@ import {
   airDensityFromConditions,
   chainRallyTurns,
   handoffFromPoint
-} from './physics.js?v=46';
+} from './physics.js?v=54';
 import {
   SHOT_PRESETS,
   INCOMING_PRESETS,
@@ -23,11 +23,11 @@ import {
   TACTICAL_LESSONS,
   evaluateTacticalAttempt,
   describeTacticalGoal
-} from './presets.js?v=46';
-import { TennisScene3D } from './scene3d.js?v=46';
-import { RacketDiagram } from './racketDiagram.js?v=46';
-import { LessonMap } from './lessonMap.js?v=46';
-import { TacticsBoard } from './tacticsBoard.js?v=46';
+} from './presets.js?v=54';
+import { TennisScene3D } from './scene3d.js?v=54';
+import { RacketDiagram } from './racketDiagram.js?v=54';
+import { LessonMap } from './lessonMap.js?v=54';
+import { TacticsBoard } from './tacticsBoard.js?v=54';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;
@@ -1516,6 +1516,7 @@ class TennisSimApp {
 
     Object.assign(this.state, {
       side: t.side,
+      strokeType: TennisSimApp.autoStroke(t),
       courtMode: t.courtMode,
       hitX: t.hitX,
       hitY: t.hitY,
@@ -2370,7 +2371,19 @@ class TennisSimApp {
     const pts = this.simResult.points;
     const t = Math.max(WINDUP_START_TIME, Math.min(this.simResult.totalDuration, this.currentTime));
 
-    this.scene3d.updatePlayerAndRacket(this.state, t, this.simResult);
+    this.scene3d.updatePlayerAndRacket(
+      this.appMode === 'solo'
+        ? this.state
+        : {
+            ...this.state,
+            rally: {
+              ...this._rallyAnimContext(),
+              staticPreview: !this.isPlaying && !this.isPlayingFullRally && Math.abs(t) < 1e-4
+            }
+          },
+      t,
+      this.simResult
+    );
 
     const activePlayerEl = document.getElementById('instActivePlayer');
     if (activePlayerEl) {
@@ -2436,6 +2449,46 @@ class TennisSimApp {
     document.getElementById('instAero').textContent = `Cd ${pt.cd.toFixed(2)} / Cl ${pt.cl.toFixed(2)}`;
   }
 
+  /** Stroke a rally shot is played with, from where it is hit (right-handed players). */
+  static autoStroke(t) {
+    if (!t) return 'fh';
+    if ((t.hitZ ?? 1) > 1.95 || t.courtMode === 'serve_deuce' || t.courtMode === 'serve_ad') return 'serve';
+    if ((t.hitY ?? 0) > 0.35) return (t.swingPathDeg ?? 20) < -3 ? 'bh1' : 'bh2';
+    return 'fh';
+  }
+
+  /**
+   * What the receiver animation needs to join up with the shots either side of this one:
+   * where they were left by their own previous shot, and how they will hit the next one.
+   */
+  _rallyAnimContext() {
+    const i = this.currentTurnIndex;
+    const prev = this.rallyTurns[i - 1];
+    const next = this.rallyTurns[i + 1];
+    const ctx = { key: `${this.appMode}:${this.activeTacticalKey || ''}:${i}:${this.rallyTurns.length}` };
+    if (next) {
+      ctx.receiverSwing = {
+        strokeType: TennisSimApp.autoStroke(next),
+        swingPathDeg: next.swingPathDeg,
+        faceAngleDeg: next.faceAngleDeg,
+        aimAngleDeg: next.aimAngleDeg
+      };
+    }
+    if (prev) {
+      ctx.receiverFrom = {
+        hitX: prev.hitX,
+        hitY: prev.hitY,
+        hitZ: prev.hitZ,
+        strokeType: TennisSimApp.autoStroke(prev),
+        swingPathDeg: prev.swingPathDeg,
+        faceAngleDeg: prev.faceAngleDeg,
+        aimAngleDeg: prev.aimAngleDeg,
+        elapsed: prev.flight?.interceptPoint?.t ?? 1.1
+      };
+    }
+    return ctx;
+  }
+
   /** A ball you can still hit: past the net and in reach (solo mode only). */
   _canHandoff(pt) {
     return !!pt && this.appMode === 'solo' && pt.localX > 0.3 && pt.z >= 0.25 && pt.z <= 2.9 && pt.speedKmh > 3;
@@ -2482,7 +2535,12 @@ class TennisSimApp {
       this._soloOpponentNamed = true;
     }
     // Forehand or backhand from where the ball is (right-hander: backhand on the left)
-    const stroke = this.state.hitY > 0.25 ? (this.state.strokeType === 'bh1' ? 'bh1' : 'bh2') : 'fh';
+    const stroke =
+      this.state.hitZ > 1.95
+        ? 'serve' // above head height: an overhead
+        : this.state.hitY > 0.25
+        ? this.state.strokeType === 'bh1' ? 'bh1' : 'bh2'
+        : 'fh';
     this.setStrokeType(stroke, true);
     this._switchSoloPlayer(fromSide);
   }

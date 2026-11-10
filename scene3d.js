@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=46';
+import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=54';
 
 // Net profile drawn with singles sticks in place (matches the physics for singles play):
 // 0.914 m at the centre rising to 1.07 m at the sticks, then level out to the posts.
@@ -37,6 +37,10 @@ const SCENE_THEMES = {
 
 // Rig limb lengths are ~0.88 of the motion-capture player's (thigh 0.42 vs 0.48 m, forearm 0.27 vs 0.29 m)
 const MOCAP_BODY_SCALE = 0.88;
+
+// Rally animation timing (s after a player's own contact)
+const RECOVERY_END = 0.48 + 0.75; // follow-through held, then recovery
+const READY_TAU = -0.18; // swing phase of the ready stance
 
 export function physToThree(x, y, z) {
   return new THREE.Vector3(x, z, -y);
@@ -1711,8 +1715,9 @@ export class TennisScene3D {
    * Resolves effective stroke type ('fh' | 'bh2' | 'bh1' | 'serve') from explicit strokeType or court position.
    */
   _resolveStrokeType(strokeType, hitY, hitZ, swingPathDeg) {
-    if (hitZ > 1.95 || strokeType === 'serve') return 'serve';
-    if (strokeType === 'bh2' || strokeType === 'bh1' || strokeType === 'fh') return strokeType;
+    // An explicit stroke wins; height only decides when the stroke is left to automatic
+    if (strokeType === 'serve' || strokeType === 'bh2' || strokeType === 'bh1' || strokeType === 'fh') return strokeType;
+    if (hitZ > 1.95) return 'serve';
     // In automatic / rally mode, balls on the left (Ad) side (hitY > 0.35) use Backhand!
     if (hitY > 0.35) {
       return swingPathDeg < -3 ? 'bh1' : 'bh2';
@@ -2518,7 +2523,9 @@ export class TennisScene3D {
     rig.contactFloorRing.visible = showTrail;
     rig.faceNormalArrow.visible = showTrail && this.showVectors;
 
-    const clip = this._pickClip(strokeType, hitZ, swingPathDeg);
+    // The clip is chosen from the shot's real contact height (clipZ) so it stays the same
+    // while a player walks or runs with an interpolated height
+    const clip = this._pickClip(strokeType, localParams.clipZ ?? hitZ, swingPathDeg);
 
     if (showTrail && !sampling) {
       const trailKey = `${swingPathDeg.toFixed(1)}_${faceAngleDeg.toFixed(1)}_${strokeType}_${hitZ.toFixed(2)}_${clip ? clip.id : 'proc'}`;
@@ -2845,26 +2852,23 @@ export class TennisScene3D {
     const receiverRig = activeSide === 'B' ? this.playerA : this.playerB;
 
     // 1. Update Active Hitter
-    let hitterTau = currentTime;
+    // the follow-through ends at 0.42 and is held until recovery starts at 0.48
+    let hitterTau = Math.min(currentTime, 0.42);
     let hitterParams = params;
     let hitterStride = 0;
 
-    // After finishing the follow-through (t > 0.48s), hitter smoothly recovers toward center baseline
+    // After the follow-through the hitter recovers towards the middle (shared with the
+    // receiver's starting point on the next shot, so the handover is seamless)
     if (currentTime > 0.48) {
-      const rec = Math.min(1, (currentTime - 0.48) / 0.75);
-      const smoothRec = rec * rec * (3 - 2 * rec);
-      hitterParams = {
-        ...params,
-        hitX: THREE.MathUtils.lerp(params.hitX, -11.8, smoothRec * 0.65),
-        hitY: THREE.MathUtils.lerp(params.hitY, 0, smoothRec * 0.55),
-        hitZ: THREE.MathUtils.lerp(params.hitZ, 1.02, smoothRec)
-      };
-      hitterTau = THREE.MathUtils.lerp(0.42, -0.18, smoothRec);
-      hitterStride = rec < 0.95 ? (currentTime - 0.48) * 14 : 0;
+      const r = this._recoveryState(params, currentTime);
+      hitterParams = { ...params, hitX: r.x, hitY: r.y, hitZ: r.z, clipZ: params.hitZ };
+      hitterTau = r.tau;
+      hitterStride = r.stride;
     }
     this._updateSinglePlayerPose(hitterRig, hitterParams, hitterTau, true, hitterStride);
 
-    // 2. Update Receiving Opponent on the Far Side (Running to Intercept & Coiling Backswing!)
+    // 2. Receiver: moves from where they are to the interception point and swings
+    const ctx = params.rally || {};
     const intercept = simResult && simResult.interceptPoint ? simResult.interceptPoint : null;
     const recSign = activeSide === 'B' ? 1 : -1;
     const targetHitX = intercept ? recSign * intercept.worldX : -11.8;
@@ -2872,46 +2876,118 @@ export class TennisScene3D {
     const targetHitZ = intercept ? intercept.z : 1.05;
     const tIntercept = intercept ? intercept.t : 1.15;
 
-    const startReadyX = -11.85;
-    const startReadyY = THREE.MathUtils.clamp(-params.hitY * 0.25, -1.8, 1.8);
-    const isStaticPreview = Math.abs(currentTime) < 1e-4;
+    // Paused on the impact frame: show the receiver at the interception (not during playback)
+    const isStaticPreview = ctx.staticPreview ?? Math.abs(currentTime) < 1e-4;
+    const sw = ctx.receiverSwing;
+    const newSwing = {
+      strokeType: sw ? sw.strokeType : targetHitY > 0.35 ? 'bh2' : 'fh',
+      swingPathDeg: sw ? sw.swingPathDeg : intercept && intercept.nextIncomingSpinRpm < -500 ? 28 : 24,
+      faceAngleDeg: sw ? sw.faceAngleDeg : -1.5,
+      aimAngleDeg: sw ? sw.aimAngleDeg : targetHitY > 0 ? -6.5 : 6.5
+    };
+
+    // Without context (first shot, previews) the receiver starts from a ready spot.
+    let startX = -11.85;
+    let startY = THREE.MathUtils.clamp(-params.hitY * 0.25, -1.8, 1.8);
+    let startZ = 1.02;
+    let tSwitch = 0;
+    const from = ctx.receiverFrom;
+    if (from && !isStaticPreview) {
+      // Phase 1: this player is still finishing the recovery from their own last shot,
+      // in that shot's stroke, exactly where the previous clip left them.
+      const since = from.elapsed + Math.max(0, currentTime);
+      // Coming forward to take this ball inside the court (volley, approach): no walk back
+      // to the baseline first, the run starts straight away from where they are.
+      const comesIn = targetHitX > -9.5;
+      if (currentTime >= 0 && since < RECOVERY_END && !comesIn) {
+        const r = this._recoveryState(from, since);
+        this._updateSinglePlayerPose(
+          receiverRig,
+          { hitX: r.x, hitY: r.y, hitZ: r.z, clipZ: from.hitZ, strokeType: from.strokeType, swingPathDeg: from.swingPathDeg, faceAngleDeg: from.faceAngleDeg, aimAngleDeg: from.aimAngleDeg },
+          r.tau,
+          false,
+          r.stride
+        );
+        return;
+      }
+      // Phase 2: recovered and in the ready stance. Switch to the next stroke with the body
+      // held in place (forehand and backhand place the body on opposite sides of the contact
+      // point), then run to the interception.
+      tSwitch = comesIn ? 0 : Math.max(0, RECOVERY_END - from.elapsed);
+      const ready = this._recoveryState(from, comesIn ? from.elapsed : RECOVERY_END);
+      const key = `${ctx.key}|${newSwing.strokeType}|${comesIn}`;
+      if (!this._receiverStartCache || this._receiverStartCache.key !== key) {
+        const fromBody = this._pelvisCanonical(receiverRig, { hitX: ready.x, hitY: ready.y, hitZ: ready.z, clipZ: from.hitZ, strokeType: from.strokeType, swingPathDeg: from.swingPathDeg, faceAngleDeg: from.faceAngleDeg, aimAngleDeg: from.aimAngleDeg }, ready.tau);
+        const toBody = this._pelvisCanonical(receiverRig, { hitX: ready.x, hitY: ready.y, hitZ: ready.z, clipZ: targetHitZ, ...newSwing }, READY_TAU);
+        this._receiverStartCache = { key, dx: fromBody[0] - toBody[0], dy: fromBody[1] - toBody[1] };
+      }
+      startX = ready.x + this._receiverStartCache.dx;
+      startY = ready.y + this._receiverStartCache.dy;
+      startZ = ready.z;
+    }
+
+    const runSpan = Math.max(0.35, tIntercept - 0.12 - tSwitch);
     const runProgress = isStaticPreview
       ? 1
-      : currentTime < 0
+      : currentTime < tSwitch
       ? 0
-      : THREE.MathUtils.clamp(currentTime / Math.max(0.35, tIntercept - 0.12), 0, 1);
+      : THREE.MathUtils.clamp((currentTime - tSwitch) / runSpan, 0, 1);
     const smoothMove = runProgress * runProgress * (3 - 2 * runProgress);
 
-    const currRecX = THREE.MathUtils.lerp(startReadyX, targetHitX, smoothMove);
-    const currRecY = THREE.MathUtils.lerp(startReadyY, targetHitY, smoothMove);
-    const currRecZ = THREE.MathUtils.lerp(1.02, targetHitZ, smoothMove);
+    const currRecX = THREE.MathUtils.lerp(startX, targetHitX, smoothMove);
+    const currRecY = THREE.MathUtils.lerp(startY, targetHitY, smoothMove);
+    const currRecZ = THREE.MathUtils.lerp(startZ, targetHitZ, smoothMove);
 
-    // As ball approaches tIntercept (from tIntercept - 0.35s to tIntercept + 0.35s), receiver coils and swings!
-    const receiverTau = isStaticPreview
-      ? 0
-      : THREE.MathUtils.clamp(currentTime - tIntercept, -0.35, 0.42);
+    // Swing timed to the interception; after the switch, ease from the ready stance into it
+    // (both sides of the blend are before contact, so the contact-frame corrections never kick in)
+    let receiverTau = isStaticPreview ? 0 : THREE.MathUtils.clamp(currentTime - tIntercept, -0.35, 0.42);
+    if (from && !isStaticPreview && currentTime >= tSwitch && currentTime < tSwitch + 0.25 && receiverTau < 0) {
+      const k = (currentTime - tSwitch) / 0.25;
+      receiverTau = THREE.MathUtils.lerp(READY_TAU, receiverTau, k * k * (3 - 2 * k));
+    }
     const isRunning =
       !isStaticPreview &&
       runProgress > 0.02 &&
       runProgress < 0.96 &&
-      Math.hypot(targetHitX - startReadyX, targetHitY - startReadyY) > 0.4;
+      Math.hypot(targetHitX - startX, targetHitY - startY) > 0.4;
     const receiverStride = isRunning ? currentTime * 16 : 0;
 
     this._updateSinglePlayerPose(
       receiverRig,
-      {
-        hitX: currRecX,
-        hitY: currRecY,
-        hitZ: currRecZ,
-        strokeType: currRecY > 0.35 ? 'bh2' : 'fh',
-        swingPathDeg: intercept && intercept.nextIncomingSpinRpm < -500 ? 28 : 24,
-        faceAngleDeg: -1.5,
-        aimAngleDeg: currRecY > 0 ? -6.5 : 6.5
-      },
+      { hitX: currRecX, hitY: currRecY, hitZ: currRecZ, clipZ: targetHitZ, ...newSwing },
       receiverTau,
       false,
       receiverStride
     );
+  }
+
+  /** Pelvis position (canonical court metres) for a pose, used to keep the body still across a stroke change. */
+  _pelvisCanonical(rig, params, tau) {
+    this._updateSinglePlayerPose(rig, params, tau, false, 0);
+    rig.root.updateMatrixWorld(true);
+    const v = new THREE.Vector3();
+    rig.pelvisGroup.getWorldPosition(v);
+    rig.root.worldToLocal(v);
+    return [v.x, -v.z];
+  }
+
+  /**
+   * Where a player is `t` seconds after their own contact: holds the follow-through until
+   * 0.48 s, then recovers towards the middle of the baseline over 0.75 s.
+   */
+  _recoveryState(p, t) {
+    if (t <= 0.48) return { x: p.hitX, y: p.hitY, z: p.hitZ, tau: Math.min(0.42, Math.max(0, t)), stride: 0 };
+    const rec = Math.min(1, (t - 0.48) / (RECOVERY_END - 0.48));
+    const s = rec * rec * (3 - 2 * rec);
+    // A server walks in holding the follow-through (the serve clip is not played backwards)
+    const isServe = p.strokeType === 'serve' || (p.hitZ ?? 1) > 1.95;
+    return {
+      x: THREE.MathUtils.lerp(p.hitX, -11.8, s * 0.65),
+      y: THREE.MathUtils.lerp(p.hitY, 0, s * 0.55),
+      z: THREE.MathUtils.lerp(p.hitZ, 1.02, s),
+      tau: isServe ? 0.42 : THREE.MathUtils.lerp(0.42, READY_TAU, s),
+      stride: rec < 0.95 ? (t - 0.48) * 14 : 0
+    };
   }
 
   updateTrajectory(simResult, ghostSimResult = null) {

@@ -274,10 +274,10 @@ export const EXAMPLE_RALLIES = {
         racketSpeedKmh: 84,
         swingPathDeg: 24.0,
         faceAngleDeg: -2.4,
-        aimAngleDeg: 4.2,
+        aimAngleDeg: 3.3,
         sidespinRpm: 150,
         targetSpeedKmh: 132,
-        targetLaunchAngleDeg: 7.2,
+        targetLaunchAngleDeg: 5.5,
         targetTopspinRpm: 2650
       },
       {
@@ -288,10 +288,10 @@ export const EXAMPLE_RALLIES = {
         racketSpeedKmh: 94,
         swingPathDeg: 28.0,
         faceAngleDeg: -2.2,
-        aimAngleDeg: 7.8,
+        aimAngleDeg: 7.7,
         sidespinRpm: 300,
         targetSpeedKmh: 139,
-        targetLaunchAngleDeg: 7.4,
+        targetLaunchAngleDeg: 8.1,
         targetTopspinRpm: 3250
       },
       {
@@ -305,7 +305,7 @@ export const EXAMPLE_RALLIES = {
         aimAngleDeg: 5.8,
         sidespinRpm: -280,
         targetSpeedKmh: 104,
-        targetLaunchAngleDeg: 4.2,
+        targetLaunchAngleDeg: 5.4,
         targetTopspinRpm: -1650
       },
       {
@@ -316,10 +316,10 @@ export const EXAMPLE_RALLIES = {
         racketSpeedKmh: 98,
         swingPathDeg: 26.5,
         faceAngleDeg: -3.2,
-        aimAngleDeg: -3.8,
+        aimAngleDeg: -3.3,
         sidespinRpm: 320,
         targetSpeedKmh: 146,
-        targetLaunchAngleDeg: 6.1,
+        targetLaunchAngleDeg: 8.4,
         targetTopspinRpm: 3150
       }
     ]
@@ -364,7 +364,7 @@ export const EXAMPLE_RALLIES = {
         aimAngleDeg: 5.8,
         sidespinRpm: 120,
         targetSpeedKmh: 136,
-        targetLaunchAngleDeg: 6.6,
+        targetLaunchAngleDeg: 7,
         targetTopspinRpm: 2550
       },
       {
@@ -378,7 +378,7 @@ export const EXAMPLE_RALLIES = {
         aimAngleDeg: 7.6,
         sidespinRpm: 260,
         targetSpeedKmh: 144,
-        targetLaunchAngleDeg: 6.2,
+        targetLaunchAngleDeg: 6.8,
         targetTopspinRpm: 3100
       },
       {
@@ -389,10 +389,10 @@ export const EXAMPLE_RALLIES = {
         racketSpeedKmh: 93,
         swingPathDeg: 24.5,
         faceAngleDeg: -2.5,
-        aimAngleDeg: -2.8,
+        aimAngleDeg: -3,
         sidespinRpm: 180,
         targetSpeedKmh: 139,
-        targetLaunchAngleDeg: 6.4,
+        targetLaunchAngleDeg: 7.8,
         targetTopspinRpm: 2800
       }
     ]
@@ -434,10 +434,10 @@ export const EXAMPLE_RALLIES = {
         racketSpeedKmh: 64,
         swingPathDeg: -14.5,
         faceAngleDeg: 5.4,
-        aimAngleDeg: 5.5,
+        aimAngleDeg: 4.3,
         sidespinRpm: -300,
         targetSpeedKmh: 103,
-        targetLaunchAngleDeg: 4.1,
+        targetLaunchAngleDeg: 4,
         targetTopspinRpm: -1600
       },
       {
@@ -448,10 +448,10 @@ export const EXAMPLE_RALLIES = {
         racketSpeedKmh: 96,
         swingPathDeg: 36.0,
         faceAngleDeg: -1.5,
-        aimAngleDeg: -4.2,
+        aimAngleDeg: -4.4,
         sidespinRpm: 380,
         targetSpeedKmh: 131,
-        targetLaunchAngleDeg: 10.2,
+        targetLaunchAngleDeg: 11.6,
         targetTopspinRpm: 3950
       },
       {
@@ -462,10 +462,10 @@ export const EXAMPLE_RALLIES = {
         racketSpeedKmh: 95,
         swingPathDeg: 25.0,
         faceAngleDeg: -2.8,
-        aimAngleDeg: -4.5,
+        aimAngleDeg: -4.8,
         sidespinRpm: 250,
         targetSpeedKmh: 142,
-        targetLaunchAngleDeg: 6.2,
+        targetLaunchAngleDeg: 7.9,
         targetTopspinRpm: 2950
       }
     ]
@@ -508,8 +508,8 @@ export const TACTICAL_LESSONS = {
     mistakeEn: "Back to the middle: two or three steps and they are back in position",
     challengeTurnIndex: 2,
     targetZone: { side: "A", localX: 8.6, localY: -2.65, rx: 1.85, ry: 1.15, minSpeedKmh: 138, minSpinRpm: 2200, maxSpinRpm: 3800 },
-    proSolution: { targetSpeedKmh: 145, targetLaunchAngleDeg: 5.3, targetTopspinRpm: 2950, aimAngleDeg: -3.4 },
-    challengeStart: { targetSpeedKmh: 126, targetLaunchAngleDeg: 6.9, targetTopspinRpm: 2700, aimAngleDeg: 7.6 },
+    proSolution: { targetSpeedKmh: 145, targetLaunchAngleDeg: 6.2, targetTopspinRpm: 2950, aimAngleDeg: -3 },
+    challengeStart: { targetSpeedKmh: 126, targetLaunchAngleDeg: 7.8, targetTopspinRpm: 2700, aimAngleDeg: 7.9 },
     turns: [
       {
         side: "A",
@@ -538,9 +538,9 @@ export const TACTICAL_LESSONS = {
         whyEn: "Stretched outside the court, B has little control of the face. The safe reply is through the middle: slow and a bit short.",
         sidespinRpm: 120,
         targetSpeedKmh: 100,
-        targetLaunchAngleDeg: 14.4,
+        targetLaunchAngleDeg: 10,
         targetTopspinRpm: 1800,
-        aimAngleDeg: 15.2
+        aimAngleDeg: 16.8
       },
       {
         side: "A",
@@ -551,9 +551,9 @@ export const TACTICAL_LESSONS = {
         receive: { mode: "bounce", depth: 10.4 },
         sidespinRpm: 280,
         targetSpeedKmh: 145,
-        targetLaunchAngleDeg: 5.3,
+        targetLaunchAngleDeg: 6.2,
         targetTopspinRpm: 2950,
-        aimAngleDeg: -3.4
+        aimAngleDeg: -3
       }
     ]
   },
@@ -578,8 +578,8 @@ export const TACTICAL_LESSONS = {
     mistakeEn: "Soft volley to the middle: short and straight at B, who then passes you",
     challengeTurnIndex: 2,
     targetZone: { side: "A", localX: 9, localY: -2.6, rx: 1.7, ry: 1.15, minSpeedKmh: 55, minSpinRpm: -2600, maxSpinRpm: -150 },
-    proSolution: { targetSpeedKmh: 70, targetLaunchAngleDeg: 11.7, targetTopspinRpm: -900, aimAngleDeg: -10.8 },
-    challengeStart: { targetSpeedKmh: 74, targetLaunchAngleDeg: 8.4, targetTopspinRpm: -900, aimAngleDeg: 1.9 },
+    proSolution: { targetSpeedKmh: 70, targetLaunchAngleDeg: 12.1, targetTopspinRpm: -900, aimAngleDeg: -10.9 },
+    challengeStart: { targetSpeedKmh: 74, targetLaunchAngleDeg: 8.9, targetTopspinRpm: -900, aimAngleDeg: 1.9 },
     turns: [
       {
         side: "A",
@@ -608,9 +608,9 @@ export const TACTICAL_LESSONS = {
         whyEn: "The best answer to a net rusher: keep it low at the feet so the volley has to be lifted.",
         sidespinRpm: 100,
         targetSpeedKmh: 95,
-        targetLaunchAngleDeg: 15.6,
+        targetLaunchAngleDeg: 11.8,
         targetTopspinRpm: 1800,
-        aimAngleDeg: 1.3
+        aimAngleDeg: 0.9
       },
       {
         side: "A",
@@ -621,9 +621,9 @@ export const TACTICAL_LESSONS = {
         receive: { mode: "volley", depth: 6.6 },
         sidespinRpm: -150,
         targetSpeedKmh: 70,
-        targetLaunchAngleDeg: 11.7,
+        targetLaunchAngleDeg: 12.1,
         targetTopspinRpm: -900,
-        aimAngleDeg: -10.8
+        aimAngleDeg: -10.9
       }
     ]
   },
@@ -648,8 +648,8 @@ export const TACTICAL_LESSONS = {
     mistakeEn: "Going for the line: high net, short court, and you are still off the court if it goes in",
     challengeTurnIndex: 1,
     targetZone: { side: "A", localX: 9.8, localY: 0, rx: 1.8, ry: 1.3, minSpeedKmh: 90, minSpinRpm: 400, maxSpinRpm: 3600 },
-    proSolution: { targetSpeedKmh: 105, targetLaunchAngleDeg: 14.7, targetTopspinRpm: 1500, aimAngleDeg: 12.3 },
-    challengeStart: { targetSpeedKmh: 125, targetLaunchAngleDeg: 8.6, targetTopspinRpm: 1400, aimAngleDeg: 3.7 },
+    proSolution: { targetSpeedKmh: 105, targetLaunchAngleDeg: 10.6, targetTopspinRpm: 1500, aimAngleDeg: 13 },
+    challengeStart: { targetSpeedKmh: 125, targetLaunchAngleDeg: 5.8, targetTopspinRpm: 1400, aimAngleDeg: 2.8 },
     turns: [
       {
         side: "B",
@@ -678,9 +678,9 @@ export const TACTICAL_LESSONS = {
         whyEn: "A is stretched off the court. A deep return through the middle leaves B a neutral third shot from behind the baseline, and the point starts over.",
         sidespinRpm: 100,
         targetSpeedKmh: 105,
-        targetLaunchAngleDeg: 14.7,
+        targetLaunchAngleDeg: 10.6,
         targetTopspinRpm: 1500,
-        aimAngleDeg: 12.3
+        aimAngleDeg: 13
       }
     ]
   },
@@ -705,8 +705,8 @@ export const TACTICAL_LESSONS = {
     mistakeEn: "Cross-court again: safe, but it hands the initiative back to A",
     challengeTurnIndex: 3,
     targetZone: { side: "B", localX: 8.6, localY: -2.85, rx: 1.95, ry: 1.05, minSpeedKmh: 132, minSpinRpm: 2200, maxSpinRpm: 3600 },
-    proSolution: { targetSpeedKmh: 138, targetLaunchAngleDeg: 8.5, targetTopspinRpm: 2750, aimAngleDeg: 5.9 },
-    challengeStart: { targetSpeedKmh: 136, targetLaunchAngleDeg: 9.9, targetTopspinRpm: 2600, aimAngleDeg: 19.9 },
+    proSolution: { targetSpeedKmh: 138, targetLaunchAngleDeg: 8.6, targetTopspinRpm: 2750, aimAngleDeg: 5.9 },
+    challengeStart: { targetSpeedKmh: 136, targetLaunchAngleDeg: 10, targetTopspinRpm: 2600, aimAngleDeg: 19.9 },
     turns: [
       {
         side: "A",
@@ -731,9 +731,9 @@ export const TACTICAL_LESSONS = {
         whyEn: "B answers cross-court. Both players fight for depth and angle; whoever lands short first is in trouble.",
         sidespinRpm: 180,
         targetSpeedKmh: 133,
-        targetLaunchAngleDeg: 11.1,
+        targetLaunchAngleDeg: 10.8,
         targetTopspinRpm: 2750,
-        aimAngleDeg: 16.6
+        aimAngleDeg: 16.7
       },
       {
         side: "A",
@@ -743,7 +743,7 @@ export const TACTICAL_LESSONS = {
         whyEn: "A finds a sharper angle and pulls B outside the sideline, but the ball arrives at a comfortable height and pace for B.",
         sidespinRpm: 240,
         targetSpeedKmh: 136,
-        targetLaunchAngleDeg: 10.2,
+        targetLaunchAngleDeg: 10,
         targetTopspinRpm: 2950,
         aimAngleDeg: 19.4
       },
@@ -755,7 +755,7 @@ export const TACTICAL_LESSONS = {
         whyEn: "B is wide but the ball is comfortable, so B changes direction: A has just hit cross-court and is on the other side, and the line is the farthest point from A. Keep it lower: the line is shorter.",
         sidespinRpm: 140,
         targetSpeedKmh: 138,
-        targetLaunchAngleDeg: 8.5,
+        targetLaunchAngleDeg: 8.6,
         targetTopspinRpm: 2750,
         aimAngleDeg: 5.9
       }
@@ -782,8 +782,8 @@ export const TACTICAL_LESSONS = {
     mistakeEn: "Flat to the middle: no kick, so B attacks from a comfortable height",
     challengeTurnIndex: 2,
     targetZone: { side: "A", localX: 9.4, localY: -2.8, rx: 1.8, ry: 1.15, minSpeedKmh: 118, minSpinRpm: 3500, maxSpinRpm: 4800, minNetClearanceM: 0.8 },
-    proSolution: { targetSpeedKmh: 126, targetLaunchAngleDeg: 11.3, targetTopspinRpm: 3900, aimAngleDeg: -16.6 },
-    challengeStart: { targetSpeedKmh: 132, targetLaunchAngleDeg: 7.5, targetTopspinRpm: 2100, aimAngleDeg: -11.1 },
+    proSolution: { targetSpeedKmh: 126, targetLaunchAngleDeg: 12.2, targetTopspinRpm: 3900, aimAngleDeg: -16.4 },
+    challengeStart: { targetSpeedKmh: 132, targetLaunchAngleDeg: 8.5, targetTopspinRpm: 2100, aimAngleDeg: -10.9 },
     turns: [
       {
         side: "A",
@@ -808,9 +808,9 @@ export const TACTICAL_LESSONS = {
         whyEn: "Above the shoulder B cannot drive the ball and slices: slow, a bit short, almost no topspin.",
         sidespinRpm: -250,
         targetSpeedKmh: 98,
-        targetLaunchAngleDeg: 7.1,
+        targetLaunchAngleDeg: 6.6,
         targetTopspinRpm: -1500,
-        aimAngleDeg: -17.1
+        aimAngleDeg: -16.6
       },
       {
         side: "A",
@@ -820,9 +820,9 @@ export const TACTICAL_LESSONS = {
         whyEn: "The ball is slow with no topspin, so A creates it: a steeper swing, high over the net, kicking higher and wider after the bounce.",
         sidespinRpm: -200,
         targetSpeedKmh: 126,
-        targetLaunchAngleDeg: 11.3,
+        targetLaunchAngleDeg: 12.2,
         targetTopspinRpm: 3900,
-        aimAngleDeg: -16.6
+        aimAngleDeg: -16.4
       }
     ]
   },
@@ -847,8 +847,8 @@ export const TACTICAL_LESSONS = {
     mistakeEn: "Inside-out again: right where B is waiting",
     challengeTurnIndex: 4,
     targetZone: { side: "A", localX: 9.3, localY: 2.9, rx: 1.7, ry: 1.05, minSpeedKmh: 132, minSpinRpm: 2000, maxSpinRpm: 3900 },
-    proSolution: { targetSpeedKmh: 142, targetLaunchAngleDeg: 8.1, targetTopspinRpm: 2800, aimAngleDeg: 1.5 },
-    challengeStart: { targetSpeedKmh: 130, targetLaunchAngleDeg: 9.8, targetTopspinRpm: 2700, aimAngleDeg: -12.9 },
+    proSolution: { targetSpeedKmh: 142, targetLaunchAngleDeg: 8, targetTopspinRpm: 2800, aimAngleDeg: 1.8 },
+    challengeStart: { targetSpeedKmh: 130, targetLaunchAngleDeg: 9.7, targetTopspinRpm: 2700, aimAngleDeg: -12.8 },
     turns: [
       {
         side: "A",
@@ -873,7 +873,7 @@ export const TACTICAL_LESSONS = {
         whyEn: "B’s reply lands on A’s backhand side but not deep: the cue to run around it.",
         sidespinRpm: -150,
         targetSpeedKmh: 110,
-        targetLaunchAngleDeg: 13.8,
+        targetLaunchAngleDeg: 13.3,
         targetTopspinRpm: 2300,
         aimAngleDeg: -15.7
       },
@@ -885,9 +885,9 @@ export const TACTICAL_LESSONS = {
         whyEn: "A moves left of the ball and uses the forehand, with more pace and spin than the backhand, pushing B wider on the backhand side.",
         sidespinRpm: 250,
         targetSpeedKmh: 135,
-        targetLaunchAngleDeg: 9.6,
+        targetLaunchAngleDeg: 8.4,
         targetTopspinRpm: 3000,
-        aimAngleDeg: -16.3
+        aimAngleDeg: -16.5
       },
       {
         side: "B",
@@ -897,9 +897,9 @@ export const TACTICAL_LESSONS = {
         whyEn: "Pulled wide, B can only send back a central, shortish ball.",
         sidespinRpm: -100,
         targetSpeedKmh: 100,
-        targetLaunchAngleDeg: 14.1,
+        targetLaunchAngleDeg: 13.9,
         targetTopspinRpm: 1800,
-        aimAngleDeg: -15.4
+        aimAngleDeg: -15
       },
       {
         side: "A",
@@ -909,9 +909,9 @@ export const TACTICAL_LESSONS = {
         whyEn: "B is still on the backhand side and the forehand side is empty. With the same preparation, A goes down the line.",
         sidespinRpm: 250,
         targetSpeedKmh: 142,
-        targetLaunchAngleDeg: 8.1,
+        targetLaunchAngleDeg: 8,
         targetTopspinRpm: 2800,
-        aimAngleDeg: 1.5
+        aimAngleDeg: 1.8
       }
     ]
   },
@@ -936,8 +936,8 @@ export const TACTICAL_LESSONS = {
     mistakeEn: "Volleying deep back to B: a second chance to pass",
     challengeTurnIndex: 4,
     targetZone: { side: "A", localX: 6, localY: 3.6, rx: 1.5, ry: 0.9, minSpeedKmh: 60, minSpinRpm: -3000, maxSpinRpm: 600 },
-    proSolution: { targetSpeedKmh: 88, targetLaunchAngleDeg: -7.4, targetTopspinRpm: -600, aimAngleDeg: 15.4 },
-    challengeStart: { targetSpeedKmh: 88, targetLaunchAngleDeg: -1.5, targetTopspinRpm: -600, aimAngleDeg: -15 },
+    proSolution: { targetSpeedKmh: 88, targetLaunchAngleDeg: -6.3, targetTopspinRpm: -600, aimAngleDeg: 15.6 },
+    challengeStart: { targetSpeedKmh: 88, targetLaunchAngleDeg: -0.7, targetTopspinRpm: -600, aimAngleDeg: -14.9 },
     turns: [
       {
         side: "A",
@@ -962,9 +962,9 @@ export const TACTICAL_LESSONS = {
         whyEn: "B’s ball lands near the service line: A can move forward.",
         sidespinRpm: 100,
         targetSpeedKmh: 90,
-        targetLaunchAngleDeg: 16,
+        targetLaunchAngleDeg: 15.3,
         targetTopspinRpm: 1500,
-        aimAngleDeg: 16.1
+        aimAngleDeg: 16.2
       },
       {
         side: "A",
@@ -975,9 +975,9 @@ export const TACTICAL_LESSONS = {
         receive: { mode: "bounce", depth: 7.6 },
         sidespinRpm: -200,
         targetSpeedKmh: 90,
-        targetLaunchAngleDeg: 5.8,
+        targetLaunchAngleDeg: 6,
         targetTopspinRpm: -1000,
-        aimAngleDeg: -2.4
+        aimAngleDeg: -2.5
       },
       {
         side: "B",
@@ -987,9 +987,9 @@ export const TACTICAL_LESSONS = {
         whyEn: "B is pinned in the corner; the line is covered, so B tries the cross-court pass.",
         sidespinRpm: 150,
         targetSpeedKmh: 115,
-        targetLaunchAngleDeg: 12.5,
+        targetLaunchAngleDeg: 13.8,
         targetTopspinRpm: 2800,
-        aimAngleDeg: -15.1
+        aimAngleDeg: -15.2
       },
       {
         side: "A",
@@ -1000,9 +1000,9 @@ export const TACTICAL_LESSONS = {
         receive: { mode: "volley", depth: 2.2 },
         sidespinRpm: -100,
         targetSpeedKmh: 88,
-        targetLaunchAngleDeg: -7.4,
+        targetLaunchAngleDeg: -6.3,
         targetTopspinRpm: -600,
-        aimAngleDeg: 15.4
+        aimAngleDeg: 15.6
       }
     ]
   },
@@ -1027,8 +1027,8 @@ export const TACTICAL_LESSONS = {
     mistakeEn: "Forcing the line from off the court: high net, short court, full swing",
     challengeTurnIndex: 2,
     targetZone: { side: "A", localX: 9.6, localY: 2.6, rx: 1.8, ry: 1.3, maxSpeedKmh: 115, minSpinRpm: 1200, maxSpinRpm: 4200, minNetClearanceM: 1.4, minFlightTimeS: 1.2 },
-    proSolution: { targetSpeedKmh: 95, targetLaunchAngleDeg: 19.4, targetTopspinRpm: 2600, aimAngleDeg: 19.9 },
-    challengeStart: { targetSpeedKmh: 135, targetLaunchAngleDeg: 7.5, targetTopspinRpm: 2500, aimAngleDeg: 4.3 },
+    proSolution: { targetSpeedKmh: 88, targetLaunchAngleDeg: 20.7, targetTopspinRpm: 2600, aimAngleDeg: 21.1 },
+    challengeStart: { targetSpeedKmh: 135, targetLaunchAngleDeg: 6.7, targetTopspinRpm: 2500, aimAngleDeg: 4.6 },
     turns: [
       {
         side: "A",
@@ -1053,9 +1053,9 @@ export const TACTICAL_LESSONS = {
         whyEn: "B hits a sharp short angle and drags A outside the sideline.",
         sidespinRpm: 250,
         targetSpeedKmh: 130,
-        targetLaunchAngleDeg: 10.4,
+        targetLaunchAngleDeg: 10.1,
         targetTopspinRpm: 3200,
-        aimAngleDeg: 19.6
+        aimAngleDeg: 19.8
       },
       {
         side: "A",
@@ -1064,10 +1064,10 @@ export const TACTICAL_LESSONS = {
         whyZh: "A 在边线外够到球，先保证不丢分：挥拍更向上，过网很高，斜线落深。",
         whyEn: "A reaches it outside the sideline and plays to stay in the point: a more upward swing, high over the net, deep cross-court.",
         sidespinRpm: 150,
-        targetSpeedKmh: 95,
-        targetLaunchAngleDeg: 19.4,
+        targetSpeedKmh: 88,
+        targetLaunchAngleDeg: 20.7,
         targetTopspinRpm: 2600,
-        aimAngleDeg: 19.9
+        aimAngleDeg: 21.1
       }
     ]
   },
@@ -1093,7 +1093,7 @@ export const TACTICAL_LESSONS = {
     challengeTurnIndex: 2,
     targetZone: { side: "A", localX: 4.1, localY: 1.55, rx: 1.75, ry: 1.25, minSpeedKmh: 52, maxSpeedKmh: 78, minSpinRpm: -2800, maxSpinRpm: -600 },
     proSolution: { targetSpeedKmh: 62, targetLaunchAngleDeg: 12.9, targetTopspinRpm: -1650, aimAngleDeg: 9 },
-    challengeStart: { targetSpeedKmh: 135, targetLaunchAngleDeg: 8.1, targetTopspinRpm: 2800, aimAngleDeg: 4.8 },
+    challengeStart: { targetSpeedKmh: 135, targetLaunchAngleDeg: 8.1, targetTopspinRpm: 2800, aimAngleDeg: 4.7 },
     turns: [
       {
         side: "A",
@@ -1118,9 +1118,9 @@ export const TACTICAL_LESSONS = {
         whyEn: "From that deep, B can only send a central ball that is not deep.",
         sidespinRpm: 140,
         targetSpeedKmh: 118,
-        targetLaunchAngleDeg: 12,
+        targetLaunchAngleDeg: 12.2,
         targetTopspinRpm: 2500,
-        aimAngleDeg: 9.8
+        aimAngleDeg: 9.1
       },
       {
         side: "A",
