@@ -14,15 +14,16 @@ import {
   samplePointAtTime,
   airDensityFromConditions,
   chainRallyTurns
-} from './physics.js?v=31';
+} from './physics.js?v=33';
 import {
   SHOT_PRESETS,
   INCOMING_PRESETS,
   EXAMPLE_RALLIES,
   TACTICAL_LESSONS,
   evaluateTacticalAttempt
-} from './presets.js?v=31';
-import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=31';
+} from './presets.js?v=33';
+import { TennisScene3D } from './scene3d.js?v=33';
+import { RacketDiagram } from './racketDiagram.js?v=33';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;
@@ -73,10 +74,8 @@ const I18N = {
     shotPresetLabel: '风格预设 (手调参数)',
     btnNextTurn: '+ 下一拍回击',
     racketVizTitle: '拍面触球示意',
-    rViewIso: '斜视',
-    rViewFront: '拍面',
-    rViewSide: '侧面',
-    racket3DHint: '拖拽旋转',
+    rViewTop: '俯视',
+    rViewSide: '侧视',
     rmFace: '拍面',
     rmSwing: '轨迹',
     rmAttack: '攻角',
@@ -212,10 +211,8 @@ const I18N = {
     shotPresetLabel: 'Style Preset (hand-tuned)',
     btnNextTurn: '+ Next Shot',
     racketVizTitle: 'Impact view (illustrative)',
-    rViewIso: '3D',
-    rViewFront: 'Face',
+    rViewTop: 'Top',
     rViewSide: 'Side',
-    racket3DHint: 'Drag 360°',
     rmFace: 'Face',
     rmSwing: 'Swing',
     rmAttack: 'Attack',
@@ -414,7 +411,7 @@ class TennisSimApp {
 
     const racketCanvasEl = document.getElementById('racketImpactCanvas');
     if (racketCanvasEl) {
-      this.racket3d = new RacketImpact3DStudio(racketCanvasEl);
+      this.racket3d = new RacketDiagram(racketCanvasEl);
     }
   }
 
@@ -1193,9 +1190,9 @@ class TennisSimApp {
     }
     this.scene3d.setCameraPreset('broadcast', this.simResult, this.state);
     if (this.racket3d) {
-      this.racket3d.setViewMode('iso');
+      this.racket3d.setViewMode('side');
       document.querySelectorAll('#racket3DViewGroup .seg-btn').forEach((b) =>
-        b.classList.toggle('active', b.getAttribute('data-racket-view') === 'iso')
+        b.classList.toggle('active', b.getAttribute('data-racket-view') === 'side')
       );
     }
   }
@@ -1402,7 +1399,7 @@ class TennisSimApp {
       });
     });
 
-    // 3b. 3D Racket Impact Studio View Switcher ('iso' | 'front' | 'side')
+    // 3b. Impact diagram view switcher ('side' | 'top')
     document.querySelectorAll('#racket3DViewGroup [data-racket-view]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const mode = btn.getAttribute('data-racket-view');
@@ -2335,7 +2332,7 @@ class TennisSimApp {
    */
   _updateRacketImpact3D() {
     if (this.racket3d) {
-      this.racket3d.updateFromState(this.state);
+      this.racket3d.updateFromState({ ...this.state, lang: this.lang });
     }
 
     const { swingPathDeg, faceAngleDeg, aimAngleDeg } = this.state;

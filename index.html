@@ -16,7 +16,7 @@
       if (localStorage.getItem('aerolab-theme') === 'light') document.documentElement.dataset.theme = 'light';
     } catch (e) {}
   </script>
-  <link rel="stylesheet" href="./styles.css?v=31" />
+  <link rel="stylesheet" href="./styles.css?v=33" />
   <script type="importmap">
     {
       "imports": {
@@ -433,14 +433,12 @@
         <summary class="section-header">
           <span class="section-tag" data-i18n="racketVizTitle">拍面触球示意</span>
           <div class="seg-control mini-seg" id="racket3DViewGroup">
-            <button class="seg-btn active" data-racket-view="iso" data-i18n="rViewIso">3D</button>
-            <button class="seg-btn" data-racket-view="front" data-i18n="rViewFront">拍面</button>
-            <button class="seg-btn" data-racket-view="side" data-i18n="rViewSide">侧面</button>
+            <button class="seg-btn active" data-racket-view="side" data-i18n="rViewSide">侧视</button>
+            <button class="seg-btn" data-racket-view="top" data-i18n="rViewTop">俯视</button>
           </div>
         </summary>
         <div class="racket-3d-wrap">
-          <canvas id="racketImpactCanvas" width="680" height="220"></canvas>
-          <span class="racket-3d-hint" data-i18n="racket3DHint">拖拽旋转</span>
+          <div id="racketImpactCanvas" class="racket-diagram"></div>
         </div>
         <div class="racket-metrics-bar">
           <div class="rm-cell">
@@ -670,6 +668,6 @@
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=31"></script>
+  <script type="module" src="./app.js?v=33"></script>
 </body>
 </html>
