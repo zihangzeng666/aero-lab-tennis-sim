@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=19';
+import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=23';
 
 // Net profile drawn with singles sticks in place (matches the physics for singles play):
 // 0.914 m at the centre rising to 1.07 m at the sticks, then level out to the posts.
@@ -13,6 +13,9 @@ function drawnNetHeightAtY(y) {
   const stickY = ITF_COURT.halfSinglesWidth + ITF_COURT.netPostOffset;
   return Math.abs(y) >= stickY ? ITF_COURT.netHeightPost : getNetHeightAtY(y, true);
 }
+
+// Rig limb lengths are ~0.88 of the motion-capture player's (thigh 0.42 vs 0.48 m, forearm 0.27 vs 0.29 m)
+const MOCAP_BODY_SCALE = 0.88;
 
 export function physToThree(x, y, z) {
   return new THREE.Vector3(x, z, -y);
@@ -115,6 +118,8 @@ export class TennisScene3D {
     this._initBallAndVectors();
     this._initTrajectoryMeshes();
     this._initHawkEyeMarkers();
+    this.strokeClips = null;
+    this._loadStrokeClips();
     if (this.playerB && this.playerB.root) {
       this.playerB.root.visible = !this.soloMode;
     }
@@ -1823,6 +1828,257 @@ export class TennisScene3D {
     );
   }
 
+  /* ----------------------------------------------------------------------- */
+  /* Motion-capture driven strokes (3DTennisDS, see mocap/strokes.json)       */
+  /* ----------------------------------------------------------------------- */
+
+  _loadStrokeClips() {
+    fetch('./mocap/strokes.json?v=2')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data || !Array.isArray(data.clips)) return;
+        this.strokeClips = data.clips;
+        [this.playerA, this.playerB].forEach((rig) => {
+          if (rig) rig._lastTrailKey = null;
+        });
+        if (typeof this.onClipsLoaded === 'function') this.onClipsLoaded();
+      })
+      .catch(() => {
+        /* fall back to the procedural swing */
+      });
+  }
+
+  /** Picks the recorded stroke closest in contact height and swing angle (topspin FH / 2H-BH only). */
+  _pickClip(strokeType, hitZ, swingPathDeg) {
+    if (!this.strokeClips || swingPathDeg < -3) return null;
+    if (strokeType !== 'fh' && strokeType !== 'bh2') return null;
+    let best = null;
+    let bestScore = Infinity;
+    for (const c of this.strokeClips) {
+      if (c.stroke !== strokeType) continue;
+      const score =
+        Math.abs(c.impactHeight * MOCAP_BODY_SCALE - hitZ) / 0.12 + Math.abs(c.swingDeg - swingPathDeg) / 15;
+      if (score < bestScore) {
+        bestScore = score;
+        best = c;
+      }
+    }
+    return best;
+  }
+
+  _clipVec(clip, key, tau, out = new THREE.Vector3()) {
+    const arr = clip.frames[key];
+    const f = (tau - clip.t0) * clip.rate;
+    const i = THREE.MathUtils.clamp(Math.floor(f), 0, arr.length - 2);
+    const u = THREE.MathUtils.clamp(f - i, 0, 1);
+    const a = arr[i];
+    const b = arr[i + 1];
+    return out.set(a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u);
+  }
+
+  _clipQuat(clip, tau) {
+    const arr = clip.frames.racketQuat;
+    const f = (tau - clip.t0) * clip.rate;
+    const i = THREE.MathUtils.clamp(Math.floor(f), 0, arr.length - 2);
+    const u = THREE.MathUtils.clamp(f - i, 0, 1);
+    const qa = new THREE.Quaternion(...arr[i]);
+    const qb = new THREE.Quaternion(...arr[i + 1]);
+    return qa.slerp(qb, u);
+  }
+
+  /**
+   * Poses a rig from a recorded stroke. The body is scaled to the rig about the contact
+   * point; feet stay on the ground; the difference between the recorded and requested
+   * contact height is absorbed by the legs and (near impact only) by the arm; the racket
+   * is rotated about the contact point near impact so its path and face match the
+   * physics inputs exactly at contact.
+   */
+  _updatePoseFromClip(rig, localParams, tau, clip, strokeType, runningStridePhase = 0) {
+    const { hitZ = 1.05, swingPathDeg = 20, faceAngleDeg = -2, aimAngleDeg = 0 } = localParams;
+    const S = MOCAP_BODY_SCALE;
+    const deg2rad = Math.PI / 180;
+    const aimRad = aimAngleDeg * deg2rad;
+    const t = THREE.MathUtils.clamp(tau, -0.35, 0.42);
+    const L = this.rigLengths;
+
+    rig.contactPivot.updateMatrix();
+    const M = rig.contactPivot.matrix;
+    const toRoot = (v) => v.clone().applyMatrix4(M);
+
+    // Body placement in the contact frame
+    const rwri0 = this._clipVec(clip, 'rwri', 0);
+    const T = rwri0.clone().multiplyScalar(1 - S);
+    const groundBelowContact = S * clip.impactHeight - T.y;
+    const dH = hitZ - groundBelowContact; // > 0: ball higher than in the recording
+    const bodyLift = THREE.MathUtils.clamp(dH, -0.3, 0.08);
+    const bodyOffsetY = -dH + bodyLift;
+    const near = Math.exp(-Math.pow(t / 0.16, 2));
+    const racketOffsetY = bodyOffsetY + (dH - bodyLift) * near;
+
+    const body = (key) => {
+      const v = this._clipVec(clip, key, t).multiplyScalar(S).add(T);
+      v.y += bodyOffsetY;
+      return v;
+    };
+    const ankle = (key) => {
+      const raw = this._clipVec(clip, key, t);
+      const v = raw.clone().multiplyScalar(S).add(T);
+      v.y = -hitZ + S * (raw.y - clip.groundY) * 0.97; // ankle height above the court
+      return v;
+    };
+
+    // Racket: follows the recorded hand, then is corrected near impact
+    const rwri = this._clipVec(clip, 'rwri', t);
+    const racketPos = this._clipVec(clip, 'racketPos', t)
+      .sub(rwri)
+      .add(rwri.clone().multiplyScalar(S).add(T));
+    racketPos.y += racketOffsetY;
+    const racketQuat = this._clipQuat(clip, t);
+    const corrSwing = (swingPathDeg - clip.swingDeg) * deg2rad * near;
+    const corrFace = (faceAngleDeg - clip.faceDeg) * deg2rad * near;
+    const zAxis = new THREE.Vector3(0, 0, 1);
+    racketPos.applyAxisAngle(zAxis, corrSwing);
+    racketQuat.premultiply(new THREE.Quaternion().setFromAxisAngle(zAxis, corrFace));
+    rig.racketGroup.position.copy(racketPos);
+    rig.racketGroup.quaternion.copy(racketQuat);
+
+    const q0 = this._clipQuat(clip, 0).premultiply(
+      new THREE.Quaternion().setFromAxisAngle(zAxis, (faceAngleDeg - clip.faceDeg) * deg2rad)
+    );
+    rig.impactPlaneIndicator.quaternion.copy(q0);
+
+    // Pelvis and trunk from the recorded hips and shoulders
+    const lhip = toRoot(body('lhip'));
+    const rhip = toRoot(body('rhip'));
+    const lsho = toRoot(body('lsho'));
+    const rsho = toRoot(body('rsho'));
+    const hipMid = lhip.clone().add(rhip).multiplyScalar(0.5);
+    const shoMid = lsho.clone().add(rsho).multiplyScalar(0.5);
+    const hipAxis = rhip.clone().sub(lhip);
+    const shoAxis = rsho.clone().sub(lsho);
+    const pelvisYaw = Math.atan2(hipAxis.x, hipAxis.z);
+    let twist = Math.atan2(shoAxis.x, shoAxis.z) - pelvisYaw;
+    twist = Math.atan2(Math.sin(twist), Math.cos(twist));
+
+    const pelvisFwd = new THREE.Vector3(Math.cos(pelvisYaw), 0, -Math.sin(pelvisYaw));
+    const pelvisRight = new THREE.Vector3(Math.sin(pelvisYaw), 0, Math.cos(pelvisYaw));
+    const trunk = shoMid.clone().sub(hipMid);
+    const lean = Math.atan2(trunk.dot(pelvisFwd), trunk.y);
+    const side = Math.atan2(trunk.dot(pelvisRight), trunk.y);
+
+    rig.pelvisGroup.position.copy(hipMid).add(new THREE.Vector3(0, 0.04, 0));
+    rig.pelvisGroup.rotation.set(0, pelvisYaw, 0);
+    rig.spinePivot.rotation.set(side * 0.5, twist * 0.45, -lean * 0.5);
+    rig.chestPivot.rotation.set(side * 0.5, twist * 0.55, -lean * 0.5);
+    rig.root.updateMatrixWorld(true);
+
+    const invRootMat = new THREE.Matrix4().copy(rig.root.matrixWorld).invert();
+    const toRootLocal = (localPt, obj) => localPt.clone().applyMatrix4(obj.matrixWorld).applyMatrix4(invRootMat);
+
+    // The rig's trunk is proportionally longer than the recorded player's: move the pelvis so the
+    // rig's shoulders land on the recorded shoulders (the legs absorb the difference).
+    const rigShoMid = toRootLocal(rig.rightShoulderLocal, rig.chestPivot)
+      .add(toRootLocal(rig.leftShoulderLocal, rig.chestPivot))
+      .multiplyScalar(0.5);
+    const shoDelta = shoMid.clone().sub(rigShoMid);
+    shoDelta.y = THREE.MathUtils.clamp(shoDelta.y, -0.16, 0.04);
+    rig.pelvisGroup.position.add(shoDelta);
+    rig.root.updateMatrixWorld(true);
+
+    const rShoulder = toRootLocal(rig.rightShoulderLocal, rig.chestPivot);
+    const lShoulder = toRootLocal(rig.leftShoulderLocal, rig.chestPivot);
+    const headRoot = toRootLocal(new THREE.Vector3(0, 0, 0), rig.headGroup);
+    const fwdDir = new THREE.Vector3(Math.cos(aimRad), 0, -Math.sin(aimRad));
+    const rightDir = new THREE.Vector3(Math.sin(aimRad), 0, Math.cos(aimRad));
+
+    // Keep the hand on the racket: clamp the grip into arm reach (outside the moment of impact).
+    // The recorded hands sit near the butt of the handle, so the grips are placed low on the handle.
+    const rGripLocal = new THREE.Vector3(0, 0, strokeType === 'bh2' ? -0.47 : -0.43);
+    let gripRoot = toRootLocal(rGripLocal, rig.racketGroup);
+    const maxReach = L.upperArm + L.forearm - 0.012;
+    const shToGrip = gripRoot.clone().sub(rShoulder);
+    if (shToGrip.length() > maxReach && Math.abs(t) > 0.01) {
+      const delta = rShoulder.clone().add(shToGrip.setLength(maxReach)).sub(gripRoot);
+      rig.racketGroup.position.add(delta.applyAxisAngle(UP_VEC, -aimRad));
+      rig.root.updateMatrixWorld(true);
+      gripRoot = toRootLocal(rGripLocal, rig.racketGroup);
+    }
+
+    // Arms: two-bone IK with elbow poles taken from the recorded elbows
+    const pole = (shoulder, wrist, elbowKey) => {
+      const elbow = toRoot(body(elbowKey));
+      const mid = shoulder.clone().add(wrist).multiplyScalar(0.5);
+      const d = elbow.sub(mid);
+      return d.lengthSq() > 1e-6 ? d.normalize() : new THREE.Vector3(0, -1, 0);
+    };
+    const rArm = solveTwoBoneIK(rShoulder, gripRoot, L.upperArm, L.forearm, pole(rShoulder, gripRoot, 'relb'));
+    alignBoneMesh(rig.rightUpperArmBone, rShoulder, rArm.midPos);
+    alignBoneMesh(rig.rightForearmBone, rArm.midPos, rArm.effectiveTarget);
+
+    const leftTarget =
+      strokeType === 'bh2'
+        ? toRootLocal(new THREE.Vector3(0, 0, -0.37), rig.racketGroup)
+        : toRoot(body('lwri'));
+    if (strokeType !== 'bh2') {
+      this._pushOutOfTorsoAndHead(leftTarget, rig.pelvisGroup.position, headRoot, fwdDir, rightDir, 0.22, 0.23);
+    }
+    const lArm = solveTwoBoneIK(lShoulder, leftTarget, L.upperArm, L.forearm, pole(lShoulder, leftTarget, 'lelb'));
+    alignBoneMesh(rig.leftUpperArmBone, lShoulder, lArm.midPos);
+    alignBoneMesh(rig.leftForearmBone, lArm.midPos, lArm.effectiveTarget);
+
+    // Legs: feet from the recording (on the court), knees from the recorded knee direction
+    const stride = Math.sin(runningStridePhase) * 0.18;
+    const lAnk = toRoot(ankle('lank')).addScaledVector(fwdDir, stride);
+    const rAnk = toRoot(ankle('rank')).addScaledVector(fwdDir, -stride);
+    if (runningStridePhase) {
+      lAnk.y += Math.max(0, Math.cos(runningStridePhase)) * 0.06;
+      rAnk.y += Math.max(0, -Math.cos(runningStridePhase)) * 0.06;
+    }
+    const lHip = toRootLocal(rig.leftHipLocal, rig.pelvisGroup);
+    const rHip = toRootLocal(rig.rightHipLocal, rig.pelvisGroup);
+    const kneePole = (hip, ank, kneeKey) => {
+      const knee = toRoot(body(kneeKey));
+      const d = knee.sub(hip.clone().add(ank).multiplyScalar(0.5));
+      d.y = Math.min(d.y, 0.05);
+      return d.lengthSq() > 1e-6 ? d.normalize() : fwdDir.clone();
+    };
+    const lLeg = solveTwoBoneIK(lHip, lAnk, L.thigh, L.shin, kneePole(lHip, lAnk, 'lkne'));
+    const rLeg = solveTwoBoneIK(rHip, rAnk, L.thigh, L.shin, kneePole(rHip, rAnk, 'rkne'));
+    alignBoneMesh(rig.leftThighBone, lHip, lLeg.midPos);
+    alignBoneMesh(rig.leftShinBone, lLeg.midPos, lLeg.effectiveTarget);
+    alignBoneMesh(rig.rightThighBone, rHip, rLeg.midPos);
+    alignBoneMesh(rig.rightShinBone, rLeg.midPos, rLeg.effectiveTarget);
+
+    const footYaw = (ankKey, toeKey) => {
+      const a = toRoot(body(ankKey));
+      const b = toRoot(body(toeKey));
+      return Math.atan2(-(b.z - a.z), b.x - a.x);
+    };
+    rig.leftShoeGroup.position.copy(lLeg.effectiveTarget);
+    rig.leftShoeGroup.rotation.set(0, footYaw('lank', 'ltoe'), 0);
+    rig.rightShoeGroup.position.copy(rLeg.effectiveTarget);
+    rig.rightShoeGroup.rotation.set(0, footYaw('rank', 'rtoe'), 0);
+
+    // Head: recorded gaze direction, expressed relative to the chest
+    const hF = toRoot(body('headF')).sub(toRoot(body('head')));
+    const chestYaw = pelvisYaw + twist;
+    const gazeYaw = Math.atan2(-hF.z, hF.x);
+    let neckYaw = gazeYaw - chestYaw;
+    neckYaw = Math.atan2(Math.sin(neckYaw), Math.cos(neckYaw));
+    const pitch = Math.atan2(hF.y, Math.hypot(hF.x, hF.z));
+    rig.headGroup.rotation.set(0, THREE.MathUtils.clamp(neckYaw, -1.1, 1.1), THREE.MathUtils.clamp(pitch, -0.6, 0.4));
+
+    // Flash, contact markers
+    const flashAlpha = rig.swingTrailGroup.visible ? Math.max(0, 1 - Math.abs(tau) * 18) : 0;
+    rig.impactFlashMat.opacity = flashAlpha * 0.75;
+    rig.impactFlashRing.scale.setScalar(0.7 + (1 - flashAlpha) * 0.9);
+    const contactPos = rig.contactPivot.position;
+    rig.contactDropLine.position.copy(contactPos);
+    rig.contactDropLine.scale.set(1, hitZ, 1);
+    rig.contactDropLine.computeLineDistances();
+    rig.contactFloorRing.position.set(contactPos.x, 0.004, contactPos.z);
+  }
+
   /**
    * Swing trail from sampled racket poses ([tau, position, quaternion] in the contact-pivot frame).
    * Fades in toward contact and out after it; colour runs takeback (slate) -> contact (ball yellow)
@@ -1976,8 +2232,10 @@ export class TennisScene3D {
     rig.contactFloorRing.visible = showTrail;
     rig.faceNormalArrow.visible = showTrail && this.showVectors;
 
+    const clip = this._pickClip(strokeType, hitZ, swingPathDeg);
+
     if (showTrail && !sampling) {
-      const trailKey = `${swingPathDeg.toFixed(1)}_${faceAngleDeg.toFixed(1)}_${strokeType}_${hitZ.toFixed(2)}`;
+      const trailKey = `${swingPathDeg.toFixed(1)}_${faceAngleDeg.toFixed(1)}_${strokeType}_${hitZ.toFixed(2)}_${clip ? clip.id : 'proc'}`;
       if (rig._lastTrailKey !== trailKey) {
         rig._lastTrailKey = trailKey;
         this._rebuildSwingTrailRibbon(rig, this._sampleRenderedSwing(rig, localParams));
@@ -1989,6 +2247,11 @@ export class TennisScene3D {
 
     rig.contactPivot.position.copy(contactPos);
     rig.contactPivot.rotation.set(0, aimRad, 0);
+
+    if (clip) {
+      this._updatePoseFromClip(rig, localParams, tau, clip, strokeType, runningStridePhase);
+      return;
+    }
 
     const impactPose0 = this._evaluateSwingPoseAtTime(0, swingPathDeg, faceAngleDeg, hitZ, strokeType);
     rig.impactPlaneIndicator.quaternion.copy(impactPose0.quat);

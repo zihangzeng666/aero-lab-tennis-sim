@@ -49,6 +49,29 @@ Player B hits in the mirrored frame: world `(x, y) = (−x_local, −y_local)`. 
 - C_D is for a new ball; felt wear and humidity are ignored.
 - In rally mode the receiver's contact point and incoming angle are clamped to a playable window so rallies can continue. That part is gameplay, not physics.
 
+## Player motion (motion capture)
+
+Topspin forehands and two-handed backhands are driven by real motion-capture data:
+13 recorded strokes (player tp2) from **3DTennisDS**, Lublin University of Technology
+(Vicon, Plug-in Gait full body + 7-marker racket, 100 Hz).
+[mocap/export_3dtennisds.py](mocap/export_3dtennisds.py) converts the C3D files into
+[mocap/strokes.json](mocap/strokes.json): joint centres and racket pose in the contact frame,
+resampled to 50 Hz.
+
+At run time the clip closest in contact height and swing angle is chosen. The body is scaled
+to the rig (0.88) about the contact point; pelvis and trunk rotation come from the recorded hips
+and shoulders; arms and legs are solved with two-bone IK towards the recorded hands and feet;
+the racket orientation comes from the hoop markers. Differences in contact height are absorbed
+by the legs and, near impact only, by the arm. Swing-path and face-angle differences are applied
+as a small rotation about the contact point that fades out within ~0.15 s of impact, so the racket
+matches the physics inputs exactly at contact.
+
+Serves, slices and the one-handed backhand are not in the dataset and still use the procedural
+keyframe swing.
+
+> The used tennis motion capture dataset was obtained from https://tennisdb.cs.pollub.pl at the
+> Lublin University of Technology.
+
 ## Validation
 
 [validation.html](validation.html) runs `physics.js` in the browser and shows:
@@ -85,6 +108,7 @@ They cover the vacuum limit, 4th-order convergence, A/B mirror symmetry, line ca
 |---|---|
 | `physics.js` | Flight integrator, impact and bounce models, line calls, rally chaining, `MODEL_ASSUMPTIONS` |
 | `presets.js` | Hand-tuned style presets, example rallies, tactics lessons and their scoring |
+| `mocap/` | Converted motion-capture strokes (3DTennisDS) and the conversion script |
 | `app.js` | UI controller: sliders, HUD, modes, playback |
 | `scene3d.js` | three.js court, player rigs and racket views |
 | `validation.html` / `validation.js` | Validation page |

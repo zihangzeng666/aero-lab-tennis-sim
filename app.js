@@ -14,15 +14,15 @@ import {
   samplePointAtTime,
   airDensityFromConditions,
   chainRallyTurns
-} from './physics.js?v=19';
+} from './physics.js?v=23';
 import {
   SHOT_PRESETS,
   INCOMING_PRESETS,
   EXAMPLE_RALLIES,
   TACTICAL_LESSONS,
   evaluateTacticalAttempt
-} from './presets.js?v=19';
-import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=19';
+} from './presets.js?v=23';
+import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=23';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;
@@ -398,6 +398,7 @@ class TennisSimApp {
   _init3D() {
     const viewportEl = document.getElementById('viewport3d');
     this.scene3d = new TennisScene3D(viewportEl);
+    this.scene3d.onClipsLoaded = () => this.updateScrubberFrame();
 
     const racketCanvasEl = document.getElementById('racketImpactCanvas');
     if (racketCanvasEl) {

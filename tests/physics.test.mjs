@@ -214,3 +214,21 @@ test('every surface passes the ITF drop test (254 cm drop -> 135–147 cm reboun
   }
   assert.ok(heights.clay > heights.hard && heights.hard > heights.grass, JSON.stringify(heights));
 });
+
+test('motion-capture clips are well formed', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const data = JSON.parse(await readFile(new URL('../mocap/strokes.json', import.meta.url), 'utf8'));
+  assert.ok(data.source.includes('tennisdb.cs.pollub.pl'));
+  const keys = ['lhip', 'rhip', 'lkne', 'rkne', 'lank', 'rank', 'ltoe', 'rtoe', 'lsho', 'rsho', 'lelb', 'relb', 'lwri', 'rwri', 'head', 'headF', 'racketPos', 'racketQuat'];
+  for (const stroke of ['fh', 'bh2']) assert.ok(data.clips.some((c) => c.stroke === stroke), stroke);
+  for (const c of data.clips) {
+    const n = c.frames.racketPos.length;
+    for (const k of keys) assert.equal(c.frames[k].length, n, `${c.id} ${k}`);
+    const i0 = Math.round(-c.t0 * c.rate); // frame at impact
+    const p = c.frames.racketPos[i0];
+    assert.ok(Math.hypot(...p) < 0.03, `${c.id}: racket head at the origin at impact`);
+    const q = c.frames.racketQuat[i0];
+    assert.ok(Math.abs(Math.hypot(...q) - 1) < 1e-3, `${c.id}: unit quaternion`);
+    assert.ok(c.headSpeed > 15 && c.headSpeed < 35, `${c.id}: racket head speed ${c.headSpeed}`);
+  }
+});
