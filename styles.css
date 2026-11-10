@@ -410,13 +410,13 @@ select:focus {
   white-space: nowrap;
 }
 
-/* Clean 3-Tab Underline Navigation */
+/* Clean 4-Tab Underline Navigation */
 .nav-tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   border-bottom: 1px solid var(--border-hairline);
   background: var(--bg-surface);
-  padding: 0 8px;
+  padding: 0 6px;
 }
 
 .nav-tab {
@@ -424,8 +424,8 @@ select:focus {
   color: var(--ink-muted);
   border: none;
   border-bottom: 2px solid transparent;
-  padding: 9px 4px 8px 4px;
-  font-size: 12px;
+  padding: 9px 2px 8px 2px;
+  font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
   transition: color 0.12s, border-color 0.12s;
@@ -1299,19 +1299,19 @@ input[type="range"]::-webkit-slider-thumb:hover {
     width: 100vw;
   }
 
-  /* 3D Court Area on Top (52% height default, or 82% when expanded) */
+  /* 3D Court Area on Top (54% height default, or 82% when expanded) */
   .main-area {
     flex: none;
-    height: 52dvh;
+    height: 54dvh;
     width: 100%;
     transition: height 0.22s ease;
   }
 
-  /* Scrollable Control Sheet on Bottom (48% height default, or 18% when 3D expanded) */
+  /* Scrollable Control Sheet on Bottom (46% height default, or 18% when 3D expanded) */
   .sidebar {
     width: 100%;
     min-width: 0;
-    height: 48dvh;
+    height: 46dvh;
     border-right: none;
     border-top: 2px solid var(--border-strong);
     overflow-y: auto;
@@ -1331,61 +1331,91 @@ input[type="range"]::-webkit-slider-thumb:hover {
     display: inline-block;
   }
 
-  /* Compact Top-Left Telemetry Strip on Mobile */
+  /* Ultra-Compact 4-Column Top Telemetry Ribbon on Mobile (keeps 3D court unobstructed) */
   .telemetry-module {
-    top: 8px;
-    left: 8px;
-    width: calc(100% - 16px);
-    max-width: 420px;
+    top: 6px;
+    left: 6px;
+    right: 6px;
+    width: auto;
+    max-width: none;
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    background: rgba(247, 243, 235, 0.90);
+    grid-template-columns: repeat(4, 1fr);
+    background: rgba(247, 243, 235, 0.92);
   }
 
   .tel-cell {
-    padding: 6px 8px;
-    gap: 2px;
+    min-width: 0;
+    overflow: hidden;
+    padding: 4px 5px;
+    gap: 1px;
+    border-bottom: none;
+    border-right: 1px solid var(--border-hairline);
+  }
+
+  .tel-cell:last-child {
+    border-right: none;
+  }
+
+  .tel-label {
+    font-size: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .tel-big-mono {
-    font-size: 13.5px;
+    font-size: 11px;
+    white-space: nowrap;
   }
 
   .tel-verdict-row .call-tag {
-    font-size: 11px;
-    padding: 1px 5px;
+    font-size: 10.5px;
+    padding: 1px 4px;
   }
 
+  .tel-action-btn,
+  .tel-badge-mono,
+  .tel-inline-slider,
+  .tel-meta,
+  .tel-meta-mono,
+  #statLandingCoord,
   #hudSpinBallCanvas,
   #hudNetGaugeCanvas {
-    display: none;
+    display: none !important;
   }
 
   .hud-top-right {
     top: auto;
-    bottom: 8px;
-    right: 8px;
-    left: 8px;
-    align-items: stretch;
+    bottom: 6px;
+    right: 6px;
+    left: 6px;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
   }
 
   .cam-strip {
     overflow-x: auto;
-    max-width: 100%;
+    max-width: calc(100% - 76px);
     -webkit-overflow-scrolling: touch;
   }
 
   .cam-btn {
     white-space: nowrap;
-    padding: 5px 8px;
-    font-size: 11px;
+    padding: 4px 7px;
+    font-size: 10.5px;
   }
 
   .layer-strip {
-    justify-content: space-between;
-    flex-wrap: wrap;
-    padding: 4px 8px;
-    gap: 6px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    backdrop-filter: none;
+  }
+
+  .layer-strip .toggle-label {
+    display: none;
   }
 
   .watermark-plaque,
@@ -1393,26 +1423,32 @@ input[type="range"]::-webkit-slider-thumb:hover {
     display: none;
   }
 
+  /* On mobile split view, tactical card is already in the bottom sheet; show floating banner only when 3D court is expanded */
   .tactical-hud-banner {
-    bottom: 66px;
-    width: calc(100% - 16px);
+    display: none !important;
+  }
+
+  body.mobile-3d-expanded .tactical-hud-banner[style*="flex"] {
+    display: flex !important;
+    bottom: 38px;
+    width: calc(100% - 12px);
     padding: 6px 10px;
   }
 
   .scrubber-bar {
-    padding: 6px 10px;
+    padding: 5px 8px;
     gap: 4px;
   }
 
   .scrubber-controls {
     flex-wrap: wrap;
-    gap: 5px;
+    gap: 4px;
   }
 
   .play-btn,
   .secondary-btn {
-    padding: 5px 8px;
-    font-size: 11px;
+    padding: 4px 7px;
+    font-size: 10.5px;
     min-width: auto;
   }
 
@@ -1431,22 +1467,10 @@ input[type="range"]::-webkit-slider-thumb:hover {
   }
 
   .racket-3d-wrap {
-    height: 155px;
+    height: 150px;
   }
 
   #racketImpactCanvas {
-    height: 155px;
-  }
-}
-
-@media (max-width: 520px) {
-  .telemetry-module {
-    grid-template-columns: 1fr 1fr;
-    gap: 0;
-  }
-
-  .tel-meta,
-  .tel-meta-mono {
-    display: none;
+    height: 150px;
   }
 }

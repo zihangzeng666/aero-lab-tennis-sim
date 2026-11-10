@@ -17,8 +17,8 @@ import {
   ATP_RALLIES,
   TACTICAL_LESSONS,
   evaluateTacticalAttempt
-} from './physics.js?v=7';
-import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=7';
+} from './physics.js?v=8';
+import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=8';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;
@@ -969,7 +969,7 @@ class TennisSimApp {
           : 'Expand 3D';
       setTimeout(() => {
         if (this.scene3d) this.scene3d._onResize();
-        if (this.racket3d) this.racket3d.resize();
+        if (this.racket3d) this.racket3d._onResize();
       }, 240);
     });
 

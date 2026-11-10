@@ -113,11 +113,25 @@ export class TennisScene3D {
       const cw = this.container.clientWidth;
       const ch = this.container.clientHeight;
       if (cw === 0 || ch === 0) return;
-      this.camera.aspect = cw / ch;
+      const aspect = cw / ch;
+      this.camera.aspect = aspect;
+      if (cw < 760) {
+        this.camera.fov = aspect < 1.0 ? 50 : 44;
+        if (!this._mobileCamAdjusted) {
+          this._mobileCamAdjusted = true;
+          this.camera.position.set(-21.0, 8.2, 2.2);
+          this.controls.target.set(-1.8, -0.2, 0);
+          this.controls.update();
+        }
+      } else {
+        this.camera.fov = 39;
+        this._mobileCamAdjusted = false;
+      }
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(cw, ch);
     };
     window.addEventListener('resize', this._onResize);
+    this._onResize();
 
     this._animateLoop();
   }
