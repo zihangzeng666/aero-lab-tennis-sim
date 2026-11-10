@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=12';
+import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=16';
 
 // Net profile drawn with singles sticks in place (matches the physics for singles play):
 // 0.914 m at the centre rising to 1.07 m at the sticks, then level out to the posts.
@@ -142,6 +142,9 @@ export class TennisScene3D {
       this.renderer.setSize(cw, ch);
     };
     window.addEventListener('resize', this._onResize);
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(() => this._onResize()).observe(this.container);
+    }
     this._onResize();
 
     this._animateLoop();
@@ -2359,6 +2362,9 @@ export class RacketImpact3DStudio {
       this.renderer.setSize(cw, ch, false);
     };
     window.addEventListener('resize', this._onResize);
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(() => this._onResize()).observe(this.canvas);
+    }
   }
 
   _initLightsAndStudioFloor() {

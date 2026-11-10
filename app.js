@@ -14,32 +14,35 @@ import {
   samplePointAtTime,
   airDensityFromConditions,
   chainRallyTurns
-} from './physics.js?v=12';
+} from './physics.js?v=16';
 import {
   SHOT_PRESETS,
   INCOMING_PRESETS,
   EXAMPLE_RALLIES,
   TACTICAL_LESSONS,
   evaluateTacticalAttempt
-} from './presets.js?v=12';
-import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=12';
+} from './presets.js?v=16';
+import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=16';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;
 
 const I18N = {
   zh: {
-    loadKicker: '3D 个人球速合成 · 正反手生物力学实验室',
+    loadKicker: '交互式物理教学模拟',
     loadModeSoloTag: 'DEFAULT',
-    loadModeSoloTitle: '🎯 单人球速实验室',
-    loadModeSoloDesc: '主动发力 vs 来球借力 · 正手 / 双反 / 单反 / 发球',
+    loadModeSoloTitle: '单人球速实验室',
+    loadModeSoloDesc: '主动发力 vs 来球借力，四种击球动作',
     loadModeRallyTag: 'RALLY',
-    loadModeRallyTitle: '⇄ 双人多拍回合',
-    loadModeRallyDesc: '示例多拍回合 · 跑动预判与触球截断',
+    loadModeRallyTitle: '双人多拍回合',
+    loadModeRallyDesc: '两人轮流击球，落点自动接力',
     loadModeTacticsTag: 'TACTICS',
-    loadModeTacticsTitle: '🏆 战术教学',
-    loadModeTacticsDesc: '战术示例 · 3D 球场靶区挑战',
-    btnEnterLab: '进入实验室 // LAUNCH →',
+    loadModeTacticsTitle: '战术教学',
+    loadModeTacticsDesc: '看示范，再自己调参打进靶区',
+    btnEnterLab: '进入实验室 →',
+    brandSub: '网球弹道教学模拟器',
+    grpPosition: '击球位置',
+    grpEnvironment: '环境',
     btnWelcomePage: '启动页',
     btnValidation: '验证',
     linkValidation: '模型说明与验证 →',
@@ -47,18 +50,18 @@ const I18N = {
     loadSubtext:
       '调节挥拍与来球参数，看球速、旋转和落点如何变化。气动力采用 Štěpánek (1988) 拟合式，拍球与落地碰撞采用 Cross 刚体模型；球员预设为手调示例，并非实测数据。',
     soloSectionTitle: '模式与球员预设',
-    modeBtnSolo: '🎯 单人球速',
-    modeBtnRally: '⇄ 双人回合',
-    modeBtnTactics: '🏆 战术教学',
+    modeBtnSolo: '单人球速',
+    modeBtnRally: '双人回合',
+    modeBtnTactics: '战术教学',
     lblStrokeType: '击球动作',
     strokeFH: '正手 FH',
     strokeBH2: '双反 2H',
     strokeBH1: '单反 1H',
-    strokeServe: '发球 Serve',
+    strokeServe: '发球',
     sscTitle: '球速合成剖析',
     sscActiveLbl: '主动发力',
     sscBorrowLbl: '来球借力',
-    sscCorLbl: '恢复系数 e_A',
+    sscCorLbl: '拍面 e_A',
     sscDwellLbl: '驻留/形变 (估算)',
     sscSecondBounceLbl: '二跳深度',
     unitSpeedLabel: '速度单位',
@@ -69,7 +72,7 @@ const I18N = {
     lblRallyPreset: '示例多拍回合',
     shotPresetLabel: '风格预设 (手调参数)',
     btnNextTurn: '+ 下一拍回击',
-    racketVizTitle: '3D 拍面触球几何 (示意)',
+    racketVizTitle: '拍面触球示意',
     rViewIso: '斜视',
     rViewFront: '拍面',
     rViewSide: '侧面',
@@ -107,7 +110,7 @@ const I18N = {
     lblHitY: '左右站位 Y',
     lblHitZ: '击球高度 Z',
     lblSidespin: '侧旋转速',
-    lblWind: '纵向风 (+ 吹向远端)',
+    lblWind: '纵向风 (+ 顺风)',
     lblCrossWind: '横向风 (+ 吹向左侧)',
     lblTemperature: '气温',
     lblAltitude: '海拔',
@@ -150,9 +153,9 @@ const I18N = {
     btnCancel: '取消',
     btnApplyImport: '解析生成',
     tabTactics: '战术',
-    lblTacticalSelect: '选择名场面',
-    btnTacticDemo: '▶ 演示 (Demo)',
-    btnTacticChallenge: '🎯 挑战 (Challenge)',
+    lblTacticalSelect: '选择战术课',
+    btnTacticDemo: '▶ 演示',
+    btnTacticChallenge: '◎ 挑战',
     btnExitTactics: '退出',
     tacticalTheoryTitle: '战术要点',
     tacticalMissionTitle: '挑战目标 · 命中金色靶区',
@@ -162,17 +165,20 @@ const I18N = {
     btnMobileExpand3D: '全屏球场'
   },
   en: {
-    loadKicker: '3D BALL SPEED SYNTHESIS · FH/BH BIOMECHANICS LAB',
+    loadKicker: 'Interactive physics teaching sim',
     loadModeSoloTag: 'DEFAULT',
-    loadModeSoloTitle: '🎯 Solo Ball Speed Lab',
-    loadModeSoloDesc: 'Active vs Borrowed Pace · FH, 2H-BH, 1H-BH & Serve',
+    loadModeSoloTitle: 'Solo Ball Speed Lab',
+    loadModeSoloDesc: 'Own swing vs borrowed pace, four strokes',
     loadModeRallyTag: 'RALLY',
-    loadModeRallyTitle: '⇄ 2-Player Rally',
-    loadModeRallyDesc: 'Example Rallies · Footwork & Interception',
+    loadModeRallyTitle: '2-Player Rally',
+    loadModeRallyDesc: 'Two players take turns; bounces chain automatically',
     loadModeTacticsTag: 'TACTICS',
-    loadModeTacticsTitle: '🏆 Tactical Masterclass',
-    loadModeTacticsDesc: 'Tactical Examples · 3D Court Target Challenge',
-    btnEnterLab: 'LAUNCH LAB →',
+    loadModeTacticsTitle: 'Tactics Lessons',
+    loadModeTacticsDesc: 'Watch the demo, then tune your shot into the target',
+    btnEnterLab: 'Enter the lab →',
+    brandSub: 'Tennis ball-flight teaching simulator',
+    grpPosition: 'Hitting position',
+    grpEnvironment: 'Environment',
     btnWelcomePage: 'WELCOME',
     btnValidation: 'VALIDATION',
     linkValidation: 'Model notes & validation →',
@@ -180,9 +186,9 @@ const I18N = {
     loadSubtext:
       'Change the swing and the incoming ball and watch speed, spin and landing point respond. Aerodynamics use the Štěpánek (1988) fits; racket and court impacts use Cross-style rigid-body models. Player presets are hand-tuned examples, not measured data.',
     soloSectionTitle: 'MODE & PLAYER PRESET',
-    modeBtnSolo: '🎯 Solo Lab',
-    modeBtnRally: '⇄ 2P Rally',
-    modeBtnTactics: '🏆 Tactics',
+    modeBtnSolo: 'Solo Lab',
+    modeBtnRally: '2P Rally',
+    modeBtnTactics: 'Tactics',
     lblStrokeType: 'Stroke',
     strokeFH: 'Forehand',
     strokeBH2: '2H-BH',
@@ -191,7 +197,7 @@ const I18N = {
     sscTitle: 'SPEED SYNTHESIS',
     sscActiveLbl: 'Active Power',
     sscBorrowLbl: 'Borrowed Pace',
-    sscCorLbl: 'COR e_A',
+    sscCorLbl: 'e_A',
     sscDwellLbl: 'Dwell/Defl (est.)',
     sscSecondBounceLbl: '2nd Bounce',
     unitSpeedLabel: 'SPEED',
@@ -202,7 +208,7 @@ const I18N = {
     lblRallyPreset: 'Example Rally',
     shotPresetLabel: 'Style Preset (hand-tuned)',
     btnNextTurn: '+ Next Shot',
-    racketVizTitle: '3D IMPACT GEOMETRY (ILLUSTRATIVE)',
+    racketVizTitle: 'Impact view (illustrative)',
     rViewIso: '3D',
     rViewFront: 'Face',
     rViewSide: 'Side',
@@ -240,7 +246,7 @@ const I18N = {
     lblHitY: 'Lateral Y',
     lblHitZ: 'Height Z',
     lblSidespin: 'Sidespin',
-    lblWind: 'Head/Tail Wind (+ to far end)',
+    lblWind: 'Tail wind (+)',
     lblCrossWind: 'Cross Wind (+ to left)',
     lblTemperature: 'Temperature',
     lblAltitude: 'Altitude',
@@ -283,9 +289,9 @@ const I18N = {
     btnCancel: 'Cancel',
     btnApplyImport: 'Build Rally',
     tabTactics: 'Tactics',
-    lblTacticalSelect: 'Select Masterclass',
+    lblTacticalSelect: 'Select lesson',
     btnTacticDemo: '▶ Demo',
-    btnTacticChallenge: '🎯 Challenge',
+    btnTacticChallenge: '◎ Challenge',
     btnExitTactics: 'Exit',
     tacticalTheoryTitle: 'TACTICAL KEY',
     tacticalMissionTitle: 'TARGET · HIT GOLD ZONE',
@@ -295,6 +301,27 @@ const I18N = {
     btnMobileExpand3D: 'Expand 3D'
   }
 };
+
+/** Fills the part of a range track left of the thumb (CSS reads --pct). */
+function paintRange(el) {
+  const min = Number(el.min || 0);
+  const max = Number(el.max || 100);
+  const pct = max > min ? ((Number(el.value) - min) / (max - min)) * 100 : 0;
+  el.style.setProperty('--pct', `${Math.max(0, Math.min(100, pct))}%`);
+}
+
+function paintAllRanges() {
+  document.querySelectorAll('input[type="range"]').forEach(paintRange);
+}
+
+document.addEventListener('input', (e) => {
+  if (e.target instanceof HTMLInputElement && e.target.type === 'range') paintRange(e.target);
+});
+
+// Buttons inside the collapsible racket panel header must not toggle the panel.
+document.querySelector('#racketVizDetails > summary')?.addEventListener('click', (e) => {
+  if (e.target.closest('button')) e.preventDefault();
+});
 
 class TennisSimApp {
   constructor() {
@@ -847,7 +874,7 @@ class TennisSimApp {
       if (fullRallyBtn) fullRallyBtn.style.display = 'inline-flex';
       if (sectionTitle) {
         sectionTitle.textContent =
-          this.lang === 'zh' ? '技战术名场面教学' : 'TACTICAL MASTERCLASS';
+          this.lang === 'zh' ? '战术教学' : 'TACTICS LESSONS';
       }
 
       document.querySelectorAll('#sidebarNavTabs .nav-tab').forEach((b) =>
@@ -949,8 +976,8 @@ class TennisSimApp {
     const dwellEl = document.getElementById('sscDwellVal');
     if (dwellEl) {
       const dwellMs = Number(impact.dwellTimeMs ?? 4.6).toFixed(1);
-      const deflMm = Number(impact.stringDeflectionMm ?? 12.8).toFixed(1);
-      dwellEl.textContent = `≈${dwellMs} ms / ≈${deflMm} mm`;
+      const deflMm = Number(impact.stringDeflectionMm ?? 12.8).toFixed(0);
+      dwellEl.textContent = `≈${dwellMs} ms · ${deflMm} mm`;
     }
 
     const sbEl = document.getElementById('sscSecondBounceVal');
@@ -1451,6 +1478,7 @@ class TennisSimApp {
       btn.addEventListener('click', () => {
         const cam = btn.getAttribute('data-cam');
         this.scene3d.setCameraPreset(cam, this.simResult, this.state);
+        document.querySelectorAll('[data-cam]').forEach((b) => b.classList.toggle('active', b === btn));
       });
     });
 
@@ -1802,6 +1830,7 @@ class TennisSimApp {
     this._updateTopLeftInteractiveHUD();
     this._updateTacticalUI();
     this.updateScrubberFrame();
+    paintAllRanges();
   }
 
   updateScrubberFrame() {
@@ -1838,6 +1867,8 @@ class TennisSimApp {
 
       if (document.activeElement !== this.timelineSlider) {
         this.timelineSlider.value = t;
+      paintRange(this.timelineSlider);
+        paintRange(this.timelineSlider);
       }
       document.getElementById('timeDisplay').textContent = `${t.toFixed(2)}s / ${this.simResult.totalDuration.toFixed(2)}s`;
       document.getElementById('instSpeed').textContent =
@@ -1859,6 +1890,7 @@ class TennisSimApp {
 
     if (document.activeElement !== this.timelineSlider) {
       this.timelineSlider.value = t;
+      paintRange(this.timelineSlider);
     }
     document.getElementById('timeDisplay').textContent = `${t.toFixed(2)}s / ${this.simResult.totalDuration.toFixed(2)}s`;
 

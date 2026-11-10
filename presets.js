@@ -992,7 +992,7 @@ export function evaluateTacticalAttempt(lesson, turnIndex, state, simResult) {
       score: Math.max(88, totalScore),
       passed: true,
       feedbackZh: `战术完美达成（${Math.max(88, totalScore)}分）！落点精准命中金色制胜靶区，球速与旋转达到本课目标！`,
-      feedbackEn: `Tactical Masterclass Passed (${Math.max(88, totalScore)}/100)! Bullseye hit with the target pace & spin!`
+      feedbackEn: `Lesson passed (${Math.max(88, totalScore)}/100)! Bullseye hit with the target pace & spin!`
     };
   }
 
