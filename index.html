@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AERO-LAB // ATP Tour Rally & Ballistics Simulator — Made by Jason Zeng</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css?v=5" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Left Architectural Control Panel -->
+    <aside class="sidebar">
+      <!-- Top Masthead & Unit/Language Controls -->
+      <div class="sidebar-header">
+        <div class="brand-row">
+          <div class="brand-title">
+            <span class="brand-mark"></span>
+            <span>AERO-LAB</span>
+            <span class="brand-author">MADE BY JASON ZENG</span>
+          </div>
+          <div class="seg-control" id="langSwitchGroup">
+            <button class="seg-btn active" data-lang="zh">中文</button>
+            <button class="seg-btn" data-lang="en">EN</button>
+          </div>
+        </div>
+
+        <div class="unit-bar">
+          <div class="unit-item">
+            <span class="unit-lbl" data-i18n="unitSpeedLabel">速度</span>
+            <div class="seg-control" id="speedUnitGroup">
+              <button class="seg-btn active" data-speed-unit="kmh">km/h</button>
+              <button class="seg-btn" data-speed-unit="mph">mph</button>
+              <button class="seg-btn" data-speed-unit="ms">m/s</button>
+            </div>
+          </div>
+          <div class="unit-item">
+            <span class="unit-lbl" data-i18n="unitTensionLabel">张力</span>
+            <div class="seg-control" id="tensionUnitGroup">
+              <button class="seg-btn active" data-tension-unit="lbs">lbs</button>
+              <button class="seg-btn" data-tension-unit="kg">kg</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ATP Rally & Telemetry Benchmark Selector -->
+      <div class="panel-section">
+        <div class="section-header">
+          <span class="section-tag" data-i18n="rallySectionTitle">ATP 实测多拍回合与球员数据库</span>
+          <button class="mini-action-btn" id="btnOpenImportModal" data-i18n="btnImportAtp">导入 ATP 数据</button>
+        </div>
+
+        <div class="preset-dual-row">
+          <div>
+            <label class="mini-lbl" data-i18n="lblRallyPreset">经典赛事多拍回合 (Turn-Based Rally)</label>
+            <select id="rallyPresetSelect"></select>
+          </div>
+          <div>
+            <label class="mini-lbl" data-i18n="shotPresetLabel">单拍球员实测档案 (覆盖当前拍)</label>
+            <select id="presetSelect"></select>
+          </div>
+        </div>
+
+        <!-- Turn-Based Rally Chain Strip -->
+        <div class="rally-turn-box">
+          <div class="rally-turn-header">
+            <span class="rally-matchup" id="rallyMatchupLabel">C. Alcaraz (A) vs N. Djokovic (B)</span>
+            <div class="rally-actions">
+              <button class="mini-action-btn active-accent" id="btnNextTurn" data-i18n="btnNextTurn">+ 下一拍对手回击</button>
+            </div>
+          </div>
+          <div class="turn-chain" id="turnChainContainer"></div>
+        </div>
+      </div>
+
+      <!-- Interactive 3D Racket-Ball Impact & Stringbed Deflection Studio -->
+      <div class="panel-section viz-section">
+        <div class="section-header">
+          <span class="section-tag" data-i18n="racketVizTitle">3D 拍面咬球与甜区穿线形变</span>
+          <div class="seg-control mini-seg" id="racket3DViewGroup">
+            <button class="seg-btn active" data-racket-view="iso" data-i18n="rViewIso">3D 斜视</button>
+            <button class="seg-btn" data-racket-view="front" data-i18n="rViewFront">拍面甜区</button>
+            <button class="seg-btn" data-racket-view="side" data-i18n="rViewSide">侧面攻角</button>
+          </div>
+        </div>
+        <div class="racket-3d-wrap">
+          <canvas id="racketImpactCanvas" width="680" height="220"></canvas>
+          <span class="racket-3d-hint" data-i18n="racket3DHint">支持鼠标拖拽 360° 旋转观察</span>
+        </div>
+        <div class="racket-metrics-bar">
+          <div class="rm-cell">
+            <span class="rm-lbl" data-i18n="rmFace">拍面倾角</span>
+            <strong id="rmFaceVal">-2.1°</strong>
+          </div>
+          <div class="rm-cell">
+            <span class="rm-lbl" data-i18n="rmSwing">挥拍仰角</span>
+            <strong id="rmSwingVal">+25.5°</strong>
+          </div>
+          <div class="rm-cell">
+            <span class="rm-lbl" data-i18n="rmAttack">刷球攻角</span>
+            <strong id="attackAngleBadge">+27.6°</strong>
+          </div>
+          <div class="rm-cell">
+            <span class="rm-lbl" data-i18n="rmAim">水平方向</span>
+            <strong id="rmAimVal">左 +7.2°</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Streamlined 3-Tab Navigation (Bidirectional Physics — No Confusing Override Mode!) -->
+      <nav class="nav-tabs" id="sidebarNavTabs">
+        <button class="nav-tab active" data-tab="tab-racket" data-i18n="tabRacket">挥拍与拍面</button>
+        <button class="nav-tab" data-tab="tab-incoming" data-i18n="tabIncoming">来球与借力</button>
+        <button class="nav-tab" data-tab="tab-position" data-i18n="tabPosition">站位与环境</button>
+      </nav>
+
+      <!-- TAB 1: Racket & Swing (Bidirectionally coupled with Top-Left HUD!) -->
+      <div class="tab-panel active" id="tab-racket">
+        <div class="coupling-hint" data-i18n="bidirectionalHint">
+          双向物理耦合：调节下方挥拍参数或直接拖动左上角【初速 / RPM / 过网高度】均会自动双向逆向推算同步
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span class="slider-label" data-i18n="lblRacketSpeed">挥拍拍头速度</span>
+            <span class="slider-val" id="racketSpeedKmhVal">94 km/h</span>
+          </div>
+          <input type="range" id="racketSpeedKmh" min="30" max="175" step="0.5" value="94" />
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span class="slider-label" data-i18n="lblSwingPath">挥拍轨迹仰角 (低向高+)</span>
+            <span class="slider-val" id="swingPathDegVal">+28.5°</span>
+          </div>
+          <input type="range" id="swingPathDeg" min="-22" max="42" step="0.5" value="28.5" />
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span class="slider-label" data-i18n="lblFaceAngle">拍面倾角 (仰开+ / 压拍-)</span>
+            <span class="slider-val" id="faceAngleDegVal">-2.2°</span>
+          </div>
+          <input type="range" id="faceAngleDeg" min="-18" max="32" step="0.2" value="-2.2" />
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span class="slider-label" data-i18n="lblAimAngle">水平瞄准方向角 (Cross / DTL)</span>
+            <span class="slider-val" id="aimAngleDegVal">左 +8.2°</span>
+          </div>
+          <input type="range" id="aimAngleDeg" min="-28" max="28" step="0.2" value="8.2" />
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span class="slider-label" data-i18n="lblStringTension">球拍穿线张力</span>
+            <span class="slider-val" id="stringTensionKgVal">50.7 lbs</span>
+          </div>
+          <input type="range" id="stringTensionKg" min="18" max="28" step="0.2" value="23" />
+        </div>
+      </div>
+
+      <!-- TAB 2: Incoming Ball -->
+      <div class="tab-panel" id="tab-incoming">
+        <div class="slider-group">
+          <div class="slider-header">
+            <span class="slider-label" data-i18n="lblIncomingPreset">对手来球预设 (或由上一拍自动继承)</span>
+          </div>
+          <select id="incomingPresetSelect"></select>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span class="slider-label" data-i18n="lblIncomingSpeed">对手来球速度</span>
+            <span class="slider-val" id="incomingSpeedKmhVal">56 km/h</span>
+          </div>
+          <input type="range" id="incomingSpeedKmh" min="0" max="140" step="1" value="56" />
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span class="slider-label" data-i18n="lblIncomingAngle">来球垂直入射角 (下落- / 上升+)</span>
+            <span class="slider-val" id="incomingAngleDegVal">-11.0°</span>
+          </div>
+          <input type="range" id="incomingAngleDeg" min="-28" max="22" step="0.5" value="-11" />
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span class="slider-label" data-i18n="lblIncomingSpin">对手来球旋转 (上旋+ / 切削-)</span>
+            <span class="slider-val" id="incomingSpinRpmVal">+1950 RPM</span>
+          </div>
+          <input type="range" id="incomingSpinRpm" min="-3000" max="3800" step="50" value="1950" />
+        </div>
+
+        <div class="incoming-effect-box">
+          <div class="effect-title" data-i18n="incomingEffectTitle">来球碰撞效应增量 (对比定点抛球)</div>
+          <div class="effect-grid">
+            <div class="effect-cell">
+              <span class="effect-lbl" data-i18n="effBorrowSpeed">借力球速</span>
+              <strong id="effDeltaSpeed">+14.2 km/h</strong>
+            </div>
+            <div class="effect-cell">
+              <span class="effect-lbl" data-i18n="effLaunchAngle">仰角偏移</span>
+              <strong id="effDeltaAngle">+2.1°</strong>
+            </div>
+            <div class="effect-cell">
+              <span class="effect-lbl" data-i18n="effSpinChange">转速变化</span>
+              <strong id="effDeltaSpin">-420 RPM</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: Position, Court & Environment -->
+      <div class="tab-panel" id="tab-position">
+        <div class="select-row">
+          <div>
+            <label class="mini-lbl" data-i18n="lblCourtMode">有效界线</label>
+            <select id="courtModeSelect">
+              <option value="singles" data-i18n="optSingles">单打 (Singles)</option>
+              <option value="doubles" data-i18n="optDoubles">双打 (Doubles)</option>
+              <option value="serve_deuce" data-i18n="optServeDeuce">平分发球区 (Deuce)</option>
+              <option value="serve_ad" data-i18n="optServeAd">占先发球区 (Ad)</option>
+            </select>
+          </div>
+          <div>
+            <label class="mini-lbl" data-i18n="lblSurface">场地表面</label>
+            <select id="surfaceSelect">
+              <option value="hard" data-i18n="optHard">硬地 (Hard)</option>
+              <option value="clay" data-i18n="optClay">红土 (Clay)</option>
+              <option value="grass" data-i18n="optGrass">草地 (Grass)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span class="slider-label" data-i18n="lblHitX">前后站位 X (底线 -11.89m)</span>
+            <span class="slider-val" id="hitXVal">-11.75 m</span>
+          </div>
+          <input type="range" id="hitX" min="-14.5" max="-1.0" step="0.05" value="-11.75" />
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span class="slider-label" data-i18n="lblHitY">左右站位 Y (单打边线 ±4.12m)</span>
+            <span class="slider-val" id="hitYVal">-1.85 m</span>
+          </div>
+          <input type="range" id="hitY" min="-5.4" max="5.4" step="0.05" value="-1.85" />
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span class="slider-label" data-i18n="lblHitZ">击球点高度 Z (发球 > 2.0m)</span>
+            <span class="slider-val" id="hitZVal">1.08 m</span>
+          </div>
+          <input type="range" id="hitZ" min="0.30" max="3.10" step="0.02" value="1.08" />
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span class="slider-label" data-i18n="lblSidespin">侧旋转速 (Sidespin Curve)</span>
+            <span class="slider-val" id="sidespinRpmVal">+280 RPM</span>
+          </div>
+          <input type="range" id="sidespinRpm" min="-2500" max="2500" step="25" value="280" />
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span class="slider-label" data-i18n="lblWind">环境风速 (顺风+ / 逆风-)</span>
+            <span class="slider-val" id="windSpeedKmhVal">0 km/h</span>
+          </div>
+          <input type="range" id="windSpeedKmh" min="-30" max="30" step="1" value="0" />
+        </div>
+      </div>
+    </aside>
+
+    <!-- Right Main Area -->
+    <main class="main-area">
+      <div class="viewport-wrapper">
+        <div id="viewport3d"></div>
+
+        <!-- ===============================================================
+             ARCHITECTURAL TOP-LEFT INTERACTIVE TELEMETRY MODULE
+             (Dragging any slider here back-solves the required Racket Swing!)
+             =============================================================== -->
+        <div class="telemetry-module" id="interactiveHudLeft">
+          <!-- Cell 1: Line Call & 1st Bounce -->
+          <div class="tel-cell tel-cell-call" id="hudCardBounce">
+            <div class="tel-cell-top">
+              <span class="tel-label" id="hudTurnBadge" data-i18n="hudTitleCall">鹰眼判罚 // 第一落点</span>
+              <button class="tel-action-btn" id="btnJumpBounce" data-i18n="btnJumpBounce">定位落点</button>
+            </div>
+            <div class="tel-verdict-row">
+              <span class="call-tag call-in" id="hawkeyeCallBadge">IN</span>
+              <span class="tel-sub-mono" id="statLandingCoord">X 8.72 / Y 0.79m</span>
+            </div>
+            <div class="tel-meta" id="hawkeyeCallDetail">界内余量 79.2 cm</div>
+            <div class="tel-meta-mono" id="statBounceSpeed">92 → 68 km/h (18.2°)</div>
+          </div>
+
+          <!-- Cell 2: Interactive Launch Velocity -->
+          <div class="tel-cell">
+            <div class="tel-cell-top">
+              <span class="tel-label" data-i18n="hudTitleSpeed">出球初速度 // VELOCITY</span>
+              <button class="tel-action-btn" id="btnCycleSpeedUnit">UNIT</button>
+            </div>
+            <div class="tel-main-row">
+              <span class="tel-big-mono" id="hudSpeedBig">138.2 km/h</span>
+              <span class="tel-badge-mono" id="hudApexBadge">APEX 2.15m</span>
+            </div>
+            <input type="range" class="tel-inline-slider" id="hudSpeedSlider" min="40" max="230" step="0.5" value="138.2" />
+          </div>
+
+          <!-- Cell 3: Interactive Spin Rate RPM -->
+          <div class="tel-cell">
+            <div class="tel-cell-top">
+              <span class="tel-label" data-i18n="hudTitleSpin">旋转转速 // SPIN RPM</span>
+              <span class="tel-badge-mono" id="hudSpinTypePill">TOPSPIN</span>
+            </div>
+            <div class="tel-media-row">
+              <canvas id="hudSpinBallCanvas" width="68" height="68"></canvas>
+              <div class="tel-media-col">
+                <span class="tel-big-mono" id="hudSpinBig">+3420 RPM</span>
+                <span class="tel-meta" id="hudMagnusInfo">Side +280 RPM</span>
+              </div>
+            </div>
+            <input type="range" class="tel-inline-slider" id="hudSpinSlider" min="-3200" max="4800" step="25" value="3420" />
+          </div>
+
+          <!-- Cell 4: Interactive Net Clearance & Launch Angle -->
+          <div class="tel-cell">
+            <div class="tel-cell-top">
+              <span class="tel-label" data-i18n="hudTitleNet">过网净空 // NET CLEARANCE</span>
+              <button class="tel-action-btn" id="btnJumpNet" data-i18n="btnJumpNet">过网瞬间</button>
+            </div>
+            <div class="tel-media-row">
+              <canvas id="hudNetGaugeCanvas" width="68" height="60"></canvas>
+              <div class="tel-media-col">
+                <span class="tel-big-mono" id="statNetClearance">+68.4 cm</span>
+                <span class="tel-meta" id="hudLaunchAngleInfo">Angle +8.4°</span>
+              </div>
+            </div>
+            <input type="range" class="tel-inline-slider" id="hudAngleSlider" min="-10" max="32" step="0.2" value="8.4" />
+          </div>
+        </div>
+
+        <!-- Top-Right Segmented Camera & Display Bar -->
+        <div class="hud-top-right">
+          <div class="cam-strip">
+            <button class="cam-btn" data-cam="player_closeup" data-i18n="camCloseup">挥拍特写</button>
+            <button class="cam-btn" data-cam="broadcast" data-i18n="camBroadcast">转播全景</button>
+            <button class="cam-btn" data-cam="side" data-i18n="camSide">侧面剖面</button>
+            <button class="cam-btn" data-cam="player_pov" data-i18n="camPov">球员视角</button>
+            <button class="cam-btn" data-cam="hawkeye" data-i18n="camHawkeye">鹰眼落点</button>
+            <button class="cam-btn" data-cam="top" data-i18n="camTop">俯视平面</button>
+          </div>
+
+          <div class="layer-strip">
+            <label class="toggle-label">
+              <input type="checkbox" id="toggleVectors" checked />
+              <span data-i18n="chkVectors">力与速度矢量</span>
+            </label>
+            <label class="toggle-label">
+              <input type="checkbox" id="toggleGhost" checked />
+              <span data-i18n="chkGhost">无旋转基准线</span>
+            </label>
+            <label class="toggle-label">
+              <input type="checkbox" id="toggleTrueScale" />
+              <span data-i18n="chkTrueScale">1:1 真实球径</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Minimal Bottom-Right Legend & Author Watermark -->
+        <div class="watermark-plaque">
+          <span class="wm-dot"></span>
+          <span>AERO-LAB // MADE BY JASON ZENG</span>
+        </div>
+
+        <div class="legend-strip">
+          <div class="legend-item">
+            <span class="legend-swatch" style="background: #d97706;"></span>
+            <span data-i18n="legIncoming">来球 / 接球落点</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-swatch" style="background: #65a30d;"></span>
+            <span data-i18n="legPreBounce">出球飞行轨迹</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-swatch" style="background: #0284c7;"></span>
+            <span data-i18n="legPostBounce">反弹轨迹与球速</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-swatch" style="background: #be123c;"></span>
+            <span data-i18n="legMagnus">马格努斯气动力</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-swatch" style="background: #64748b;"></span>
+            <span data-i18n="legNoSpin">无旋转对照基准</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Precision Scrubber & Turn-Based Rally Playback Bar -->
+      <footer class="scrubber-bar">
+        <div class="scrubber-controls">
+          <button class="play-btn" id="btnPlayPause">暂停</button>
+          <button class="secondary-btn active-rally-btn" id="btnPlayFullRally" data-i18n="btnPlayFullRally">连播整回合</button>
+          <button class="secondary-btn" id="btnRestart" data-i18n="btnRestart">重播本拍</button>
+          <button class="secondary-btn" id="btnSnapImpact" data-i18n="btnSnapImpact">触球点 t=0</button>
+
+          <select id="speedSelect" style="width: 112px;">
+            <option value="0.15" data-i18n="spd015">0.15x 慢放</option>
+            <option value="0.25" data-i18n="spd025">0.25x 慢放</option>
+            <option value="0.4" selected data-i18n="spd040">0.40x 慢放</option>
+            <option value="1.0" data-i18n="spd100">1.00x 原速</option>
+          </select>
+
+          <div class="timeline-slider-wrap">
+            <input type="range" id="timelineSlider" min="-0.35" max="1.8" step="0.002" value="-0.35" />
+            <span class="time-readout" id="timeDisplay">0.00s / 1.40s</span>
+          </div>
+        </div>
+
+        <div class="instant-telemetry">
+          <span><span data-i18n="telTurn">当前击球方</span> <strong id="instActivePlayer">Player A</strong></span>
+          <span><span data-i18n="telSpeed">实时球速</span> <strong id="instSpeed">--</strong></span>
+          <span><span data-i18n="telHeight">实时高度 Z</span> <strong id="instHeight">--</strong></span>
+          <span><span data-i18n="telPos">空间坐标</span> <strong id="instPos">--</strong></span>
+          <span><span data-i18n="telSpin">实时转速</span> <strong id="instSpin">--</strong></span>
+          <span><span data-i18n="telAero">气动参数</span> <strong id="instAero">--</strong></span>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <!-- Custom ATP Telemetry CSV / JSON Import Modal -->
+  <div class="modal-backdrop" id="importModalBackdrop" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <span class="modal-title" data-i18n="modalImportTitle">导入 ATP Hawk-Eye / TrackMan 实测数据 (CSV / JSON)</span>
+        <button class="mini-action-btn" id="btnCloseImportModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc" data-i18n="modalImportDesc">
+          每行输入一拍实测数据（格式：出球速度km/h, 转速RPM, 出球仰角°, 水平角°, 击球X, 击球Y, 击球Z），系统将自动逆向解算每一拍的球拍挥拍速度与拍面倾角并生成对拉回合：
+        </p>
+        <textarea id="atpImportTextarea" rows="6" spellcheck="false">196, 2400, -5.2, 6.8, -11.88, -0.90, 2.74
+134, 2750, 8.6, -4.5, -11.60, -2.40, 1.05
+144, 3450, 7.8, 8.5, -11.40, -1.75, 1.10
+118, -1700, 6.4, -6.2, -11.80, 2.50, 0.96
+152, 3600, 6.8, -5.0, -10.80, -1.50, 1.12</textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="secondary-btn" id="btnCancelImport" data-i18n="btnCancel">取消</button>
+        <button class="play-btn" id="btnConfirmImport" data-i18n="btnApplyImport">解析并生成回合</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./app.js?v=5"></script>
+</body>
+</html>
