@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=36';
+import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=37';
 
 // Net profile drawn with singles sticks in place (matches the physics for singles play):
 // 0.914 m at the centre rising to 1.07 m at the sticks, then level out to the posts.
@@ -143,6 +143,9 @@ export class TennisScene3D {
     this._initHawkEyeMarkers();
     this.strokeClips = null;
     this._loadStrokeClips();
+    this.dragTargetRig = this.playerA;
+    this.onPlayerDrag = null;
+    this._initPlayerDrag();
     if (this.playerB && this.playerB.root) {
       this.playerB.root.visible = !this.soloMode;
     }
@@ -1929,6 +1932,93 @@ export class TennisScene3D {
   /* Motion-capture driven strokes (3DTennisDS, see mocap/strokes.json)       */
   /* ----------------------------------------------------------------------- */
 
+  /**
+   * Long-press (0.45 s, mouse or touch) on the hitting player picks them up; dragging then moves
+   * them over the court. A press that moves first is left to OrbitControls (normal orbit).
+   * Reports ground-plane deltas in world court coordinates via onPlayerDrag({ phase, dWorldX, dWorldY }).
+   */
+  _initPlayerDrag() {
+    const el = this.renderer.domElement;
+    const ray = new THREE.Raycaster();
+    const ndc = new THREE.Vector2();
+    const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    let pending = null;
+    let dragging = null;
+    const aim = (e) => {
+      const r = el.getBoundingClientRect();
+      ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      ray.setFromCamera(ndc, this.camera);
+    };
+    const groundPoint = (e) => {
+      aim(e);
+      const p = new THREE.Vector3();
+      return ray.ray.intersectPlane(ground, p) ? p : null;
+    };
+    const hitsPlayer = (e) => {
+      const rig = this.dragTargetRig;
+      if (!rig || !rig.root.visible) return false;
+      aim(e);
+      return ray.intersectObject(rig.root, true).length > 0;
+    };
+    el.addEventListener(
+      'pointerdown',
+      (e) => {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        if (!hitsPlayer(e)) return;
+        const start = groundPoint(e);
+        if (!start) return;
+        const id = e.pointerId;
+        pending = {
+          id,
+          x: e.clientX,
+          y: e.clientY,
+          timer: setTimeout(() => {
+            pending = null;
+            dragging = { id, start };
+            this.controls.enabled = false;
+            el.classList.add('dragging-player');
+            if (navigator.vibrate) navigator.vibrate(12);
+            if (this.onPlayerDrag) this.onPlayerDrag({ phase: 'start' });
+          }, 450)
+        };
+      },
+      true
+    );
+    el.addEventListener(
+      'pointermove',
+      (e) => {
+        if (pending && e.pointerId === pending.id && Math.hypot(e.clientX - pending.x, e.clientY - pending.y) > 8) {
+          clearTimeout(pending.timer);
+          pending = null;
+        }
+        if (dragging && e.pointerId === dragging.id) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+          const p = groundPoint(e);
+          if (p && this.onPlayerDrag) {
+            // three.js x = court x, three.js z = -court y
+            this.onPlayerDrag({ phase: 'move', dWorldX: p.x - dragging.start.x, dWorldY: -(p.z - dragging.start.z) });
+          }
+        }
+      },
+      true
+    );
+    const end = () => {
+      if (pending) {
+        clearTimeout(pending.timer);
+        pending = null;
+      }
+      if (dragging) {
+        dragging = null;
+        this.controls.enabled = true;
+        el.classList.remove('dragging-player');
+        if (this.onPlayerDrag) this.onPlayerDrag({ phase: 'end' });
+      }
+    };
+    el.addEventListener('pointerup', end, true);
+    el.addEventListener('pointercancel', end, true);
+  }
+
   _loadStrokeClips() {
     // strokes.json: forehands + two-handed backhands (3DTennisDS)
     // strokes_bvh.json: serves + one-handed backhands (Tennis-MoCap, CC BY-SA 3.0)
@@ -2662,6 +2752,7 @@ export class TennisScene3D {
     if (this.soloMode) {
       this.playerA.root.visible = true;
       this.playerB.root.visible = false;
+      this.dragTargetRig = this.playerA;
       const soloTau = THREE.MathUtils.clamp(currentTime, -0.35, 0.42);
       this._updateSinglePlayerPose(this.playerA, { ...params, side: 'A' }, soloTau, true, 0);
       return;
@@ -2671,6 +2762,7 @@ export class TennisScene3D {
     this.playerB.root.visible = true;
     const activeSide = params.side || 'A';
     const hitterRig = activeSide === 'B' ? this.playerB : this.playerA;
+    this.dragTargetRig = hitterRig;
     const receiverRig = activeSide === 'B' ? this.playerA : this.playerB;
 
     // 1. Update Active Hitter

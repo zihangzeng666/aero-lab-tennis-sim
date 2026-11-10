@@ -14,16 +14,16 @@ import {
   samplePointAtTime,
   airDensityFromConditions,
   chainRallyTurns
-} from './physics.js?v=36';
+} from './physics.js?v=37';
 import {
   SHOT_PRESETS,
   INCOMING_PRESETS,
   EXAMPLE_RALLIES,
   TACTICAL_LESSONS,
   evaluateTacticalAttempt
-} from './presets.js?v=36';
-import { TennisScene3D } from './scene3d.js?v=36';
-import { RacketDiagram } from './racketDiagram.js?v=36';
+} from './presets.js?v=37';
+import { TennisScene3D } from './scene3d.js?v=37';
+import { RacketDiagram } from './racketDiagram.js?v=37';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;
@@ -131,6 +131,7 @@ const I18N = {
     themeLight: '浅色',
     themeDark: '深色',
     chkStands: '观众席',
+    hintDragPlayer: '长按球员可拖动站位',
     legIncoming: '来球',
     legPreBounce: '飞行',
     legPostBounce: '反弹',
@@ -268,6 +269,7 @@ const I18N = {
     themeLight: 'Light',
     themeDark: 'Dark',
     chkStands: 'Stands',
+    hintDragPlayer: 'Long-press the player to move them',
     legIncoming: 'Incoming',
     legPreBounce: 'Flight',
     legPostBounce: 'Rebound',
@@ -408,10 +410,28 @@ class TennisSimApp {
     const viewportEl = document.getElementById('viewport3d');
     this.scene3d = new TennisScene3D(viewportEl);
     this.scene3d.onClipsLoaded = () => this.updateScrubberFrame();
+    // Long-press the hitter in 3D and drag: moves the contact point (the player follows)
+    this.scene3d.onPlayerDrag = ({ phase, dWorldX = 0, dWorldY = 0 }) => {
+      if (phase === 'start') {
+        this._dragBase = { hitX: this.state.hitX, hitY: this.state.hitY };
+        return;
+      }
+      if (phase !== 'move' || !this._dragBase) return;
+      const sign = this.state.side === 'B' ? -1 : 1; // player B hits in the mirrored frame
+      const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+      this.state.hitX = Math.round(clamp(this._dragBase.hitX + sign * dWorldX, -14.5, -1.0) * 20) / 20;
+      this.state.hitY = Math.round(clamp(this._dragBase.hitY + sign * dWorldY, -5.4, 5.4) * 20) / 20;
+      this.recomputeSimulation({ source: 'racket' });
+    };
 
     const racketCanvasEl = document.getElementById('racketImpactCanvas');
     if (racketCanvasEl) {
       this.racket3d = new RacketDiagram(racketCanvasEl);
+      // Dragging a dial in the diagram behaves exactly like moving the matching slider
+      this.racket3d.onChange = (key, value) => {
+        this.state[key] = value;
+        this.recomputeSimulation({ source: 'racket' });
+      };
     }
   }
 
