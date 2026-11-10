@@ -232,26 +232,44 @@ export function computeRacketBallImpact(params) {
 
 /**
  * Inverse Racket-Ball Impact Solver (Eliminates "Direct Override" Mode!):
- * Given desired outgoing (targetSpeedKmh, targetLaunchAngleDeg, targetTopspinRpm) from the interactive HUD,
- * uses a 10-step 3x3 Jacobian Newton-Secant solver to back-calculate the exact physically consistent
- * (racketSpeedKmh, swingPathDeg, faceAngleDeg) required to produce that shot!
+ * Supports both `solveRacketFromTargetLaunch({ targetSpeedKmh, targetLaunchAngleDeg, targetTopspinRpm, ...baseParams })`
+ * and `solveRacketFromTargetLaunch(targetSpeedKmh, targetLaunchAngleDeg, targetTopspinRpm, baseParams)`.
  */
 export function solveRacketFromTargetLaunch(
-  targetSpeedKmh,
-  targetLaunchAngleDeg,
-  targetTopspinRpm,
-  baseParams
+  arg1,
+  arg2,
+  arg3,
+  arg4 = {}
 ) {
+  let targetSpeedKmh;
+  let targetLaunchAngleDeg;
+  let targetTopspinRpm;
+  let baseParams;
+
+  if (typeof arg1 === 'object' && arg1 !== null) {
+    targetSpeedKmh = Number(arg1.targetSpeedKmh ?? arg1.speedKmh ?? 135);
+    targetLaunchAngleDeg = Number(arg1.targetLaunchAngleDeg ?? arg1.launchAngleDeg ?? 8.0);
+    targetTopspinRpm = Number(arg1.targetTopspinRpm ?? arg1.topspinRpm ?? 2800);
+    baseParams = arg1;
+  } else {
+    targetSpeedKmh = Number(arg1 ?? 135);
+    targetLaunchAngleDeg = Number(arg2 ?? 8.0);
+    targetTopspinRpm = Number(arg3 ?? 2800);
+    baseParams = arg4 || {};
+  }
+
   const {
     incomingSpeedKmh = 52,
     incomingAngleDeg = -11,
     incomingSpinRpm = 1800,
-    stringTensionKg = 23
+    stringTensionKg = 23,
+    hitZ = 1.05
   } = baseParams;
 
-  let vr = baseParams.racketSpeedKmh || 86;
-  let sw = baseParams.swingPathDeg || 24;
-  let fa = baseParams.faceAngleDeg || 0;
+  const isServe = hitZ > 1.95 || incomingSpeedKmh < 2;
+  let vr = baseParams.racketSpeedKmh || (isServe ? targetSpeedKmh * 0.68 : 88);
+  let sw = baseParams.swingPathDeg ?? (targetTopspinRpm < 0 ? -14 : isServe ? 6 : 25);
+  let fa = baseParams.faceAngleDeg ?? (isServe ? targetLaunchAngleDeg - 2 : -1.8);
 
   for (let iter = 0; iter < 12; iter++) {
     const c0 = evaluateSingleImpact(
@@ -688,28 +706,34 @@ export function simulateTrajectory(config) {
 
   // Compute Receiver's Optimal Strike Zone Intercept Point (after 1st bounce) for Turn-Based Rally Play!
   let interceptPoint = null;
-  const postBouncePts = points.filter((p) => p.phase === 1 && p.localX > 1.5);
+  const postBouncePts = points.filter((p) => p.phase === 1 && p.localX > 2.5);
   if (postBouncePts.length > 4) {
-    // Prefer a point where ball is near baseline (localX ~ 10.2 to 13.8m) or at comfortable waist-chest height (z ~ 1.02m) after post-bounce apex
-    let bestPt = postBouncePts[Math.floor(postBouncePts.length * 0.62)];
+    // Prefer a point after the post-bounce apex (vz <= 0) where ball is descending into the comfortable strike zone (z ~ 0.95 to 1.15m)
+    let bestPt = postBouncePts[Math.floor(postBouncePts.length * 0.68)];
     let bestScore = 999;
     let passedApex = false;
     for (let i = 1; i < postBouncePts.length; i++) {
       const p = postBouncePts[i];
       if (p.vz <= 0) passedApex = true;
       const heightErr = Math.abs(p.z - 1.04);
-      const depthBonus = p.localX >= 9.5 && p.localX <= 14.0 ? -0.25 : 0;
-      const descentBonus = passedApex ? -0.20 : 0.15;
+      const depthBonus = p.localX >= 9.2 && p.localX <= 13.2 ? -0.35 : 0.25;
+      const descentBonus = passedApex ? -0.45 : 0.35;
       const score = heightErr + depthBonus + descentBonus;
-      if (p.z >= 0.48 && p.z <= 1.72 && score < bestScore) {
+      if (p.z >= 0.58 && p.z <= 1.55 && score < bestScore) {
         bestScore = score;
         bestPt = p;
       }
     }
 
     const horizSpd = Math.hypot(bestPt.localVx, bestPt.localVy);
-    const inAngleDeg = (Math.atan2(bestPt.vz, Math.max(0.1, horizSpd)) * 180) / Math.PI;
+    const rawInAngle = (Math.atan2(bestPt.vz, Math.max(0.1, horizSpd)) * 180) / Math.PI;
+    // Receiver takes the ball in a controlled strike window (-12° to -6° falling or slightly rising)
+    const clampedInAngle = Math.max(-13, Math.min(-5, rawInAngle < -2 ? rawInAngle : -9));
     const spinSign = bestPt.localWy >= 0 ? 1 : -1;
+    const realisticPostBounceRpm = Math.max(
+      -2200,
+      Math.min(2400, Math.round((spinSign * Math.min(2350, bestPt.rpm * 0.62)) / 50) * 50)
+    );
 
     interceptPoint = {
       t: bestPt.t,
@@ -718,12 +742,12 @@ export function simulateTrajectory(config) {
       z: bestPt.z,
       // Handoff state in the NEXT hitter's canonical frame (rotated 180 deg):
       nextSide: side === 'A' ? 'B' : 'A',
-      nextHitX: Math.round(Math.max(-14.2, Math.min(-2.0, -bestPt.localX)) * 20) / 20,
-      nextHitY: Math.round(Math.max(-5.2, Math.min(5.2, -bestPt.localY)) * 20) / 20,
-      nextHitZ: Math.round(Math.max(0.45, Math.min(1.75, bestPt.z)) * 50) / 50,
-      nextIncomingSpeedKmh: Math.round(bestPt.speedKmh),
-      nextIncomingAngleDeg: Math.round(Math.max(-26, Math.min(20, inAngleDeg)) * 2) / 2,
-      nextIncomingSpinRpm: Math.round((spinSign * bestPt.rpm) / 50) * 50
+      nextHitX: Math.round(Math.max(-12.9, Math.min(-9.8, -bestPt.localX)) * 20) / 20,
+      nextHitY: Math.round(Math.max(-3.8, Math.min(3.8, -bestPt.localY)) * 20) / 20,
+      nextHitZ: Math.round(Math.max(0.92, Math.min(1.18, bestPt.z)) * 50) / 50,
+      nextIncomingSpeedKmh: Math.round(Math.max(42, Math.min(82, bestPt.speedKmh))),
+      nextIncomingAngleDeg: Math.round(clampedInAngle * 2) / 2,
+      nextIncomingSpinRpm: realisticPostBounceRpm
     };
   }
 
@@ -899,12 +923,12 @@ export const SHOT_PRESETS = {
     hitX: -11.35,
     hitY: -1.60,
     hitZ: 1.12,
-    racketSpeedKmh: 99,
-    swingPathDeg: 24.0,
-    faceAngleDeg: -3.0,
+    racketSpeedKmh: 98,
+    swingPathDeg: 26.5,
+    faceAngleDeg: -4.2,
     aimAngleDeg: 6.5,
-    incomingSpeedKmh: 64,
-    incomingAngleDeg: 9.5,
+    incomingSpeedKmh: 62,
+    incomingAngleDeg: -6.5,
     incomingSpinRpm: 1700,
     sidespinRpm: 180
   },
@@ -1020,18 +1044,24 @@ export const ATP_RALLIES = {
         incomingSpeedKmh: 0,
         incomingAngleDeg: 0,
         incomingSpinRpm: 0,
-        sidespinRpm: 450
+        sidespinRpm: 450,
+        targetSpeedKmh: 184,
+        targetLaunchAngleDeg: -3.9,
+        targetTopspinRpm: 1550
       },
       {
         side: 'B',
         titleZh: '#2 Djokovic 借力深区接发',
         titleEn: '#2 Djokovic Deep Return',
         courtMode: 'singles',
-        racketSpeedKmh: 78,
-        swingPathDeg: 21.0,
-        faceAngleDeg: -0.8,
-        aimAngleDeg: -4.5,
-        sidespinRpm: 150
+        racketSpeedKmh: 84,
+        swingPathDeg: 24.0,
+        faceAngleDeg: -2.4,
+        aimAngleDeg: 4.2,
+        sidespinRpm: 150,
+        targetSpeedKmh: 132,
+        targetLaunchAngleDeg: 7.2,
+        targetTopspinRpm: 2650
       },
       {
         side: 'A',
@@ -1040,31 +1070,40 @@ export const ATP_RALLIES = {
         courtMode: 'singles',
         racketSpeedKmh: 94,
         swingPathDeg: 28.0,
-        faceAngleDeg: -2.0,
-        aimAngleDeg: 8.8,
-        sidespinRpm: 300
+        faceAngleDeg: -2.2,
+        aimAngleDeg: 7.8,
+        sidespinRpm: 300,
+        targetSpeedKmh: 139,
+        targetLaunchAngleDeg: 7.4,
+        targetTopspinRpm: 3250
       },
       {
         side: 'B',
         titleZh: '#4 Djokovic 跑动切削防守',
         titleEn: '#4 Djokovic Defensive Slice',
         courtMode: 'singles',
-        racketSpeedKmh: 65,
-        swingPathDeg: -13.5,
-        faceAngleDeg: 6.2,
-        aimAngleDeg: -6.5,
-        sidespinRpm: -280
+        racketSpeedKmh: 64,
+        swingPathDeg: -14.5,
+        faceAngleDeg: 5.5,
+        aimAngleDeg: 5.8,
+        sidespinRpm: -280,
+        targetSpeedKmh: 104,
+        targetLaunchAngleDeg: 4.2,
+        targetTopspinRpm: -1650
       },
       {
         side: 'A',
         titleZh: '#5 Alcaraz 侧身直线制胜分',
         titleEn: '#5 Alcaraz Inside-In Winner',
         courtMode: 'singles',
-        racketSpeedKmh: 102,
-        swingPathDeg: 25.5,
-        faceAngleDeg: -2.8,
-        aimAngleDeg: -5.2,
-        sidespinRpm: 350
+        racketSpeedKmh: 98,
+        swingPathDeg: 26.5,
+        faceAngleDeg: -3.2,
+        aimAngleDeg: -3.8,
+        sidespinRpm: 320,
+        targetSpeedKmh: 146,
+        targetLaunchAngleDeg: 6.1,
+        targetTopspinRpm: 3150
       }
     ]
   },
@@ -1092,40 +1131,52 @@ export const ATP_RALLIES = {
         incomingSpeedKmh: 54,
         incomingAngleDeg: -10,
         incomingSpinRpm: 1750,
-        sidespinRpm: 200
+        sidespinRpm: 200,
+        targetSpeedKmh: 141,
+        targetLaunchAngleDeg: 6.4,
+        targetTopspinRpm: 2950
       },
       {
         side: 'B',
         titleZh: '#2 Medvedev 退后平击反抽',
         titleEn: '#2 Medvedev Deep Flat Counter',
         courtMode: 'singles',
-        racketSpeedKmh: 88,
-        swingPathDeg: 19.5,
-        faceAngleDeg: -0.6,
-        aimAngleDeg: 6.8,
-        sidespinRpm: 120
+        racketSpeedKmh: 90,
+        swingPathDeg: 23.0,
+        faceAngleDeg: -2.6,
+        aimAngleDeg: 5.8,
+        sidespinRpm: 120,
+        targetSpeedKmh: 136,
+        targetLaunchAngleDeg: 6.6,
+        targetTopspinRpm: 2550
       },
       {
         side: 'A',
         titleZh: '#3 Sinner 抢上升期大斜线',
         titleEn: '#3 Sinner Rising Cross-Court',
         courtMode: 'singles',
-        racketSpeedKmh: 98,
-        swingPathDeg: 24.5,
-        faceAngleDeg: -2.5,
-        aimAngleDeg: 9.2,
-        sidespinRpm: 260
+        racketSpeedKmh: 96,
+        swingPathDeg: 26.5,
+        faceAngleDeg: -2.8,
+        aimAngleDeg: 7.6,
+        sidespinRpm: 260,
+        targetSpeedKmh: 144,
+        targetLaunchAngleDeg: 6.2,
+        targetTopspinRpm: 3100
       },
       {
         side: 'B',
         titleZh: '#4 Medvedev 极限直线反击',
         titleEn: '#4 Medvedev DTL Riposte',
         courtMode: 'singles',
-        racketSpeedKmh: 92,
-        swingPathDeg: 22.0,
-        faceAngleDeg: -1.5,
-        aimAngleDeg: -3.5,
-        sidespinRpm: 180
+        racketSpeedKmh: 93,
+        swingPathDeg: 24.5,
+        faceAngleDeg: -2.5,
+        aimAngleDeg: -2.8,
+        sidespinRpm: 180,
+        targetSpeedKmh: 139,
+        targetLaunchAngleDeg: 6.4,
+        targetTopspinRpm: 2800
       }
     ]
   },
@@ -1153,7 +1204,10 @@ export const ATP_RALLIES = {
         incomingSpeedKmh: 50,
         incomingAngleDeg: -12,
         incomingSpinRpm: 1900,
-        sidespinRpm: 420
+        sidespinRpm: 420,
+        targetSpeedKmh: 129,
+        targetLaunchAngleDeg: 11.1,
+        targetTopspinRpm: 3850
       },
       {
         side: 'B',
@@ -1162,9 +1216,12 @@ export const ATP_RALLIES = {
         courtMode: 'singles',
         racketSpeedKmh: 64,
         swingPathDeg: -14.5,
-        faceAngleDeg: 5.8,
-        aimAngleDeg: 6.5,
-        sidespinRpm: -300
+        faceAngleDeg: 5.4,
+        aimAngleDeg: 5.5,
+        sidespinRpm: -300,
+        targetSpeedKmh: 103,
+        targetLaunchAngleDeg: 4.1,
+        targetTopspinRpm: -1600
       },
       {
         side: 'A',
@@ -1173,20 +1230,26 @@ export const ATP_RALLIES = {
         courtMode: 'singles',
         racketSpeedKmh: 96,
         swingPathDeg: 36.0,
-        faceAngleDeg: 0.4,
-        aimAngleDeg: -6.2,
-        sidespinRpm: 380
+        faceAngleDeg: -1.5,
+        aimAngleDeg: -4.2,
+        sidespinRpm: 380,
+        targetSpeedKmh: 131,
+        targetLaunchAngleDeg: 10.2,
+        targetTopspinRpm: 3950
       },
       {
         side: 'B',
         titleZh: '#4 Federer 抢攻正手制胜',
         titleEn: '#4 Federer Forehand Drive',
         courtMode: 'singles',
-        racketSpeedKmh: 96,
-        swingPathDeg: 24.0,
-        faceAngleDeg: -2.0,
-        aimAngleDeg: -7.5,
-        sidespinRpm: 250
+        racketSpeedKmh: 95,
+        swingPathDeg: 25.0,
+        faceAngleDeg: -2.8,
+        aimAngleDeg: -4.5,
+        sidespinRpm: 250,
+        targetSpeedKmh: 142,
+        targetLaunchAngleDeg: 6.2,
+        targetTopspinRpm: 2950
       }
     ]
   }

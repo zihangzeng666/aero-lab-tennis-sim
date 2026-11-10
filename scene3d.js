@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=5';
+import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=6';
 
 export function physToThree(x, y, z) {
   return new THREE.Vector3(x, z, -y);

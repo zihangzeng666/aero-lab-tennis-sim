@@ -15,8 +15,8 @@ import {
   SHOT_PRESETS,
   INCOMING_PRESETS,
   ATP_RALLIES
-} from './physics.js?v=5';
-import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=5';
+} from './physics.js?v=6';
+import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=6';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;
@@ -26,6 +26,7 @@ const I18N = {
     unitSpeedLabel: '速度单位',
     unitTensionLabel: '穿线张力',
     rallySectionTitle: 'ATP 赛事回合与球员技术档案',
+    btnReset: '一键重置',
     btnImportAtp: '导入实测数据',
     lblRallyPreset: 'ATP 经典多拍回合回放',
     shotPresetLabel: '职业球员单拍技术基准 (覆盖当前拍)',
@@ -114,6 +115,7 @@ const I18N = {
     unitSpeedLabel: 'SPEED',
     unitTensionLabel: 'TENSION',
     rallySectionTitle: 'ATP TOUR RALLIES & PLAYER BENCHMARKS',
+    btnReset: 'RESET',
     btnImportAtp: 'IMPORT ATP CSV',
     lblRallyPreset: 'ATP Multi-Shot Rally Replay',
     shotPresetLabel: 'Pro Player Single-Shot Profile (Overwrites Turn)',
@@ -386,11 +388,32 @@ class TennisSimApp {
       incomingAngleDeg: t.incomingAngleDeg ?? -10,
       incomingSpinRpm: t.incomingSpinRpm ?? 1800,
       stringTensionKg: t.stringTensionKg ?? 23,
-      sidespinRpm: t.sidespinRpm ?? 200
+      sidespinRpm: t.sidespinRpm ?? 200,
+      targetSpeedKmh: t.targetSpeedKmh,
+      targetLaunchAngleDeg: t.targetLaunchAngleDeg,
+      targetTopspinRpm: t.targetTopspinRpm
     }));
 
     this._rechainRallyFromTurn(0);
     this.selectTurn(0, false);
+  }
+
+  /**
+   * One-Click Reset: restores current rally, sliders, camera, and playback to clean benchmark state.
+   */
+  resetAll() {
+    this.isPlayingFullRally = false;
+    this.windSpeedKmh = 0;
+    this.state.windSpeedKmh = 0;
+    this.state.stringTensionKg = 23;
+    this.loadRally(this.currentRallyKey || 'ao2024_sinner_medvedev');
+    this.scene3d.setCameraPreset('broadcast', this.simResult, this.state);
+    if (this.racket3d) {
+      this.racket3d.setViewMode('iso');
+      document.querySelectorAll('#racket3DViewGroup .seg-btn').forEach((b) =>
+        b.classList.toggle('active', b.getAttribute('data-racket-view') === 'iso')
+      );
+    }
   }
 
   /**
@@ -399,6 +422,36 @@ class TennisSimApp {
   _rechainRallyFromTurn(startIdx = 0) {
     for (let i = startIdx; i < this.rallyTurns.length; i++) {
       const turn = this.rallyTurns[i];
+      if (i > startIdx && turn.targetSpeedKmh !== undefined) {
+        const solved = solveRacketFromTargetLaunch({
+          targetSpeedKmh: turn.targetSpeedKmh,
+          targetLaunchAngleDeg: turn.targetLaunchAngleDeg,
+          targetTopspinRpm: turn.targetTopspinRpm,
+          incomingSpeedKmh: turn.incomingSpeedKmh,
+          incomingAngleDeg: turn.incomingAngleDeg,
+          incomingSpinRpm: turn.incomingSpinRpm,
+          stringTensionKg: turn.stringTensionKg ?? 23,
+          hitZ: turn.hitZ
+        });
+        turn.racketSpeedKmh = solved.racketSpeedKmh;
+        turn.swingPathDeg = solved.swingPathDeg;
+        turn.faceAngleDeg = solved.faceAngleDeg;
+      } else if (i === 0 && turn.targetSpeedKmh !== undefined && startIdx === 0) {
+        const solved = solveRacketFromTargetLaunch({
+          targetSpeedKmh: turn.targetSpeedKmh,
+          targetLaunchAngleDeg: turn.targetLaunchAngleDeg,
+          targetTopspinRpm: turn.targetTopspinRpm,
+          incomingSpeedKmh: turn.incomingSpeedKmh,
+          incomingAngleDeg: turn.incomingAngleDeg,
+          incomingSpinRpm: turn.incomingSpinRpm,
+          stringTensionKg: turn.stringTensionKg ?? 23,
+          hitZ: turn.hitZ
+        });
+        turn.racketSpeedKmh = solved.racketSpeedKmh;
+        turn.swingPathDeg = solved.swingPathDeg;
+        turn.faceAngleDeg = solved.faceAngleDeg;
+      }
+
       const impact = computeRacketBallImpact(turn);
       turn.speedKmh = impact.launchSpeedKmh;
       turn.launchAngleDeg = impact.launchAngleDeg;
@@ -489,8 +542,18 @@ class TennisSimApp {
     const incAng = ip ? ip.nextIncomingAngleDeg : -10;
     const incSpn = ip ? ip.nextIncomingSpinRpm : 1850;
 
-    // Aim back cross-court toward the open court
-    const smartAimDeg = hitY < -0.5 ? 7.5 : hitY > 0.5 ? -7.5 : 4.0;
+    // Aim back cross-court toward the open court so the return lands IN
+    const smartAimDeg = Math.round(Math.max(-6.8, Math.min(6.8, -hitY * 2.4)) * 10) / 10;
+    const solved = solveRacketFromTargetLaunch({
+      targetSpeedKmh: 136,
+      targetLaunchAngleDeg: 6.6,
+      targetTopspinRpm: 2950,
+      incomingSpeedKmh: incSpd,
+      incomingAngleDeg: incAng,
+      incomingSpinRpm: incSpn,
+      stringTensionKg: this.state.stringTensionKg,
+      hitZ
+    });
 
     const newTurn = {
       side: nextSide,
@@ -500,15 +563,18 @@ class TennisSimApp {
       hitX,
       hitY,
       hitZ,
-      racketSpeedKmh: 91,
-      swingPathDeg: 25.5,
-      faceAngleDeg: -1.8,
+      racketSpeedKmh: solved.racketSpeedKmh,
+      swingPathDeg: solved.swingPathDeg,
+      faceAngleDeg: solved.faceAngleDeg,
       aimAngleDeg: smartAimDeg,
       incomingSpeedKmh: incSpd,
       incomingAngleDeg: incAng,
       incomingSpinRpm: incSpn,
       stringTensionKg: this.state.stringTensionKg,
-      sidespinRpm: hitY < 0 ? 220 : -220
+      sidespinRpm: hitY < 0 ? 220 : -220,
+      targetSpeedKmh: 136,
+      targetLaunchAngleDeg: 6.6,
+      targetTopspinRpm: 2950
     };
 
     this.rallyTurns.push(newTurn);
@@ -639,6 +705,14 @@ class TennisSimApp {
 
     document.getElementById('btnNextTurn')?.addEventListener('click', () => {
       this.appendOrAdvanceNextTurn();
+    });
+
+    document.getElementById('btnResetRally')?.addEventListener('click', () => {
+      this.resetAll();
+    });
+
+    document.getElementById('btnResetAll')?.addEventListener('click', () => {
+      this.resetAll();
     });
 
     document.getElementById('incomingPresetSelect')?.addEventListener('change', (e) => {
@@ -887,7 +961,10 @@ class TennisSimApp {
             incomingSpeedKmh: idx === 0 && hitZ > 1.95 ? 0 : 58,
             incomingAngleDeg: idx === 0 && hitZ > 1.95 ? 0 : -10,
             incomingSpinRpm: idx === 0 && hitZ > 1.95 ? 0 : 1800,
-            sidespinRpm: Number(item.sidespinRpm ?? 220)
+            sidespinRpm: Number(item.sidespinRpm ?? 220),
+            targetSpeedKmh: Number(item.speedKmh ?? 135),
+            targetLaunchAngleDeg: Number(item.launchAngleDeg ?? 6.8),
+            targetTopspinRpm: Number(item.topspinRpm ?? 3000)
           });
         });
       } else {
@@ -927,7 +1004,10 @@ class TennisSimApp {
             incomingSpeedKmh: isServe ? 0 : 58,
             incomingAngleDeg: isServe ? 0 : -10,
             incomingSpinRpm: isServe ? 0 : 1800,
-            sidespinRpm: 200
+            sidespinRpm: 200,
+            targetSpeedKmh: spd,
+            targetLaunchAngleDeg: launchAng,
+            targetTopspinRpm: rpm
           });
         });
       }
@@ -1064,7 +1144,10 @@ class TennisSimApp {
         sidespinRpm: this.state.sidespinRpm,
         speedKmh: this.state.speedKmh,
         launchAngleDeg: this.state.launchAngleDeg,
-        topspinRpm: this.state.topspinRpm
+        topspinRpm: this.state.topspinRpm,
+        targetSpeedKmh: this.state.speedKmh,
+        targetLaunchAngleDeg: this.state.launchAngleDeg,
+        targetTopspinRpm: this.state.topspinRpm
       });
       if (!skipChain) {
         this._rechainRallyFromTurn(this.currentTurnIndex);

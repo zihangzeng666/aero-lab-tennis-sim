@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=5" />
+  <link rel="stylesheet" href="./styles.css?v=6" />
   <script type="importmap">
     {
       "imports": {
@@ -57,8 +57,11 @@
       <!-- ATP Rally & Telemetry Benchmark Selector -->
       <div class="panel-section">
         <div class="section-header">
-          <span class="section-tag" data-i18n="rallySectionTitle">ATP 实测多拍回合与球员数据库</span>
-          <button class="mini-action-btn" id="btnOpenImportModal" data-i18n="btnImportAtp">导入 ATP 数据</button>
+          <span class="section-tag" data-i18n="rallySectionTitle">ATP 赛事回合与球员技术档案</span>
+          <div class="rally-actions">
+            <button class="mini-action-btn" id="btnResetRally" data-i18n="btnReset">一键重置</button>
+            <button class="mini-action-btn" id="btnOpenImportModal" data-i18n="btnImportAtp">导入实测数据</button>
+          </div>
         </div>
 
         <div class="preset-dual-row">
@@ -421,7 +424,8 @@
           <button class="play-btn" id="btnPlayPause">暂停</button>
           <button class="secondary-btn active-rally-btn" id="btnPlayFullRally" data-i18n="btnPlayFullRally">连播整回合</button>
           <button class="secondary-btn" id="btnRestart" data-i18n="btnRestart">重播本拍</button>
-          <button class="secondary-btn" id="btnSnapImpact" data-i18n="btnSnapImpact">触球点 t=0</button>
+          <button class="secondary-btn" id="btnSnapImpact" data-i18n="btnSnapImpact">定格触球 t=0</button>
+          <button class="secondary-btn" id="btnResetAll" data-i18n="btnReset">一键重置</button>
 
           <select id="speedSelect" style="width: 112px;">
             <option value="0.15" data-i18n="spd015">0.15x 慢放</option>
@@ -459,11 +463,11 @@
         <p class="modal-desc" data-i18n="modalImportDesc">
           每行输入一拍实测数据（格式：出球速度km/h, 转速RPM, 出球仰角°, 水平角°, 击球X, 击球Y, 击球Z），系统将自动逆向解算每一拍的球拍挥拍速度与拍面倾角并生成对拉回合：
         </p>
-        <textarea id="atpImportTextarea" rows="6" spellcheck="false">196, 2400, -5.2, 6.8, -11.88, -0.90, 2.74
-134, 2750, 8.6, -4.5, -11.60, -2.40, 1.05
-144, 3450, 7.8, 8.5, -11.40, -1.75, 1.10
-118, -1700, 6.4, -6.2, -11.80, 2.50, 0.96
-152, 3600, 6.8, -5.0, -10.80, -1.50, 1.12</textarea>
+        <textarea id="atpImportTextarea" rows="6" spellcheck="false">194, 1850, -4.4, 7.2, -11.88, -0.90, 2.74
+134, 2750, 7.0, 4.5, -11.60, -2.10, 1.05
+142, 3350, 6.8, 7.5, -11.40, -1.50, 1.08
+104, -1650, 4.2, 5.5, -11.80, -2.40, 0.98
+148, 3250, 5.8, -3.5, -11.00, 0.50, 1.08</textarea>
       </div>
       <div class="modal-footer">
         <button class="secondary-btn" id="btnCancelImport" data-i18n="btnCancel">取消</button>
@@ -472,6 +476,6 @@
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=5"></script>
+  <script type="module" src="./app.js?v=6"></script>
 </body>
 </html>
