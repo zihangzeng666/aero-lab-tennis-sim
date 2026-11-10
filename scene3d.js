@@ -91,6 +91,7 @@ export class TennisScene3D {
     this.ballVisualScale = 2.0;
     this.showVectors = true;
     this.showGhostNoSpin = true;
+    this.soloMode = true;
 
     this.rigLengths = {
       thigh: 0.42,
@@ -107,6 +108,9 @@ export class TennisScene3D {
     this._initBallAndVectors();
     this._initTrajectoryMeshes();
     this._initHawkEyeMarkers();
+    if (this.playerB && this.playerB.root) {
+      this.playerB.root.visible = !this.soloMode;
+    }
 
     this._onResize = () => {
       if (!this.container) return;
@@ -1333,19 +1337,39 @@ export class TennisScene3D {
     }
   }
 
+  setSoloMode(isSolo) {
+    this.soloMode = Boolean(isSolo);
+    if (this.playerA && this.playerA.root) this.playerA.root.visible = true;
+    if (this.playerB && this.playerB.root) this.playerB.root.visible = !this.soloMode;
+  }
+
+  /**
+   * Resolves effective stroke type ('fh' | 'bh2' | 'bh1' | 'serve') from explicit strokeType or court position.
+   */
+  _resolveStrokeType(strokeType, hitY, hitZ, swingPathDeg) {
+    if (hitZ > 1.95 || strokeType === 'serve') return 'serve';
+    if (strokeType === 'bh2' || strokeType === 'bh1' || strokeType === 'fh') return strokeType;
+    // In automatic / rally mode, balls on the left (Ad) side (hitY > 0.35) use Backhand!
+    if (hitY > 0.35) {
+      return swingPathDeg < -3 ? 'bh1' : 'bh2';
+    }
+    return 'fh';
+  }
+
   /**
    * Evaluates the Zero-Clipping 3D Biomechanical Racket Pose at time `tau` (tau = 0 is impact).
-   *
-   * Key Anti-Clipping Guarantees:
-   * - During follow-through (`s > 0`), `rotY` sweeps smoothly to `-2.05 rad (-117°)` while `rotX` stays negative (`-0.25 -> -0.60`),
-   *   so the racket head extends FORWARD across the body first (`x > +0.18m`), and as the hand finishes outside the left shoulder,
-   *   the racket head points BACKWARD (`-X`), UPWARD (`+Y`), and OUTWARD-LEFT (`-Z`), NEVER crossing back across the player's neck or face!
+   * Supports:
+   * - Forehand ('fh'): Modern circular loop & wrap over left shoulder
+   * - Two-Handed Backhand ('bh2'): Coiled left-hip unit turn & double-handed wrap over right shoulder
+   * - One-Handed Backhand ('bh1'): Classic eastern backhand drive or knife slice with high right-side finish
+   * - Overhead Serve ('serve'): Trophy pose -> racquet drop -> pronation extension
    */
-  _evaluateSwingPoseAtTime(tau, swingPathDeg, faceAngleDeg, hitZ) {
+  _evaluateSwingPoseAtTime(tau, swingPathDeg, faceAngleDeg, hitZ, strokeType = 'fh') {
     const deg2rad = Math.PI / 180;
     const swingRad = swingPathDeg * deg2rad;
     const faceRad = faceAngleDeg * deg2rad;
-    const isOverhead = hitZ > 1.95;
+    const isOverhead = hitZ > 1.95 || strokeType === 'serve';
+    const isBackhand = !isOverhead && (strokeType === 'bh2' || strokeType === 'bh1');
 
     const s = THREE.MathUtils.clamp(tau, -0.35, 0.42);
     const vx0 = Math.cos(swingRad) * 2.15;
@@ -1376,6 +1400,79 @@ export class TennisScene3D {
         rotX = baseRx + 0.90 * u;
         rotY = -0.85 * u2;
         rotZ = faceRad - 0.65 * u;
+      }
+    } else if (isBackhand) {
+      // BACKHAND BIOMECHANICS ('bh2' Two-Handed or 'bh1' One-Handed)
+      // Rotating around local X by PI + 0.25 flips the handle (-Z -> +Z) toward the player standing on the right (+Z) of the ball,
+      // while keeping the stringbed face normal (+X) pointing toward the net!
+      const baseRx = Math.PI + 0.25;
+      if (swingPathDeg < -3) {
+        // Backhand Knife Slice
+        if (s < 0) {
+          const u = -s / 0.35;
+          const u2 = u * u;
+          pos.x = vx0 * s - 0.08 * u2;
+          pos.y = vy0 * s + 0.28 * u2;
+          pos.z = 0.08 * u2;
+          rotX = baseRx + 0.32 * u;
+          rotY = 0.65 * u2;
+          rotZ = faceRad + 0.28 * u;
+        } else {
+          const u = s / 0.42;
+          const u2 = u * u;
+          pos.x = vx0 * s - 0.46 * u2;
+          pos.y = vy0 * s + 0.22 * u2;
+          pos.z = 0.46 * u2;
+          rotX = baseRx + 0.30 * u;
+          rotY = 0.60 * u2;
+          rotZ = faceRad + 0.14 * u;
+        }
+      } else if (strokeType === 'bh1') {
+        // One-Handed Topspin Backhand (Wawrinka / Federer High Right Finish)
+        if (s < 0) {
+          const u = -s / 0.35;
+          const u2 = u * u;
+          const u3 = u2 * u;
+          pos.x = vx0 * s + 0.18 * u2;
+          pos.y = vy0 * s + 0.18 * u3;
+          pos.z = 0.10 * u2;
+          rotX = baseRx + 0.28 * u3;
+          rotY = 0.85 * u2;
+          rotZ = faceRad - 0.16 * u2;
+        } else {
+          const u = s / 0.42;
+          const u2 = u * u;
+          const u3 = u2 * u;
+          pos.x = vx0 * s - 0.78 * u3;
+          pos.y = vy0 * s + 0.18 * u2;
+          pos.z = 0.72 * Math.pow(u, 1.12);
+          rotX = baseRx + 0.30 * u;
+          rotY = 1.45 * Math.pow(u, 1.12);
+          rotZ = faceRad + 0.15 * u2;
+        }
+      } else {
+        // Two-Handed Topspin Backhand (Sinner / Djokovic Compact Wrap Over Right Shoulder)
+        if (s < 0) {
+          const u = -s / 0.35;
+          const u2 = u * u;
+          const u3 = u2 * u;
+          pos.x = vx0 * s + 0.20 * u2;
+          pos.y = vy0 * s + 0.20 * u3;
+          pos.z = 0.08 * u2;
+          rotX = baseRx + 0.28 * u3;
+          rotY = 0.82 * u2;
+          rotZ = faceRad - 0.16 * u2;
+        } else {
+          const u = s / 0.42;
+          const u2 = u * u;
+          const u3 = u2 * u;
+          pos.x = vx0 * s - 1.02 * u3;
+          pos.y = vy0 * s + 0.02 * u2;
+          pos.z = 0.88 * Math.pow(u, 1.15);
+          rotX = baseRx + 0.34 * u;
+          rotY = 1.98 * Math.pow(u, 1.15);
+          rotZ = faceRad + 0.15 * u2;
+        }
       }
     } else if (swingPathDeg < -3) {
       const baseRx = -0.20;
@@ -1429,7 +1526,7 @@ export class TennisScene3D {
     return { pos, quat };
   }
 
-  _rebuildSwingTrailRibbon(rig, swingPathDeg, faceAngleDeg, hitZ) {
+  _rebuildSwingTrailRibbon(rig, swingPathDeg, faceAngleDeg, hitZ, strokeType = 'fh') {
     while (rig.swingTrailGroup.children.length > 0) {
       const c = rig.swingTrailGroup.children[0];
       if (c.geometry) c.geometry.dispose();
@@ -1445,7 +1542,7 @@ export class TennisScene3D {
 
     for (let i = 0; i <= samples; i++) {
       const tau = -0.34 + (i / samples) * (0.34 + 0.38);
-      const pose = this._evaluateSwingPoseAtTime(tau, swingPathDeg, faceAngleDeg, hitZ);
+      const pose = this._evaluateSwingPoseAtTime(tau, swingPathDeg, faceAngleDeg, hitZ, strokeType);
       centerPts.push(pose.pos.clone());
 
       const topOffset = new THREE.Vector3(0, 0.11, 0).applyQuaternion(pose.quat);
@@ -1539,7 +1636,9 @@ export class TennisScene3D {
     const deg2rad = Math.PI / 180;
     const aimRad = aimAngleDeg * deg2rad;
     const contactPos = physToThree(hitX, hitY, hitZ);
-    const isOverhead = hitZ > 1.95;
+    const strokeType = this._resolveStrokeType(localParams.strokeType, hitY, hitZ, swingPathDeg);
+    const isOverhead = strokeType === 'serve';
+    const isBackhand = strokeType === 'bh2' || strokeType === 'bh1';
 
     rig.swingTrailGroup.visible = showTrail;
     rig.impactPlaneIndicator.visible = showTrail;
@@ -1548,24 +1647,24 @@ export class TennisScene3D {
     rig.faceNormalArrow.visible = showTrail && this.showVectors;
 
     if (showTrail) {
-      const trailKey = `${swingPathDeg.toFixed(1)}_${faceAngleDeg.toFixed(1)}_${isOverhead}`;
+      const trailKey = `${swingPathDeg.toFixed(1)}_${faceAngleDeg.toFixed(1)}_${strokeType}`;
       if (rig._lastTrailKey !== trailKey) {
         rig._lastTrailKey = trailKey;
-        this._rebuildSwingTrailRibbon(rig, swingPathDeg, faceAngleDeg, hitZ);
+        this._rebuildSwingTrailRibbon(rig, swingPathDeg, faceAngleDeg, hitZ, strokeType);
       }
     }
 
     rig.contactPivot.position.copy(contactPos);
     rig.contactPivot.rotation.set(0, aimRad, 0);
 
-    const impactPose0 = this._evaluateSwingPoseAtTime(0, swingPathDeg, faceAngleDeg, hitZ);
+    const impactPose0 = this._evaluateSwingPoseAtTime(0, swingPathDeg, faceAngleDeg, hitZ, strokeType);
     rig.impactPlaneIndicator.quaternion.copy(impactPose0.quat);
 
     const flashAlpha = showTrail ? Math.max(0, 1 - Math.abs(tau) * 18) : 0;
     rig.impactFlashMat.opacity = flashAlpha * 0.75;
     rig.impactFlashRing.scale.setScalar(0.7 + (1 - flashAlpha) * 0.9);
 
-    const swingPose = this._evaluateSwingPoseAtTime(tau, swingPathDeg, faceAngleDeg, hitZ);
+    const swingPose = this._evaluateSwingPoseAtTime(tau, swingPathDeg, faceAngleDeg, hitZ, strokeType);
     rig.racketGroup.position.copy(swingPose.pos);
     rig.racketGroup.quaternion.copy(swingPose.quat);
 
@@ -1576,8 +1675,8 @@ export class TennisScene3D {
     const fwdDir = new THREE.Vector3(Math.cos(aimRad), 0, -Math.sin(aimRad));
     const rightDir = new THREE.Vector3(Math.sin(aimRad), 0, Math.cos(aimRad));
 
-    const stanceBackOffset = isOverhead ? -0.22 : -0.26;
-    const stanceSideOffset = isOverhead ? -0.25 : -0.64;
+    const stanceBackOffset = isOverhead ? -0.22 : isBackhand ? -0.15 : -0.26;
+    const stanceSideOffset = isOverhead ? -0.25 : isBackhand ? 0.50 : -0.64;
     const stanceGroundCenter = new THREE.Vector3(contactPos.x, 0, contactPos.z)
       .addScaledVector(fwdDir, stanceBackOffset)
       .addScaledVector(rightDir, stanceSideOffset);
@@ -1598,12 +1697,21 @@ export class TennisScene3D {
       .addScaledVector(fwdDir, weightShiftFwd)
       .setY(targetHipY);
 
-    // Full biomechanical torso rotation: -83° at takeback -> +14° at impact -> +73° at follow-through
-    // This rotates the Right Shoulder forward toward the net and clears the Left Shoulder backward!
-    const totalYawRel =
-      coilPhase < 0
-        ? THREE.MathUtils.lerp(-1.45, 0.25, 1 + coilPhase)
-        : THREE.MathUtils.lerp(0.25, 1.28, Math.pow(coilPhase, 0.85));
+    // Full biomechanical torso rotation around +Y:
+    // - Forehand / Serve: coils right (-1.45 rad, left shoulder fwd) -> impact (+0.25 rad) -> follow-through (+1.28 rad)
+    // - Backhand (2H / 1H): coils left (+1.38 rad, right shoulder fwd) -> impact (+0.52 rad, right shoulder leading into ball!) -> follow-through (-0.28 rad for 1H-BH / -0.82 rad for 2H-BH)
+    const totalYawRel = isBackhand
+      ? coilPhase < 0
+        ? THREE.MathUtils.lerp(1.38, 0.52, 1 + coilPhase)
+        : THREE.MathUtils.lerp(
+            0.52,
+            strokeType === 'bh1' ? -0.28 : -0.82,
+            Math.pow(coilPhase, 0.85)
+          )
+      : coilPhase < 0
+      ? THREE.MathUtils.lerp(-1.45, 0.25, 1 + coilPhase)
+      : THREE.MathUtils.lerp(0.25, 1.28, Math.pow(coilPhase, 0.85));
+
     const hipTurnRad = aimRad + totalYawRel * 0.56;
     const totalTorsoExtraTurn = totalYawRel * 0.44;
 
@@ -1627,13 +1735,16 @@ export class TennisScene3D {
     const leftShoulderRoot = toRootLocal(rig.leftShoulderLocal, rig.chestPivot);
     const headRoot = toRootLocal(new THREE.Vector3(0, 0, 0), rig.headGroup);
 
-    let gripRoot = toRootLocal(rig.gripPointLocal, rig.racketGroup);
+    const rGripLocal = strokeType === 'bh2' ? new THREE.Vector3(0, 0, -0.42) : rig.gripPointLocal;
+    let gripRoot = toRootLocal(rGripLocal, rig.racketGroup);
     let sweetRoot = toRootLocal(new THREE.Vector3(0, 0, 0), rig.racketGroup);
 
-    // Anti-Clipping Step 1: Ensure gripRoot never enters torso or head sphere
-    this._pushOutOfTorsoAndHead(gripRoot, pelvisPos, headRoot, fwdDir, rightDir, 0.23, 0.24);
+    // Anti-Clipping Step 1: Ensure gripRoot never enters torso or head sphere during takeback/follow-through
+    if (Math.abs(tau) > 0.02) {
+      this._pushOutOfTorsoAndHead(gripRoot, pelvisPos, headRoot, fwdDir, rightDir, 0.22, 0.23);
+    }
 
-    // Anti-Clipping Step 2: Clamp gripRoot to maxArmReach from rightShoulderRoot (moving racket with hand, NEVER pulling torso into racket!)
+    // Anti-Clipping Step 2: Clamp gripRoot to maxArmReach from rightShoulderRoot (and leftShoulderRoot on 2H-BH)
     const L = this.rigLengths;
     const maxArmReach = L.upperArm + L.forearm - 0.012;
     const shToGrip = new THREE.Vector3().subVectors(gripRoot, rightShoulderRoot);
@@ -1643,25 +1754,46 @@ export class TennisScene3D {
       const deltaPivotLocal = deltaGrip.clone().applyAxisAngle(UP_VEC, -aimRad);
       rig.racketGroup.position.add(deltaPivotLocal);
       rig.root.updateMatrixWorld(true);
-      gripRoot = toRootLocal(rig.gripPointLocal, rig.racketGroup);
+      gripRoot = toRootLocal(rGripLocal, rig.racketGroup);
       sweetRoot = toRootLocal(new THREE.Vector3(0, 0, 0), rig.racketGroup);
     }
 
+    if (strokeType === 'bh2' && Math.abs(tau) > 0.01) {
+      const upperGripRoot = toRootLocal(new THREE.Vector3(0, 0, -0.32), rig.racketGroup);
+      const leftShToUpper = new THREE.Vector3().subVectors(upperGripRoot, leftShoulderRoot);
+      if (leftShToUpper.length() > maxArmReach) {
+        const clampedUpper = leftShoulderRoot.clone().add(leftShToUpper.setLength(maxArmReach));
+        const deltaUpper = new THREE.Vector3().subVectors(clampedUpper, upperGripRoot);
+        const deltaPivotLocal = deltaUpper.clone().applyAxisAngle(UP_VEC, -aimRad);
+        rig.racketGroup.position.add(deltaPivotLocal);
+        rig.root.updateMatrixWorld(true);
+        gripRoot = toRootLocal(rGripLocal, rig.racketGroup);
+        sweetRoot = toRootLocal(new THREE.Vector3(0, 0, 0), rig.racketGroup);
+      }
+    }
+
     const throatRoot = toRootLocal(rig.throatPointLocal, rig.racketGroup);
+    const upperHandleRoot = toRootLocal(new THREE.Vector3(0, 0, -0.32), rig.racketGroup);
 
     // Right Arm Two-Bone IK (with elevated forward elbow pole during follow-through)
     const followFactor = Math.max(0, coilPhase);
-    const rightElbowPole = rightDir
-      .clone()
-      .multiplyScalar(THREE.MathUtils.lerp(0.75, 0.20, followFactor))
-      .addScaledVector(fwdDir, THREE.MathUtils.lerp(-0.30, 0.92, followFactor))
-      .add(
-        new THREE.Vector3(
-          0,
-          isOverhead && coilPhase < 0 ? 0.25 : THREE.MathUtils.lerp(-0.68, -0.05, followFactor),
-          0
-        )
-      );
+    const rightElbowPole = isBackhand
+      ? rightDir
+          .clone()
+          .multiplyScalar(THREE.MathUtils.lerp(0.25, 0.72, followFactor))
+          .addScaledVector(fwdDir, THREE.MathUtils.lerp(0.55, 0.45, followFactor))
+          .add(new THREE.Vector3(0, THREE.MathUtils.lerp(-0.68, -0.15, followFactor), 0))
+      : rightDir
+          .clone()
+          .multiplyScalar(THREE.MathUtils.lerp(0.75, 0.20, followFactor))
+          .addScaledVector(fwdDir, THREE.MathUtils.lerp(-0.30, 0.92, followFactor))
+          .add(
+            new THREE.Vector3(
+              0,
+              isOverhead && coilPhase < 0 ? 0.25 : THREE.MathUtils.lerp(-0.68, -0.05, followFactor),
+              0
+            )
+          );
 
     const rightArmIK = solveTwoBoneIK(
       rightShoulderRoot,
@@ -1674,7 +1806,7 @@ export class TennisScene3D {
     alignBoneMesh(rig.rightUpperArmBone, rightShoulderRoot, rightArmIK.midPos);
     alignBoneMesh(rig.rightForearmBone, rightArmIK.midPos, rightArmIK.effectiveTarget);
 
-    // Left Balance / Catch Arm Two-Bone IK (stays strictly outside chest cylinder!)
+    // Left Arm Two-Bone IK (Two-Handed Grip for bh2, Throat-Cradle + Wingspan for bh1, Balance/Catch for fh)
     const currentChestYaw = hipTurnRad + totalTorsoExtraTurn;
     const chestFwdRoot = new THREE.Vector3(Math.cos(currentChestYaw), 0, -Math.sin(currentChestYaw));
     const chestLeftRoot = new THREE.Vector3(-Math.sin(currentChestYaw), 0, -Math.cos(currentChestYaw));
@@ -1688,6 +1820,18 @@ export class TennisScene3D {
         .addScaledVector(chestFwdRoot, tossFwd)
         .addScaledVector(chestLeftRoot, 0.08)
         .add(new THREE.Vector3(0, tossUp, 0));
+    } else if (strokeType === 'bh2') {
+      // Two-Handed Backhand: Left hand stays locked on upper handle right above right hand!
+      leftHandTarget.copy(upperHandleRoot);
+    } else if (strokeType === 'bh1') {
+      // One-Handed Backhand: Left hand cradles throat during takeback, then opens backward into wingspan!
+      const releaseWeight = THREE.MathUtils.smoothstep(coilPhase, -0.15, 0.22);
+      const wingspanPos = leftShoulderRoot
+        .clone()
+        .addScaledVector(fwdDir, -0.36)
+        .addScaledVector(rightDir, 0.34)
+        .add(new THREE.Vector3(0, 0.06 + 0.16 * Math.max(0, coilPhase), 0));
+      leftHandTarget.lerpVectors(throatRoot, wingspanPos, releaseWeight);
     } else {
       const catchFinishWeight =
         coilPhase > 0.42 ? THREE.MathUtils.smoothstep(coilPhase, 0.42, 0.88) * 0.92 : 0;
@@ -1698,13 +1842,21 @@ export class TennisScene3D {
         .add(new THREE.Vector3(0, -0.10, 0));
       leftHandTarget.lerpVectors(balancePos, throatRoot, catchFinishWeight);
     }
-    this._pushOutOfTorsoAndHead(leftHandTarget, pelvisPos, headRoot, fwdDir, rightDir, 0.25, 0.24);
+    if (strokeType !== 'bh2' || Math.abs(tau) > 0.02) {
+      this._pushOutOfTorsoAndHead(leftHandTarget, pelvisPos, headRoot, fwdDir, rightDir, 0.22, 0.23);
+    }
 
-    const leftElbowPole = chestLeftRoot
-      .clone()
-      .multiplyScalar(0.85)
-      .addScaledVector(chestFwdRoot, 0.55)
-      .add(new THREE.Vector3(0, -0.55, 0));
+    const leftElbowPole = isBackhand
+      ? rightDir
+          .clone()
+          .multiplyScalar(-0.65)
+          .addScaledVector(fwdDir, 0.35)
+          .add(new THREE.Vector3(0, -0.58, 0))
+      : chestLeftRoot
+          .clone()
+          .multiplyScalar(0.85)
+          .addScaledVector(chestFwdRoot, 0.55)
+          .add(new THREE.Vector3(0, -0.55, 0));
 
     const leftArmIK = solveTwoBoneIK(
       leftShoulderRoot,
@@ -1727,17 +1879,29 @@ export class TennisScene3D {
     const strideLiftL = Math.max(0, Math.cos(runningStridePhase)) * 0.06 * (Math.abs(runningStridePhase) > 0.01 ? 1 : 0);
     const strideLiftR = Math.max(0, -Math.cos(runningStridePhase)) * 0.06 * (Math.abs(runningStridePhase) > 0.01 ? 1 : 0);
 
-    const leftAnkleTarget = stanceGroundCenter
-      .clone()
-      .addScaledVector(fwdDir, 0.20 + strideSwing)
-      .addScaledVector(rightDir, -0.17)
-      .setY(0.068 + airborneLift + strideLiftL);
+    const leftAnkleTarget = isBackhand
+      ? stanceGroundCenter
+          .clone()
+          .addScaledVector(fwdDir, -0.16 + 0.10 * Math.max(0, coilPhase) + strideSwing)
+          .addScaledVector(rightDir, 0.18)
+          .setY(0.068 + airborneLift + strideLiftL + (coilPhase > 0.15 ? 0.03 * coilPhase : 0))
+      : stanceGroundCenter
+          .clone()
+          .addScaledVector(fwdDir, 0.20 + strideSwing)
+          .addScaledVector(rightDir, -0.17)
+          .setY(0.068 + airborneLift + strideLiftL);
 
-    const rightAnkleTarget = stanceGroundCenter
-      .clone()
-      .addScaledVector(fwdDir, -0.16 + 0.12 * Math.max(0, coilPhase) - strideSwing)
-      .addScaledVector(rightDir, 0.20)
-      .setY(0.068 + airborneLift + strideLiftR + (coilPhase > 0.15 ? 0.03 * coilPhase : 0));
+    const rightAnkleTarget = isBackhand
+      ? stanceGroundCenter
+          .clone()
+          .addScaledVector(fwdDir, 0.20 - strideSwing)
+          .addScaledVector(rightDir, -0.16)
+          .setY(0.068 + airborneLift + strideLiftR)
+      : stanceGroundCenter
+          .clone()
+          .addScaledVector(fwdDir, -0.16 + 0.12 * Math.max(0, coilPhase) - strideSwing)
+          .addScaledVector(rightDir, 0.20)
+          .setY(0.068 + airborneLift + strideLiftR + (coilPhase > 0.15 ? 0.03 * coilPhase : 0));
 
     const leftKneePole = fwdDir.clone().addScaledVector(rightDir, -0.18).normalize();
     const rightKneePole = fwdDir.clone().addScaledVector(rightDir, 0.32).normalize();
@@ -1757,7 +1921,7 @@ export class TennisScene3D {
     rig.rightShoeGroup.rotation.set(0, aimRad - 0.35 + 0.35 * Math.max(0, coilPhase), 0);
 
     // Head Tracking
-    const desiredWorldYaw = aimRad - 0.10 * Math.max(0, 1 - coilPhase);
+    const desiredWorldYaw = aimRad + (isBackhand ? 0.10 : -0.10) * Math.max(0, 1 - coilPhase);
     const neckCounterYaw = THREE.MathUtils.clamp(desiredWorldYaw - currentChestYaw, -0.95, 0.95);
     const headPitchZ = isOverhead
       ? THREE.MathUtils.lerp(0.45, -0.05, Math.max(0, coilPhase))
@@ -1772,11 +1936,21 @@ export class TennisScene3D {
   }
 
   /**
-   * Updates BOTH Player A (Near -X) and Player B (Far +X) at time `currentTime`!
-   * - Active Hitter executes the biomechanical wind-up, impact (`t = 0`), follow-through (`t > 0`), and split-step recovery (`t > 0.45s`).
-   * - Receiving Opponent on the opposite side of the net dynamically runs from their baseline ready position to intercept the ball at `simResult.interceptPoint`!
+   * Updates Player A (Near -X) and (when in Rally / Tactics mode) Player B (Far +X) at time `currentTime`!
+   * - In Solo Mode (`this.soloMode === true`), only Player A is visible on court (`playerB.root.visible = false`).
+   * - In Rally / Tactics Mode (`this.soloMode === false`), both players are active and the receiver runs to intercept.
    */
   updatePlayerAndRacket(params, currentTime = 0, simResult = null) {
+    if (this.soloMode) {
+      this.playerA.root.visible = true;
+      this.playerB.root.visible = false;
+      const soloTau = THREE.MathUtils.clamp(currentTime, -0.35, 0.42);
+      this._updateSinglePlayerPose(this.playerA, { ...params, side: 'A' }, soloTau, true, 0);
+      return;
+    }
+
+    this.playerA.root.visible = true;
+    this.playerB.root.visible = true;
     const activeSide = params.side || 'A';
     const hitterRig = activeSide === 'B' ? this.playerB : this.playerA;
     const receiverRig = activeSide === 'B' ? this.playerA : this.playerB;
@@ -1840,6 +2014,7 @@ export class TennisScene3D {
         hitX: currRecX,
         hitY: currRecY,
         hitZ: currRecZ,
+        strokeType: currRecY > 0.35 ? 'bh2' : 'fh',
         swingPathDeg: intercept && intercept.nextIncomingSpinRpm < -500 ? 28 : 24,
         faceAngleDeg: -1.5,
         aimAngleDeg: currRecY > 0 ? -6.5 : 6.5
@@ -1954,7 +2129,11 @@ export class TennisScene3D {
       this.bounceRingMesh.visible = false;
     }
 
-    if (simResult.interceptPoint && simResult.firstBounce && simResult.firstBounce.isIn) {
+    if (this.soloMode && simResult.secondBounce) {
+      const sb = simResult.secondBounce;
+      this.interceptRingMesh.visible = true;
+      this.interceptRingMesh.position.set(sb.x, 0.005, -sb.y);
+    } else if (!this.soloMode && simResult.interceptPoint && simResult.firstBounce && simResult.firstBounce.isIn) {
       const ip = simResult.interceptPoint;
       this.interceptRingMesh.visible = true;
       this.interceptRingMesh.position.set(ip.worldX, 0.005, -ip.worldY);
@@ -2069,17 +2248,37 @@ export class TennisScene3D {
   setCameraPreset(presetName, simResult, hitParams) {
     const sign = hitParams.side === 'B' ? -1 : 1;
     const p = physToThree(sign * hitParams.hitX, sign * hitParams.hitY, hitParams.hitZ);
+    const strokeType = this._resolveStrokeType(
+      hitParams.strokeType,
+      hitParams.hitY,
+      hitParams.hitZ,
+      hitParams.swingPathDeg
+    );
+    const sideFlip = strokeType === 'bh2' || strokeType === 'bh1' ? -1 : 1;
+
     if (presetName === 'broadcast') {
       this.camera.position.set(sign * -19.5, 6.2, sign * 3.5);
       this.controls.target.set(sign * -0.5, 0.8, 0);
     } else if (presetName === 'player_closeup') {
-      this.camera.position.set(p.x - sign * 1.65, Math.max(1.35, p.y + 0.35), p.z + sign * 1.85);
-      this.controls.target.set(p.x - sign * 0.1, Math.max(0.95, p.y - 0.05), p.z - sign * 0.35);
+      this.camera.position.set(
+        p.x - sign * 1.75,
+        Math.max(1.38, p.y + 0.35),
+        p.z + sign * sideFlip * 1.85
+      );
+      this.controls.target.set(
+        p.x - sign * 0.08,
+        Math.max(0.95, p.y - 0.05),
+        p.z - sign * sideFlip * 0.32
+      );
     } else if (presetName === 'side') {
       this.camera.position.set(0, 2.8, 18.0);
       this.controls.target.set(0, 1.1, 0);
     } else if (presetName === 'player_pov') {
-      this.camera.position.set(p.x - sign * 3.2, p.y + 0.75, p.z + sign * 0.85);
+      this.camera.position.set(
+        p.x - sign * 3.2,
+        p.y + 0.75,
+        p.z + sign * sideFlip * 0.85
+      );
       this.controls.target.set(sign * 4.0, 0.6, 0);
     } else if (presetName === 'hawkeye' && simResult && simResult.firstBounce) {
       const b = simResult.firstBounce;

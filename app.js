@@ -17,21 +17,51 @@ import {
   ATP_RALLIES,
   TACTICAL_LESSONS,
   evaluateTacticalAttempt
-} from './physics.js?v=8';
-import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=8';
+} from './physics.js?v=9';
+import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=9';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;
 
 const I18N = {
   zh: {
+    loadKicker: '3D 个人球速合成 · 正反手生物力学 · 气动弹道实验室',
+    loadModeSoloTag: 'DEFAULT // 核心初衷',
+    loadModeSoloTitle: '🎯 单人球速与正反手实验室',
+    loadModeSoloDesc:
+      '单球员纯粹弹道模拟 · 拍头主动发力 vs 来球借力分解 · 正手 / 双反 / 单反 / 发球全动作及完整二跳落点',
+    loadModeRallyTag: 'TURN-BASED // 对抗模拟',
+    loadModeRallyTitle: '⇄ 双人多拍回合对抗',
+    loadModeRallyDesc:
+      'ATP 经典多拍回合 · 远端球员跑动预判引拍 · 触球瞬间精准截断与来球物理继承',
+    loadModeTacticsTag: 'MASTERCLASS // 互动解谜',
+    loadModeTacticsTitle: '🏆 大满贯技战术名场面教学',
+    loadModeTacticsDesc:
+      '4 大传奇实战名场面 · 球场 3D 金色战术靶区与扇形线路走廊 · 实时评分教练反馈',
+    btnEnterLab: '进入实验室 // LAUNCH LAB →',
+    btnWelcomePage: '启动页',
+    soloSectionTitle: '单人球速与正反手弹道实验室',
+    modeBtnSolo: '🎯 单人球速模拟',
+    modeBtnRally: '⇄ 双人多拍回合',
+    modeBtnTactics: '🏆 技战术教学',
+    lblStrokeType: '击球技术动作 (3D Biomechanics)',
+    strokeFH: '正手 FH',
+    strokeBH2: '双手反拍 2H-BH',
+    strokeBH1: '单手反拍 1H-BH',
+    strokeServe: '发球 Serve',
+    sscTitle: '个人球速物理合成剖析 (Impact Speed Synthesis)',
+    sscActiveLbl: '拍头主动发力',
+    sscBorrowLbl: '来球借力反弹',
+    sscCorLbl: '表观恢复系数 e_A',
+    sscDwellLbl: '驻留 / 穿线形变',
+    sscSecondBounceLbl: '二跳落点深度',
     unitSpeedLabel: '速度单位',
     unitTensionLabel: '穿线张力',
     rallySectionTitle: 'ATP 赛事回合与球员技术档案',
     btnReset: '一键重置',
-    btnImportAtp: '导入实测数据',
+    btnImportAtp: '导入实测',
     lblRallyPreset: 'ATP 经典多拍回合回放',
-    shotPresetLabel: '职业球员单拍技术基准 (覆盖当前拍)',
+    shotPresetLabel: 'ATP 单拍球员实测技术档案 (正手 / 双反 / 单反 / 发球)',
     btnNextTurn: '+ 续写下一拍回击',
     racketVizTitle: '3D 拍面咬球与甜区穿线形变',
     rViewIso: '3D 斜视',
@@ -89,7 +119,7 @@ const I18N = {
     chkVectors: '显示速度与马格努斯力矢量',
     chkGhost: '显示无旋转基准轨迹',
     chkTrueScale: '1:1 真实网球尺寸',
-    legIncoming: '来球 / 下一拍接球点',
+    legIncoming: '来球 / 二跳或接球点',
     legPreBounce: '出球飞行轨迹',
     legPostBounce: '落地反弹与球速矢量',
     legMagnus: '马格努斯气动力',
@@ -125,13 +155,43 @@ const I18N = {
     btnMobileExpand3D: '全屏球场'
   },
   en: {
+    loadKicker: '3D BALL SPEED SYNTHESIS · FH/BH BIOMECHANICS · RK4 BALLISTICS LAB',
+    loadModeSoloTag: 'DEFAULT // CORE LAB',
+    loadModeSoloTitle: '🎯 Solo Ball Speed & Stroke Lab',
+    loadModeSoloDesc:
+      'Single-player ballistics · Active vs Borrowed speed breakdown · Forehand, 2H-BH, 1H-BH & Serve 3D IK + full 2nd bounce',
+    loadModeRallyTag: 'TURN-BASED // RALLY',
+    loadModeRallyTitle: '⇄ Two-Player Turn-Based Rally',
+    loadModeRallyDesc:
+      'ATP multi-shot rallies · Opponent footwork & interception · Exact racket-contact truncation & incoming handoff',
+    loadModeTacticsTag: 'MASTERCLASS // CHALLENGE',
+    loadModeTacticsTitle: '🏆 Grand Slam Tactical Masterclass',
+    loadModeTacticsDesc:
+      '4 iconic Grand Slam points · 3D court target rings & corridors · Real-time coaching score',
+    btnEnterLab: 'LAUNCH SIMULATOR →',
+    btnWelcomePage: 'WELCOME',
+    soloSectionTitle: 'SOLO BALL SPEED & STROKE BIOMECHANICS LAB',
+    modeBtnSolo: '🎯 Solo Lab',
+    modeBtnRally: '⇄ 2P Rally',
+    modeBtnTactics: '🏆 Tactics',
+    lblStrokeType: '3D Stroke Biomechanics (FH / 2H-BH / 1H-BH / Serve)',
+    strokeFH: 'Forehand',
+    strokeBH2: '2H-Backhand',
+    strokeBH1: '1H-Backhand',
+    strokeServe: 'Serve',
+    sscTitle: 'BALL SPEED SYNTHESIS BREAKDOWN',
+    sscActiveLbl: 'Active Swing Power',
+    sscBorrowLbl: 'Borrowed Pace',
+    sscCorLbl: 'Apparent COR e_A',
+    sscDwellLbl: 'Dwell / Deflection',
+    sscSecondBounceLbl: '2nd Bounce Depth',
     unitSpeedLabel: 'SPEED',
     unitTensionLabel: 'TENSION',
     rallySectionTitle: 'ATP TOUR RALLIES & PLAYER BENCHMARKS',
     btnReset: 'RESET',
-    btnImportAtp: 'IMPORT ATP CSV',
+    btnImportAtp: 'IMPORT CSV',
     lblRallyPreset: 'ATP Multi-Shot Rally Replay',
-    shotPresetLabel: 'Pro Player Single-Shot Profile (Overwrites Turn)',
+    shotPresetLabel: 'Pro Player Single-Shot Profile (FH / 2H-BH / 1H-BH / Serve)',
     btnNextTurn: '+ Append Return Shot',
     racketVizTitle: '3D STRINGBED POCKETING & IMPACT GEOMETRY',
     rViewIso: '3D Oblique',
@@ -189,7 +249,7 @@ const I18N = {
     chkVectors: 'Force & Velocity Vectors',
     chkGhost: 'No-Spin Baseline',
     chkTrueScale: '1:1 True Ball Scale',
-    legIncoming: 'Incoming / Next Hit',
+    legIncoming: 'Incoming / 2nd Bounce',
     legPreBounce: 'Outgoing Flight',
     legPostBounce: 'Post-Bounce / Vel',
     legMagnus: 'Magnus Force',
@@ -231,14 +291,15 @@ class TennisSimApp {
     this.lang = 'zh';
     this.speedUnit = 'kmh';
     this.tensionUnit = 'lbs';
+    this.appMode = 'solo'; // Default mode: Solo Ball Speed & Biomechanics Lab!
 
     this.currentRallyKey = 'ao2024_sinner_medvedev';
     this.activeTacticalKey = null;
     this.tacticalMode = 'demo';
     this.rallyMeta = {
-      playerAZh: 'J. Sinner (近端 A)',
+      playerAZh: 'C. Alcaraz (单人实验室)',
       playerBZh: 'D. Medvedev (远端 B)',
-      playerAEn: 'J. Sinner (Near A)',
+      playerAEn: 'C. Alcaraz (Solo Lab)',
       playerBEn: 'D. Medvedev (Far B)'
     };
     this.rallyTurns = [];
@@ -247,6 +308,7 @@ class TennisSimApp {
 
     this.state = {
       side: 'A',
+      strokeType: 'fh',
       courtMode: 'singles',
       surfaceKey: 'hard',
 
@@ -284,8 +346,11 @@ class TennisSimApp {
     this._init3D();
     this._populatePresetSelects();
     this._bindControls();
+    this._initLoadingScreen();
     this._applyLanguageUI();
-    this.loadRally(this.currentRallyKey);
+    // Initialize in Default Mode: Solo Ball Speed & Biomechanics Lab
+    this.setAppMode('solo');
+    this.applyPreset('alcaraz_fh');
     this._startPlaybackLoop();
   }
 
@@ -610,7 +675,279 @@ class TennisSimApp {
   }
 
   /**
-   * One-Click Reset: restores current rally, sliders, camera, and playback to clean benchmark state.
+   * Initializes the Architectural Loading & Mode-Launch Screen (`#aeroLoadingOverlay`)
+   */
+  _initLoadingScreen() {
+    const overlay = document.getElementById('aeroLoadingOverlay');
+    const barFill = document.getElementById('loadingBarFill');
+    const pctText = document.getElementById('loadingPercentText');
+    const statusText = document.getElementById('loadingStatusText');
+    const enterBtn = document.getElementById('btnEnterLab');
+    const reopenBtn = document.getElementById('btnReopenWelcome');
+
+    let selectedLaunchMode = 'solo';
+
+    document.querySelectorAll('.loading-mode-card[data-launch-mode]').forEach((card) => {
+      card.addEventListener('click', () => {
+        selectedLaunchMode = card.getAttribute('data-launch-mode') || 'solo';
+        document.querySelectorAll('.loading-mode-card').forEach((c) => {
+          const isAct = c === card;
+          c.classList.toggle('active', isAct);
+          const chk = c.querySelector('.lmc-check');
+          if (chk) chk.textContent = isAct ? '●' : '○';
+        });
+      });
+    });
+
+    const closeOverlayAndLaunch = (modeToLaunch) => {
+      if (overlay) {
+        overlay.classList.add('is-hidden');
+      }
+      if (modeToLaunch) {
+        this.setAppMode(modeToLaunch);
+      }
+    };
+
+    enterBtn?.addEventListener('click', () => {
+      closeOverlayAndLaunch(selectedLaunchMode);
+    });
+
+    reopenBtn?.addEventListener('click', () => {
+      if (overlay) {
+        overlay.classList.remove('is-hidden');
+      }
+    });
+
+    // Smooth animated telemetry progress on startup
+    if (barFill && pctText && statusText) {
+      barFill.style.width = '38%';
+      pctText.textContent = '38%';
+      setTimeout(() => {
+        barFill.style.width = '76%';
+        pctText.textContent = '76%';
+        statusText.textContent =
+          this.lang === 'zh'
+            ? '正在校准 3D 双骨 IK 正反手动作与 16x19 穿线咬球刚度...'
+            : 'CALIBRATING 3D FOREHAND/BACKHAND IK & 16x19 STRINGBED...';
+      }, 180);
+      setTimeout(() => {
+        barFill.style.width = '100%';
+        pctText.textContent = '100%';
+        statusText.textContent =
+          this.lang === 'zh'
+            ? '系统就绪 // 默认模式：单人球速与正反手弹道实验室 (READY)'
+            : 'ENGINE READY // DEFAULT: SOLO BALL SPEED & BIOMECHANICS LAB';
+      }, 420);
+    }
+  }
+
+  /**
+   * Switches between the 3 Core Modes:
+   * - 'solo' (DEFAULT): Single-player ball speed synthesis & Forehand/Backhand/Serve biomechanics lab (no opponent cutoff, full 2nd bounce)
+   * - 'rally': Two-player turn-based ATP rally with receiver running interception
+   * - 'tactics': Grand Slam interactive tactical masterclass
+   */
+  setAppMode(mode = 'solo') {
+    this.appMode = mode;
+
+    // Sync top-level mode buttons
+    document.querySelectorAll('#appModeSwitchGroup [data-app-mode]').forEach((btn) => {
+      btn.classList.toggle('active', btn.getAttribute('data-app-mode') === mode);
+    });
+
+    const soloBox = document.getElementById('soloModeContainer');
+    const rallyBox = document.getElementById('rallyModeContainer');
+    const fullRallyBtn = document.getElementById('btnPlayFullRally');
+    const sectionTitle = document.getElementById('coreModeSectionTitle');
+
+    if (mode === 'solo') {
+      this.isPlayingFullRally = false;
+      this.activeTacticalKey = null;
+      if (this.scene3d) {
+        this.scene3d.setSoloMode(true);
+        this.scene3d.updateTacticalOverlay(null, 0, false);
+      }
+      if (soloBox) soloBox.style.display = 'block';
+      if (rallyBox) rallyBox.style.display = 'none';
+      if (fullRallyBtn) fullRallyBtn.style.display = 'none';
+      if (sectionTitle) {
+        sectionTitle.textContent =
+          this.lang === 'zh'
+            ? I18N.zh.soloSectionTitle
+            : I18N.en.soloSectionTitle;
+      }
+
+      this.state.side = 'A';
+      const activePresetKey = document.getElementById('presetSelect')?.value || 'alcaraz_fh';
+      const activePreset = SHOT_PRESETS[activePresetKey];
+      const playerTitleZh = activePreset ? activePreset.labelZh.split('·')[0].trim() : '单人球速实验室';
+      const playerTitleEn = activePreset ? activePreset.labelEn.split('·')[0].trim() : 'Solo Ballistics Lab';
+      this.rallyMeta.playerAZh = `${playerTitleZh} (单人模拟)`;
+      this.rallyMeta.playerAEn = `${playerTitleEn} (Solo Lab)`;
+
+      // Ensure we are on a physics control tab if previously in tactics
+      const activeTab = document.querySelector('#sidebarNavTabs .nav-tab.active')?.getAttribute('data-tab');
+      if (activeTab === 'tab-tactics') {
+        document.querySelector('#sidebarNavTabs [data-tab="tab-racket"]')?.click();
+      }
+
+      this.scene3d.setTargetZone(this.state.courtMode, 'A');
+      this.recomputeSimulation({ source: 'racket', skipChain: true });
+      this._updateTacticalUI();
+      this.currentTime = WINDUP_START_TIME;
+      this.isPlaying = true;
+      this._updatePlayButtonUI();
+    } else if (mode === 'rally') {
+      this.activeTacticalKey = null;
+      if (this.scene3d) {
+        this.scene3d.setSoloMode(false);
+        this.scene3d.updateTacticalOverlay(null, 0, false);
+      }
+      if (soloBox) soloBox.style.display = 'none';
+      if (rallyBox) rallyBox.style.display = 'block';
+      if (fullRallyBtn) fullRallyBtn.style.display = 'inline-flex';
+      if (sectionTitle) {
+        sectionTitle.textContent =
+          this.lang === 'zh'
+            ? I18N.zh.rallySectionTitle
+            : I18N.en.rallySectionTitle;
+      }
+
+      const activeTab = document.querySelector('#sidebarNavTabs .nav-tab.active')?.getAttribute('data-tab');
+      if (activeTab === 'tab-tactics') {
+        document.querySelector('#sidebarNavTabs [data-tab="tab-racket"]')?.click();
+      }
+
+      this.loadRally(this.currentRallyKey || 'ao2024_sinner_medvedev');
+    } else if (mode === 'tactics') {
+      if (this.scene3d) {
+        this.scene3d.setSoloMode(false);
+      }
+      if (soloBox) soloBox.style.display = 'none';
+      if (rallyBox) rallyBox.style.display = 'block';
+      if (fullRallyBtn) fullRallyBtn.style.display = 'inline-flex';
+      if (sectionTitle) {
+        sectionTitle.textContent =
+          this.lang === 'zh' ? 'ATP 大满贯技战术实操教学' : 'ATP TACTICAL MASTERCLASS LAB';
+      }
+
+      document.querySelectorAll('#sidebarNavTabs .nav-tab').forEach((b) =>
+        b.classList.toggle('active', b.getAttribute('data-tab') === 'tab-tactics')
+      );
+      document.querySelectorAll('.tab-panel').forEach((panel) =>
+        panel.classList.toggle('active', panel.id === 'tab-tactics')
+      );
+      const key = document.getElementById('tacticalLessonSelect')?.value || 'federer_serve_plus_one';
+      this.loadTacticalLesson(key, this.tacticalMode || 'demo');
+    }
+  }
+
+  /**
+   * Switches the 3D Biomechanical Stroke Type ('fh' | 'bh2' | 'bh1' | 'serve') in Solo Mode.
+   */
+  setStrokeType(strokeType = 'fh', fromPreset = false) {
+    this.state.strokeType = strokeType;
+    document.querySelectorAll('#strokeTypeGroup [data-stroke]').forEach((btn) => {
+      btn.classList.toggle('active', btn.getAttribute('data-stroke') === strokeType);
+    });
+
+    if (!fromPreset) {
+      if (strokeType === 'serve') {
+        const presetSelect = document.getElementById('presetSelect');
+        if (presetSelect) presetSelect.value = 'sinner_serve';
+        this.applyPreset('sinner_serve');
+        return;
+      }
+
+      // If switching from Serve back to groundstroke, restore groundstroke height & incoming ball
+      if (this.state.hitZ > 1.95) {
+        this.state.hitZ = 1.05;
+        this.state.courtMode = 'singles';
+        this.state.incomingSpeedKmh = 56;
+        this.state.incomingAngleDeg = -10;
+        this.state.incomingSpinRpm = 1850;
+        this.state.swingPathDeg = 25.0;
+        this.state.faceAngleDeg = -1.8;
+        this.state.racketSpeedKmh = 92;
+      }
+
+      // Mirror stance lateral coordinate (hitY) & cross-court aim angle naturally between FH (Deuce -Y) and BH (Ad +Y)
+      if ((strokeType === 'bh2' || strokeType === 'bh1') && this.state.hitY < -0.2) {
+        this.state.hitY = Math.abs(this.state.hitY);
+        this.state.aimAngleDeg = -Math.abs(this.state.aimAngleDeg);
+        this.state.sidespinRpm = -Math.abs(this.state.sidespinRpm);
+      } else if (strokeType === 'fh' && this.state.hitY > 0.2) {
+        this.state.hitY = -Math.abs(this.state.hitY);
+        this.state.aimAngleDeg = Math.abs(this.state.aimAngleDeg);
+        this.state.sidespinRpm = Math.abs(this.state.sidespinRpm);
+      }
+
+      const courtSelect = document.getElementById('courtModeSelect');
+      if (courtSelect) courtSelect.value = this.state.courtMode;
+      this.scene3d.setTargetZone(this.state.courtMode, this.state.side);
+      this.recomputeSimulation({ source: 'racket', skipChain: true });
+      this.currentTime = WINDUP_START_TIME;
+      this.isPlaying = true;
+      this._updatePlayButtonUI();
+    }
+  }
+
+  /**
+   * Updates the Solo Ball Speed Synthesis & Impact Physics Breakdown Card (`#soloSpeedBreakdownCard`)
+   */
+  _updateSoloSpeedCard(impact, simRes) {
+    if (!impact) return;
+    const totalKmh = impact.launchSpeedKmh || this.state.speedKmh;
+    const activeKmh = impact.activePowerKmh ?? totalKmh * 0.82;
+    const borrowKmh = impact.borrowedPowerKmh ?? Math.max(0, totalKmh - activeKmh);
+    const sumParts = Math.max(1, activeKmh + borrowKmh);
+    const activePct = Math.round((activeKmh / sumParts) * 100);
+    const borrowPct = Math.max(0, 100 - activePct);
+
+    const totalEl = document.getElementById('sscTotalSpeed');
+    if (totalEl) totalEl.textContent = this.formatSpeed(totalKmh, 1);
+
+    const barActive = document.getElementById('sscBarActive');
+    const barBorrow = document.getElementById('sscBarBorrow');
+    if (barActive) barActive.style.width = `${activePct}%`;
+    if (barBorrow) barBorrow.style.width = `${borrowPct}%`;
+
+    const activeValEl = document.getElementById('sscActiveVal');
+    if (activeValEl) {
+      activeValEl.textContent = `${this.formatSpeed(activeKmh, 1)} (${activePct}%)`;
+    }
+
+    const borrowValEl = document.getElementById('sscBorrowVal');
+    if (borrowValEl) {
+      borrowValEl.textContent = `+${this.formatSpeed(borrowKmh, 1)} (${borrowPct}%)`;
+    }
+
+    const corEl = document.getElementById('sscCorVal');
+    if (corEl) {
+      corEl.textContent = `${(impact.apparentCor ?? 0.42).toFixed(3)}`;
+    }
+
+    const dwellEl = document.getElementById('sscDwellVal');
+    if (dwellEl) {
+      const dwellMs = Number(impact.dwellTimeMs ?? 4.6).toFixed(1);
+      const deflMm = Number(impact.stringDeflectionMm ?? 12.8).toFixed(1);
+      dwellEl.textContent = `${dwellMs} ms / ${deflMm} mm`;
+    }
+
+    const sbEl = document.getElementById('sscSecondBounceVal');
+    if (sbEl) {
+      if (simRes && simRes.secondBounce) {
+        sbEl.textContent = `X ${Math.abs(simRes.secondBounce.x).toFixed(1)}m`;
+      } else if (simRes && simRes.firstBounce) {
+        sbEl.textContent = `>${(Math.abs(simRes.firstBounce.x) + 4.8).toFixed(1)}m`;
+      } else {
+        sbEl.textContent = '—';
+      }
+    }
+  }
+
+  /**
+   * One-Click Reset: restores current mode (Solo or Rally), sliders, camera, and playback to clean benchmark state.
    */
   resetAll() {
     this.isPlayingFullRally = false;
@@ -618,7 +955,13 @@ class TennisSimApp {
     this.windSpeedKmh = 0;
     this.state.windSpeedKmh = 0;
     this.state.stringTensionKg = 23;
-    this.loadRally(this.currentRallyKey || 'ao2024_sinner_medvedev');
+    if (this.appMode === 'solo') {
+      const presetSelect = document.getElementById('presetSelect');
+      if (presetSelect) presetSelect.value = 'alcaraz_fh';
+      this.applyPreset('alcaraz_fh');
+    } else {
+      this.loadRally(this.currentRallyKey || 'ao2024_sinner_medvedev');
+    }
     this.scene3d.setCameraPreset('broadcast', this.simResult, this.state);
     if (this.racket3d) {
       this.racket3d.setViewMode('iso');
@@ -973,7 +1316,21 @@ class TennisSimApp {
       }, 240);
     });
 
-    // 5. Rally & Shot Preset Selectors
+    // 5. Core Mode Switcher, Stroke Selector, Rally & Shot Preset Selectors
+    document.querySelectorAll('#appModeSwitchGroup [data-app-mode]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const mode = btn.getAttribute('data-app-mode') || 'solo';
+        this.setAppMode(mode);
+      });
+    });
+
+    document.querySelectorAll('#strokeTypeGroup [data-stroke]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const stroke = btn.getAttribute('data-stroke') || 'fh';
+        this.setStrokeType(stroke, false);
+      });
+    });
+
     document.getElementById('rallyPresetSelect')?.addEventListener('change', (e) => {
       if (e.target.value) this.loadRally(e.target.value);
     });
@@ -1297,6 +1654,7 @@ class TennisSimApp {
 
     if (!parsedTurns.length) return false;
 
+    this.setAppMode('rally');
     this.rallyMeta = {
       playerAZh: 'ATP 导入球员 A',
       playerBZh: 'ATP 导入球员 B',
@@ -1316,7 +1674,9 @@ class TennisSimApp {
     const p = SHOT_PRESETS[presetKey];
     if (!p) return;
 
+    const strokeType = p.strokeType || (p.hitZ > 1.95 ? 'serve' : p.hitY > 0.25 ? 'bh2' : 'fh');
     Object.assign(this.state, {
+      strokeType,
       courtMode: p.courtMode,
       hitX: p.hitX,
       hitY: p.hitY,
@@ -1330,6 +1690,15 @@ class TennisSimApp {
       incomingSpinRpm: p.incomingSpinRpm,
       sidespinRpm: p.sidespinRpm
     });
+
+    this.setStrokeType(strokeType, true);
+
+    if (this.appMode === 'solo') {
+      const playerTitleZh = p.labelZh.split('·')[0].trim();
+      const playerTitleEn = p.labelEn.split('·')[0].trim();
+      this.rallyMeta.playerAZh = `${playerTitleZh} (单人模拟)`;
+      this.rallyMeta.playerAEn = `${playerTitleEn} (Solo Lab)`;
+    }
 
     const courtSelect = document.getElementById('courtModeSelect');
     if (courtSelect) courtSelect.value = this.state.courtMode;
@@ -1398,15 +1767,22 @@ class TennisSimApp {
       document.getElementById('effDeltaSpin').textContent = `${spnSign}${Math.round(deltaSpinRpm)} RPM`;
     }
 
-    this.simResult = simulateTrajectory(this.state);
+    const stopAtIntercept = this.appMode !== 'solo';
+    this.simResult = simulateTrajectory({
+      ...this.state,
+      stopAtIntercept
+    });
     this.ghostSimResult = simulateTrajectory({
       ...this.state,
       topspinRpm: 0,
-      sidespinRpm: 0
+      sidespinRpm: 0,
+      stopAtIntercept
     });
 
-    // Save current turn state & chain to subsequent rally turns if edited
-    if (this.rallyTurns[this.currentTurnIndex]) {
+    this._updateSoloSpeedCard(impact, this.simResult);
+
+    // Save current turn state & chain to subsequent rally turns if edited in Rally/Tactics Mode
+    if (this.appMode !== 'solo' && this.rallyTurns[this.currentTurnIndex]) {
       Object.assign(this.rallyTurns[this.currentTurnIndex], {
         courtMode: this.state.courtMode,
         hitX: this.state.hitX,
@@ -1523,9 +1899,19 @@ class TennisSimApp {
 
     const hudTurnBadge = document.getElementById('hudTurnBadge');
     if (hudTurnBadge) {
-      const turnTag = `#${this.currentTurnIndex + 1} (${this.state.side})`;
-      hudTurnBadge.textContent =
-        this.lang === 'zh' ? `${turnTag} 鹰眼判罚 // 第一落点` : `${turnTag} LINE CALL // 1ST BOUNCE`;
+      if (this.appMode === 'solo') {
+        const strokeMapZh = { fh: '正手 FH', bh2: '双反 2H-BH', bh1: '单反 1H-BH', serve: '发球 SERVE' };
+        const strokeMapEn = { fh: 'FH', bh2: '2H-BH', bh1: '1H-BH', serve: 'SERVE' };
+        const st = this.state.strokeType || 'fh';
+        hudTurnBadge.textContent =
+          this.lang === 'zh'
+            ? `单人 ${strokeMapZh[st] || '正手'} // 第一落点`
+            : `SOLO ${strokeMapEn[st] || 'FH'} // 1ST BOUNCE`;
+      } else {
+        const turnTag = `#${this.currentTurnIndex + 1} (${this.state.side})`;
+        hudTurnBadge.textContent =
+          this.lang === 'zh' ? `${turnTag} 鹰眼判罚 // 第一落点` : `${turnTag} LINE CALL // 1ST BOUNCE`;
+      }
     }
 
     // 1. Launch Velocity Cell

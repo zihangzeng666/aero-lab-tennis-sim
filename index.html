@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=8" />
+  <link rel="stylesheet" href="./styles.css?v=9" />
   <script type="importmap">
     {
       "imports": {
@@ -18,6 +18,120 @@
   </script>
 </head>
 <body>
+  <!-- =====================================================================
+       ARCHITECTURAL LOADING & MODE-LAUNCH SCREEN (Warm Alabaster Blueprint)
+       ===================================================================== -->
+  <div class="aero-loading-overlay" id="aeroLoadingOverlay">
+    <div class="loading-shell">
+      <div class="loading-top-bar">
+        <div class="loading-brand">
+          <span class="brand-mark"></span>
+          <span class="loading-brand-name">AERO-LAB // BIOMECHANICS & BALLISTICS</span>
+          <span class="loading-author-pill">MADE BY JASON ZENG</span>
+        </div>
+        <span class="loading-spec-code">ITF / ATP HAWK-EYE RK4 ENGINE v9.0</span>
+      </div>
+
+      <div class="loading-hero-grid">
+        <div class="loading-hero-left">
+          <div class="loading-kicker" data-i18n="loadKicker">3D 个人球速合成 · 正反手生物力学 · 气动弹道实验室</div>
+          <h1 class="loading-headline" data-i18n="loadHeadline">
+            精准解算每一拍的<span>球速合成、正反手挥拍与旋转落点</span>
+          </h1>
+          <p class="loading-subtext" data-i18n="loadSubtext">
+            回归核心初衷：默认开启【单人球速与正反手实验室】，支持正手 (FH)、双手反拍 (2H-BH)、单手反拍 (1H-BH) 与发球全套 3D 双骨 IK 动作及球速物理分解；亦可随时切换双人回合与大满贯技战术教学。
+          </p>
+
+          <!-- Mode Quick-Select Cards -->
+          <div class="loading-mode-cards">
+            <div class="loading-mode-card active" data-launch-mode="solo">
+              <div class="lmc-top">
+                <span class="lmc-badge lmc-badge-primary" data-i18n="loadModeSoloTag">DEFAULT // 核心初衷</span>
+                <span class="lmc-check">●</span>
+              </div>
+              <div class="lmc-title" data-i18n="loadModeSoloTitle">🎯 单人球速与正反手实验室</div>
+              <div class="lmc-desc" data-i18n="loadModeSoloDesc">
+                单球员纯粹弹道模拟 · 拍头主动发力 vs 来球借力分解 · 正手 / 双反 / 单反 / 发球全动作及完整二跳落点
+              </div>
+            </div>
+
+            <div class="loading-mode-card" data-launch-mode="rally">
+              <div class="lmc-top">
+                <span class="lmc-badge" data-i18n="loadModeRallyTag">TURN-BASED // 对抗模拟</span>
+                <span class="lmc-check">○</span>
+              </div>
+              <div class="lmc-title" data-i18n="loadModeRallyTitle">⇄ 双人多拍回合对抗</div>
+              <div class="lmc-desc" data-i18n="loadModeRallyDesc">
+                ATP 经典多拍回合 · 远端球员跑动预判引拍 · 触球瞬间精准截断与来球物理继承
+              </div>
+            </div>
+
+            <div class="loading-mode-card" data-launch-mode="tactics">
+              <div class="lmc-top">
+                <span class="lmc-badge lmc-badge-gold" data-i18n="loadModeTacticsTag">MASTERCLASS // 互动解谜</span>
+                <span class="lmc-check">○</span>
+              </div>
+              <div class="lmc-title" data-i18n="loadModeTacticsTitle">🏆 大满贯技战术名场面教学</div>
+              <div class="lmc-desc" data-i18n="loadModeTacticsDesc">
+                4 大传奇实战名场面 · 球场 3D 金色战术靶区与扇形线路走廊 · 实时评分教练反馈
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Architectural Trajectory & Impact Formula Blueprint Card -->
+        <div class="loading-blueprint-card">
+          <div class="lbp-header">
+            <span>BALL SPEED SYNTHESIS // 球速物理合成模型</span>
+            <span>600 Hz RK4</span>
+          </div>
+          <svg class="lbp-svg" viewBox="0 0 360 175" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <line x1="20" y1="145" x2="340" y2="145" stroke="#CBD5E1" stroke-width="1.5"/>
+            <line x1="180" y1="112" x2="180" y2="145" stroke="#0F172A" stroke-width="2.5"/>
+            <path d="M 36 108 Q 148 24 275 144" stroke="#14532D" stroke-width="3" stroke-linecap="round"/>
+            <path d="M 275 144 Q 308 102 336 132" stroke="#0284C7" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M 36 108 Q 165 48 310 144" stroke="#94A3B8" stroke-width="1.3" stroke-dasharray="4 4"/>
+            <circle cx="36" cy="108" r="5" fill="#B45309"/>
+            <circle cx="275" cy="144" r="4.5" fill="#15803D"/>
+            <circle cx="180" cy="74" r="3.5" fill="#0284C7"/>
+            <text x="28" y="94" fill="#B45309" font-family="JetBrains Mono" font-size="9" font-weight="700">IMPACT t=0</text>
+            <text x="148" y="62" fill="#0284C7" font-family="JetBrains Mono" font-size="9" font-weight="700">NET +68cm</text>
+            <text x="242" y="160" fill="#15803D" font-family="JetBrains Mono" font-size="9" font-weight="700">1ST BOUNCE IN</text>
+          </svg>
+          <div class="lbp-formula-grid">
+            <div class="lbp-item">
+              <span>出球速度合成公式</span>
+              <strong>v_out = (1 + e_A)·v_racket + e_A·v_in</strong>
+            </div>
+            <div class="lbp-item">
+              <span>3D 击球动作支持</span>
+              <strong>正手 FH · 双反 2H-BH · 单反 1H-BH · 发球</strong>
+            </div>
+            <div class="lbp-item">
+              <span>气动与旋转模型</span>
+              <strong>Magnus 升力 + 穿线咬球自旋恢复扭矩</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="loading-footer-bar">
+        <div class="loading-progress-wrap">
+          <div class="loading-progress-meta">
+            <span id="loadingStatusText">INITIALIZING 3D STADIUM, RK4 BALLISTICS & BACKHAND IK...</span>
+            <strong id="loadingPercentText">100%</strong>
+          </div>
+          <div class="loading-bar-track">
+            <div class="loading-bar-fill" id="loadingBarFill" style="width: 100%;"></div>
+          </div>
+        </div>
+        <button class="loading-enter-btn" id="btnEnterLab" data-i18n="btnEnterLab">
+          进入实验室 // LAUNCH LAB →
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div class="app-layout">
     <!-- Left Architectural Control Panel -->
     <aside class="sidebar">
@@ -29,9 +143,12 @@
             <span>AERO-LAB</span>
             <span class="brand-author">MADE BY JASON ZENG</span>
           </div>
-          <div class="seg-control" id="langSwitchGroup">
-            <button class="seg-btn active" data-lang="zh">中文</button>
-            <button class="seg-btn" data-lang="en">EN</button>
+          <div class="header-right-controls">
+            <button class="mini-action-btn" id="btnReopenWelcome" title="打开模式启动页" data-i18n="btnWelcomePage">启动页</button>
+            <div class="seg-control" id="langSwitchGroup">
+              <button class="seg-btn active" data-lang="zh">中文</button>
+              <button class="seg-btn" data-lang="en">EN</button>
+            </div>
           </div>
         </div>
 
@@ -54,36 +171,104 @@
         </div>
       </div>
 
-      <!-- ATP Rally & Telemetry Benchmark Selector -->
+      <!-- Core Simulator Mode Switcher + Solo / Rally Controls -->
       <div class="panel-section">
         <div class="section-header">
-          <span class="section-tag" data-i18n="rallySectionTitle">ATP 赛事回合与球员技术档案</span>
+          <span class="section-tag" id="coreModeSectionTitle" data-i18n="soloSectionTitle">单人球速与正反手弹道实验室</span>
           <div class="rally-actions">
             <button class="mini-action-btn" id="btnResetRally" data-i18n="btnReset">一键重置</button>
-            <button class="mini-action-btn" id="btnOpenImportModal" data-i18n="btnImportAtp">导入实测数据</button>
+            <button class="mini-action-btn" id="btnOpenImportModal" data-i18n="btnImportAtp">导入实测</button>
           </div>
         </div>
 
-        <div class="preset-dual-row">
-          <div>
-            <label class="mini-lbl" data-i18n="lblRallyPreset">经典赛事多拍回合 (Turn-Based Rally)</label>
-            <select id="rallyPresetSelect"></select>
-          </div>
-          <div>
-            <label class="mini-lbl" data-i18n="shotPresetLabel">单拍球员实测档案 (覆盖当前拍)</label>
-            <select id="presetSelect"></select>
-          </div>
+        <!-- Primary 3-Way Simulator Mode Switcher (Default: SOLO BALLISTICS LAB) -->
+        <div class="mode-switch-bar" id="appModeSwitchGroup">
+          <button class="mode-switch-btn active" data-app-mode="solo" data-i18n="modeBtnSolo">
+            🎯 单人球速模拟
+          </button>
+          <button class="mode-switch-btn" data-app-mode="rally" data-i18n="modeBtnRally">
+            ⇄ 双人多拍回合
+          </button>
+          <button class="mode-switch-btn mode-switch-gold" data-app-mode="tactics" data-i18n="modeBtnTactics">
+            🏆 技战术教学
+          </button>
         </div>
 
-        <!-- Turn-Based Rally Chain Strip -->
-        <div class="rally-turn-box">
-          <div class="rally-turn-header">
-            <span class="rally-matchup" id="rallyMatchupLabel">C. Alcaraz (A) vs N. Djokovic (B)</span>
-            <div class="rally-actions">
-              <button class="mini-action-btn active-accent" id="btnNextTurn" data-i18n="btnNextTurn">+ 下一拍对手回击</button>
+        <!-- SOLO MODE CONTAINER (Default Visible: Stroke Hand Selector + Player Preset + Ball Speed Synthesis Breakdown) -->
+        <div id="soloModeContainer">
+          <div class="stroke-selector-row">
+            <span class="mini-lbl" data-i18n="lblStrokeType">击球技术动作 (3D Biomechanics)</span>
+            <div class="stroke-btn-group" id="strokeTypeGroup">
+              <button class="stroke-btn active" data-stroke="fh" data-i18n="strokeFH">正手 FH</button>
+              <button class="stroke-btn" data-stroke="bh2" data-i18n="strokeBH2">双手反拍 2H-BH</button>
+              <button class="stroke-btn" data-stroke="bh1" data-i18n="strokeBH1">单手反拍 1H-BH</button>
+              <button class="stroke-btn" data-stroke="serve" data-i18n="strokeServe">发球 Serve</button>
             </div>
           </div>
-          <div class="turn-chain" id="turnChainContainer"></div>
+
+          <div class="solo-preset-row">
+            <label class="mini-lbl" data-i18n="shotPresetLabel">ATP 单拍球员实测技术档案 (正手 / 双反 / 单反 / 发球)</label>
+            <select id="presetSelect"></select>
+          </div>
+
+          <!-- Solo Ball Speed & Impact Energy Synthesis Breakdown Card -->
+          <div class="solo-speed-card" id="soloSpeedBreakdownCard">
+            <div class="ssc-header">
+              <span class="ssc-title" data-i18n="sscTitle">个人球速物理合成剖析 (Impact Speed Synthesis)</span>
+              <span class="ssc-total" id="sscTotalSpeed">138.2 km/h</span>
+            </div>
+            <div class="ssc-bar-wrap">
+              <div class="ssc-bar-active" id="sscBarActive" style="width: 82%;"></div>
+              <div class="ssc-bar-borrow" id="sscBarBorrow" style="width: 18%;"></div>
+            </div>
+            <div class="ssc-legend-row">
+              <span class="ssc-leg-item">
+                <i class="ssc-dot ssc-dot-active"></i>
+                <span data-i18n="sscActiveLbl">拍头主动发力</span>
+                <strong id="sscActiveVal">113.4 km/h (82%)</strong>
+              </span>
+              <span class="ssc-leg-item">
+                <i class="ssc-dot ssc-dot-borrow"></i>
+                <span data-i18n="sscBorrowLbl">来球借力反弹</span>
+                <strong id="sscBorrowVal">+24.8 km/h (18%)</strong>
+              </span>
+            </div>
+            <div class="ssc-metrics-grid">
+              <div class="ssc-cell">
+                <span data-i18n="sscCorLbl">表观恢复系数 e_A</span>
+                <strong id="sscCorVal">0.425</strong>
+              </div>
+              <div class="ssc-cell">
+                <span data-i18n="sscDwellLbl">拍面驻留 / 穿线形变</span>
+                <strong id="sscDwellVal">4.6ms / 24mm</strong>
+              </div>
+              <div class="ssc-cell">
+                <span data-i18n="sscSecondBounceLbl">二跳落点深度</span>
+                <strong id="sscSecondBounceVal">16.4 m</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RALLY MODE CONTAINER (Hidden in Solo Mode, Shown in Multi-Turn Rally / Tactics Mode) -->
+        <div id="rallyModeContainer" style="display: none;">
+          <div class="preset-dual-row">
+            <div>
+              <label class="mini-lbl" data-i18n="lblRallyPreset">经典赛事多拍回合 (Turn-Based Rally)</label>
+              <select id="rallyPresetSelect"></select>
+            </div>
+          </div>
+
+          <!-- Turn-Based Rally Chain Strip -->
+          <div class="rally-turn-box">
+            <div class="rally-turn-header">
+              <span class="rally-matchup" id="rallyMatchupLabel">C. Alcaraz (A) vs N. Djokovic (B)</span>
+              <div class="rally-actions">
+                <button class="mini-action-btn active-accent" id="btnNextTurn" data-i18n="btnNextTurn">+ 下一拍对手回击</button>
+              </div>
+            </div>
+            <div class="turn-chain" id="turnChainContainer"></div>
+          </div>
         </div>
       </div>
 
@@ -537,6 +722,6 @@
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=8"></script>
+  <script type="module" src="./app.js?v=9"></script>
 </body>
 </html>

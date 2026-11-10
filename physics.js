@@ -215,6 +215,18 @@ export function computeRacketBallImpact(params) {
     stringTensionKg
   );
 
+  const deltaSpeed = actual.launchSpeedKmh - baseline.launchSpeedKmh;
+  const activePowerKmh = Math.max(10, Math.min(actual.launchSpeedKmh, baseline.launchSpeedKmh));
+  const borrowedPowerKmh = Math.max(0, deltaSpeed);
+  const dwellTimeMs = Math.max(
+    3.6,
+    Math.min(6.4, 4.9 - (stringTensionKg - 23) * 0.11 + (actual.launchSpeedKmh - 120) * 0.004)
+  );
+  const stringDeflectionMm = Math.max(
+    5.5,
+    Math.min(22.5, actual.launchSpeedKmh * 0.092 * (23 / Math.max(15, stringTensionKg)))
+  );
+
   return {
     launchSpeedKmh: actual.launchSpeedKmh,
     launchAngleDeg: actual.launchAngleDeg,
@@ -222,8 +234,12 @@ export function computeRacketBallImpact(params) {
     topspinRpm: actual.topspinRpm,
     eA: actual.eA,
     attackAngleDeg: swingPathDeg - faceAngleDeg,
+    activePowerKmh,
+    borrowedPowerKmh,
+    dwellTimeMs,
+    stringDeflectionMm,
     incomingEffect: {
-      deltaSpeedKmh: actual.launchSpeedKmh - baseline.launchSpeedKmh,
+      deltaSpeedKmh: deltaSpeed,
       deltaAngleDeg: actual.launchAngleDeg - baseline.launchAngleDeg,
       deltaSpinRpm: actual.topspinRpm - baseline.topspinRpm
     }
@@ -765,8 +781,8 @@ export function simulateTrajectory(config) {
       nextIncomingSpinRpm: realisticPostBounceRpm
     };
 
-    // Stop ball flight right at the receiver's racket stringbed (prevent ball flying through the racket)
-    if (firstBounce && firstBounce.isIn && config.stopAtIntercept !== false) {
+    // Stop ball flight right at the receiver's racket stringbed ONLY when in Multi-Turn Rally / Tactical Mode (stopAtIntercept === true)
+    if (firstBounce && firstBounce.isIn && config.stopAtIntercept === true) {
       const cutIdx = points.findIndex((p) => p.t >= contactPt.t);
       if (cutIdx > 0) {
         points.length = cutIdx + 1;
@@ -927,6 +943,7 @@ export const SHOT_PRESETS = {
   alcaraz_fh: {
     labelZh: 'Carlos Alcaraz // 138 km/h 暴力正手斜线 (3420 RPM)',
     labelEn: 'Carlos Alcaraz // 138 km/h Heavy Forehand (3420 RPM)',
+    strokeType: 'fh',
     courtMode: 'singles',
     hitX: -11.75,
     hitY: -1.85,
@@ -940,9 +957,61 @@ export const SHOT_PRESETS = {
     incomingSpinRpm: 1950,
     sidespinRpm: 280
   },
+  sinner_bh2: {
+    labelZh: 'Jannik Sinner // 139 km/h 暴力双手反拍斜线 (2880 RPM)',
+    labelEn: 'Jannik Sinner // 139 km/h Two-Handed Backhand Cross (2880 RPM)',
+    strokeType: 'bh2',
+    courtMode: 'singles',
+    hitX: -11.55,
+    hitY: 1.85,
+    hitZ: 1.06,
+    racketSpeedKmh: 93,
+    swingPathDeg: 24.5,
+    faceAngleDeg: -2.2,
+    aimAngleDeg: -7.6,
+    incomingSpeedKmh: 58,
+    incomingAngleDeg: -9.5,
+    incomingSpinRpm: 1850,
+    sidespinRpm: -180
+  },
+  djokovic_bh2_dtl: {
+    labelZh: 'Novak Djokovic // 134 km/h 教科书双反变直线 (2620 RPM)',
+    labelEn: 'Novak Djokovic // 134 km/h Two-Handed Backhand DTL (2620 RPM)',
+    strokeType: 'bh2',
+    courtMode: 'singles',
+    hitX: -11.60,
+    hitY: 2.35,
+    hitZ: 1.04,
+    racketSpeedKmh: 89,
+    swingPathDeg: 23.0,
+    faceAngleDeg: -1.8,
+    aimAngleDeg: 1.8,
+    incomingSpeedKmh: 62,
+    incomingAngleDeg: -9.0,
+    incomingSpinRpm: 1750,
+    sidespinRpm: -120
+  },
+  wawrinka_bh1: {
+    labelZh: 'Stan Wawrinka // 143 km/h 重炮单手反拍抽球 (3250 RPM)',
+    labelEn: 'Stan Wawrinka // 143 km/h Heavy One-Handed Backhand (3250 RPM)',
+    strokeType: 'bh1',
+    courtMode: 'singles',
+    hitX: -11.80,
+    hitY: 1.95,
+    hitZ: 1.12,
+    racketSpeedKmh: 97,
+    swingPathDeg: 27.5,
+    faceAngleDeg: -2.6,
+    aimAngleDeg: -7.4,
+    incomingSpeedKmh: 56,
+    incomingAngleDeg: -10.5,
+    incomingSpinRpm: 1900,
+    sidespinRpm: -260
+  },
   sinner_fh: {
     labelZh: 'Jannik Sinner // 146 km/h 抢上升期平快正手 (3120 RPM)',
-    labelEn: 'Jannik Sinner // 146 km/h Rising Power Drive (3120 RPM)',
+    labelEn: 'Jannik Sinner // 146 km/h Rising Power Forehand (3120 RPM)',
+    strokeType: 'fh',
     courtMode: 'singles',
     hitX: -11.35,
     hitY: -1.60,
@@ -957,8 +1026,9 @@ export const SHOT_PRESETS = {
     sidespinRpm: 180
   },
   nadal_heavy: {
-    labelZh: 'Rafael Nadal // 129 km/h 4550 RPM 超级上旋高弧线',
-    labelEn: 'Rafael Nadal // 129 km/h 4550 RPM Extreme Topspin',
+    labelZh: 'Rafael Nadal // 129 km/h 4550 RPM 超级上旋正手',
+    labelEn: 'Rafael Nadal // 129 km/h 4550 RPM Extreme Topspin FH',
+    strokeType: 'fh',
     courtMode: 'singles',
     hitX: -12.60,
     hitY: -2.20,
@@ -973,8 +1043,9 @@ export const SHOT_PRESETS = {
     sidespinRpm: 450
   },
   djokovic_redirect: {
-    labelZh: 'Novak Djokovic // 134 km/h 借力深区变线直线 (2850 RPM)',
-    labelEn: 'Novak Djokovic // 134 km/h Deep Down-the-Line (2850 RPM)',
+    labelZh: 'Novak Djokovic // 134 km/h 正手借力深区变直线 (2850 RPM)',
+    labelEn: 'Novak Djokovic // 134 km/h Forehand Down-the-Line (2850 RPM)',
+    strokeType: 'fh',
     courtMode: 'singles',
     hitX: -11.65,
     hitY: -2.40,
@@ -989,8 +1060,9 @@ export const SHOT_PRESETS = {
     sidespinRpm: 120
   },
   federer_slice: {
-    labelZh: 'Roger Federer // 101 km/h 贴网刀切滑行球 (-1850 RPM)',
-    labelEn: 'Roger Federer // 101 km/h Knife Skidding Slice (-1850 RPM)',
+    labelZh: 'Roger Federer // 101 km/h 经典单反刀切下旋 (-1850 RPM)',
+    labelEn: 'Roger Federer // 101 km/h One-Handed Backhand Slice (-1850 RPM)',
+    strokeType: 'bh1',
     courtMode: 'singles',
     hitX: -11.40,
     hitY: 1.95,
@@ -1007,6 +1079,7 @@ export const SHOT_PRESETS = {
   shelton_serve: {
     labelZh: 'Ben Shelton // 214 km/h 平击重炮一发 (Deuce)',
     labelEn: 'Ben Shelton // 214 km/h Flat Bomb Serve (Deuce)',
+    strokeType: 'serve',
     courtMode: 'serve_deuce',
     hitX: -11.88,
     hitY: -0.85,
@@ -1023,6 +1096,7 @@ export const SHOT_PRESETS = {
   kick_serve: {
     labelZh: 'ATP 外角高弹跳上旋二发 // Kick Serve (3650 RPM)',
     labelEn: 'ATP Wide Kick Second Serve (3650 RPM - Ad)',
+    strokeType: 'serve',
     courtMode: 'serve_ad',
     hitX: -11.88,
     hitY: 1.05,
