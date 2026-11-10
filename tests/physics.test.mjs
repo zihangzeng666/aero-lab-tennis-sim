@@ -217,8 +217,13 @@ test('every surface passes the ITF drop test (254 cm drop -> 135–147 cm reboun
 
 test('motion-capture clips are well formed', async () => {
   const { readFile } = await import('node:fs/promises');
-  const data = JSON.parse(await readFile(new URL('../mocap/strokes.json', import.meta.url), 'utf8'));
-  assert.ok(data.source.includes('tennisdb.cs.pollub.pl'));
+  const read = async (f) => JSON.parse(await readFile(new URL(f, import.meta.url), 'utf8'));
+  const c3d = await read('../mocap/strokes.json');
+  const bvh = await read('../mocap/strokes_bvh.json');
+  assert.ok(c3d.source.includes('tennisdb.cs.pollub.pl'));
+  assert.ok(bvh.license.includes('CC BY-SA 3.0') && bvh.citation.includes('10.1007/978-3-319-52277-7_38'));
+  const data = { clips: [...c3d.clips, ...bvh.clips] };
+  for (const stroke of ['serve', 'bh1']) assert.ok(data.clips.some((c) => c.stroke === stroke), stroke);
   const keys = ['lhip', 'rhip', 'lkne', 'rkne', 'lank', 'rank', 'ltoe', 'rtoe', 'lsho', 'rsho', 'lelb', 'relb', 'lwri', 'rwri', 'head', 'headF', 'racketPos', 'racketQuat'];
   for (const stroke of ['fh', 'bh2']) assert.ok(data.clips.some((c) => c.stroke === stroke), stroke);
   for (const c of data.clips) {

@@ -66,8 +66,19 @@ by the legs and, near impact only, by the arm. Swing-path and face-angle differe
 as a small rotation about the contact point that fades out within ~0.15 s of impact, so the racket
 matches the physics inputs exactly at contact.
 
-Serves, slices and the one-handed backhand are not in the dataset and still use the procedural
-keyframe swing.
+Serves and one-handed backhands come from a second dataset, **Tennis-MoCap**
+(jdpulgarin/Tennis-MoCap, 17 Caldas-Colombia league players, OptiTrack 100 Hz, BVH skeleton),
+converted by [mocap/export_tennis_mocap_bvh.py](mocap/export_tennis_mocap_bvh.py) into
+[mocap/strokes_bvh.json](mocap/strokes_bvh.json): 4 serves and 4 one-handed backhands. That dataset
+has no racket markers, so the racket follows the recorded wrist rotation, calibrated to the expected
+contact pose at impact. Serves may leave the ground (the recorded players jump into the ball).
+Only slices still use the procedural keyframe swing.
+
+> Tennis-MoCap is licensed under CC BY-SA 3.0; `mocap/strokes_bvh.json` is a derived work shared
+> under the same licence. Pulgarin-Giraldo J.D., Alvarez-Meza A.M., Melo-Betancourt L.G.,
+> Ramos-Bermudez S., Castellanos-Dominguez G. *A Similarity Indicator for Differentiating Kinematic
+> Performance Between Qualified Tennis Players.* LNCS 10125, pp. 309–317, 2017.
+> https://doi.org/10.1007/978-3-319-52277-7_38
 
 > The used tennis motion capture dataset was obtained from https://tennisdb.cs.pollub.pl at the
 > Lublin University of Technology.
@@ -108,7 +119,7 @@ They cover the vacuum limit, 4th-order convergence, A/B mirror symmetry, line ca
 |---|---|
 | `physics.js` | Flight integrator, impact and bounce models, line calls, rally chaining, `MODEL_ASSUMPTIONS` |
 | `presets.js` | Hand-tuned style presets, example rallies, tactics lessons and their scoring |
-| `mocap/` | Converted motion-capture strokes (3DTennisDS) and the conversion script |
+| `mocap/` | Converted motion-capture strokes (3DTennisDS; Tennis-MoCap, CC BY-SA 3.0) and the conversion scripts |
 | `app.js` | UI controller: sliders, HUD, modes, playback |
 | `scene3d.js` | three.js court, player rigs and racket views |
 | `validation.html` / `validation.js` | Validation page |

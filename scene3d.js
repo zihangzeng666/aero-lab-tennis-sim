@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=33';
+import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=36';
 
 // Net profile drawn with singles sticks in place (matches the physics for singles play):
 // 0.914 m at the centre rising to 1.07 m at the sticks, then level out to the posts.
@@ -1930,11 +1930,14 @@ export class TennisScene3D {
   /* ----------------------------------------------------------------------- */
 
   _loadStrokeClips() {
-    fetch('./mocap/strokes.json?v=2')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data || !Array.isArray(data.clips)) return;
-        this.strokeClips = data.clips;
+    // strokes.json: forehands + two-handed backhands (3DTennisDS)
+    // strokes_bvh.json: serves + one-handed backhands (Tennis-MoCap, CC BY-SA 3.0)
+    const files = ['./mocap/strokes.json?v=2', './mocap/strokes_bvh.json?v=2'];
+    Promise.all(files.map((f) => fetch(f).then((r) => (r.ok ? r.json() : null)).catch(() => null)))
+      .then((sets) => {
+        const clips = sets.flatMap((d) => (d && Array.isArray(d.clips) ? d.clips : []));
+        if (!clips.length) return;
+        this.strokeClips = clips;
         [this.playerA, this.playerB].forEach((rig) => {
           if (rig) rig._lastTrailKey = null;
         });
@@ -1945,16 +1948,19 @@ export class TennisScene3D {
       });
   }
 
-  /** Picks the recorded stroke closest in contact height and swing angle (topspin FH / 2H-BH only). */
+  /**
+   * Picks the recorded stroke closest in contact height and swing angle. Covers forehands,
+   * one- and two-handed backhands and serves; slices (swing path < -3 deg) stay procedural.
+   */
   _pickClip(strokeType, hitZ, swingPathDeg) {
-    if (!this.strokeClips || swingPathDeg < -3) return null;
-    if (strokeType !== 'fh' && strokeType !== 'bh2') return null;
+    if (!this.strokeClips) return null;
+    if (strokeType !== 'serve' && swingPathDeg < -3) return null;
     let best = null;
     let bestScore = Infinity;
     for (const c of this.strokeClips) {
       if (c.stroke !== strokeType) continue;
-      const score =
-        Math.abs(c.impactHeight * MOCAP_BODY_SCALE - hitZ) / 0.12 + Math.abs(c.swingDeg - swingPathDeg) / 15;
+      const S = c.bodyScale ?? MOCAP_BODY_SCALE;
+      const score = Math.abs(c.impactHeight * S - hitZ) / 0.12 + Math.abs(c.swingDeg - swingPathDeg) / 15;
       if (score < bestScore) {
         bestScore = score;
         best = c;
@@ -1992,7 +1998,7 @@ export class TennisScene3D {
    */
   _updatePoseFromClip(rig, localParams, tau, clip, strokeType, runningStridePhase = 0) {
     const { hitZ = 1.05, swingPathDeg = 20, faceAngleDeg = -2, aimAngleDeg = 0 } = localParams;
-    const S = MOCAP_BODY_SCALE;
+    const S = clip.bodyScale ?? MOCAP_BODY_SCALE;
     const deg2rad = Math.PI / 180;
     const aimRad = aimAngleDeg * deg2rad;
     const t = THREE.MathUtils.clamp(tau, -0.35, 0.42);
@@ -2007,9 +2013,14 @@ export class TennisScene3D {
     const T = rwri0.clone().multiplyScalar(1 - S);
     const groundBelowContact = S * clip.impactHeight - T.y;
     const dH = hitZ - groundBelowContact; // > 0: ball higher than in the recording
-    const bodyLift = THREE.MathUtils.clamp(dH, -0.3, 0.08);
-    const bodyOffsetY = -dH + bodyLift;
     const near = Math.exp(-Math.pow(t / 0.16, 2));
+    // Groundstrokes keep the feet down (lift <= 8 cm). Serves may also jump into the ball: the extra
+    // lift ramps in around contact only, so the feet stay planted through the windup.
+    let bodyLift = THREE.MathUtils.clamp(dH, -0.3, 0.08);
+    if (strokeType === 'serve' && dH > 0.08) {
+      bodyLift += (Math.min(dH, 0.45) - 0.08) * Math.exp(-Math.pow(t / 0.22, 2));
+    }
+    const bodyOffsetY = -dH + bodyLift;
     const racketOffsetY = bodyOffsetY + (dH - bodyLift) * near;
 
     const body = (key) => {
@@ -2082,6 +2093,23 @@ export class TennisScene3D {
     rig.pelvisGroup.position.add(shoDelta);
     rig.root.updateMatrixWorld(true);
 
+    // The recorded hands sit near the butt of the handle, so the grips are placed low on the handle.
+    const rGripLocal = new THREE.Vector3(0, 0, strokeType === 'bh2' ? -0.47 : -0.43);
+    const maxReach = L.upperArm + L.forearm - 0.012;
+
+    // Near impact the racket must stay on the ball: if the grip is out of the arm's reach, move the
+    // whole body towards it (the legs absorb it) instead of letting the hand leave the handle.
+    {
+      const sh = toRootLocal(rig.rightShoulderLocal, rig.chestPivot);
+      const toGrip = toRootLocal(rGripLocal, rig.racketGroup).sub(sh);
+      const excess = toGrip.length() - maxReach;
+      const w = Math.exp(-Math.pow(t / 0.12, 2));
+      if (excess > 0 && w > 0.01) {
+        rig.pelvisGroup.position.addScaledVector(toGrip.normalize(), excess * w);
+        rig.root.updateMatrixWorld(true);
+      }
+    }
+
     const rShoulder = toRootLocal(rig.rightShoulderLocal, rig.chestPivot);
     const lShoulder = toRootLocal(rig.leftShoulderLocal, rig.chestPivot);
     const headRoot = toRootLocal(new THREE.Vector3(0, 0, 0), rig.headGroup);
@@ -2089,10 +2117,7 @@ export class TennisScene3D {
     const rightDir = new THREE.Vector3(Math.sin(aimRad), 0, Math.cos(aimRad));
 
     // Keep the hand on the racket: clamp the grip into arm reach (outside the moment of impact).
-    // The recorded hands sit near the butt of the handle, so the grips are placed low on the handle.
-    const rGripLocal = new THREE.Vector3(0, 0, strokeType === 'bh2' ? -0.47 : -0.43);
     let gripRoot = toRootLocal(rGripLocal, rig.racketGroup);
-    const maxReach = L.upperArm + L.forearm - 0.012;
     const shToGrip = gripRoot.clone().sub(rShoulder);
     if (shToGrip.length() > maxReach && Math.abs(t) > 0.01) {
       const delta = rShoulder.clone().add(shToGrip.setLength(maxReach)).sub(gripRoot);
