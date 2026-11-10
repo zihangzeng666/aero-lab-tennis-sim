@@ -276,7 +276,7 @@ function dropTest(surfaceKey) {
 const dropRows = Object.entries(COURT_SURFACES).map(([k, s]) => {
   const h = dropTest(k);
   const ok = h >= 135 && h <= 147;
-  return [s.nameEn, s.cor.toFixed(2), h.toFixed(1), '135 – 147', verdict(ok, 'IN BAND', h > 147 ? 'ABOVE BAND' : 'BELOW BAND')];
+  return [s.nameEn, s.cor.toFixed(3), h.toFixed(1), '135 – 147', verdict(ok, 'IN BAND', h > 147 ? 'ABOVE BAND' : 'BELOW BAND')];
 });
 $('dropTable').innerHTML = table(['surface', 'model COR', 'rebound (cm)', 'ITF band (cm)', ''], dropRows, [1, 2]);
 const dropHeights = Object.fromEntries(Object.keys(COURT_SURFACES).map((k) => [k, dropTest(k)]));
@@ -289,7 +289,7 @@ $('dropNote').textContent =
 const cpiRows = Object.entries(COURT_SURFACES).map(([k, s]) => {
   const c = courtPaceIndex(s);
   const band = c < 30 ? 'slow' : c < 35 ? 'medium-slow' : c < 40 ? 'medium' : c < 45 ? 'medium-fast' : 'fast';
-  return [s.nameEn, s.mu.toFixed(2), s.cor.toFixed(2), c.toFixed(1), band];
+  return [s.nameEn, s.mu.toFixed(2), s.cor.toFixed(3), c.toFixed(1), band];
 });
 $('cpiTable').innerHTML = table(['surface', 'μ', 'e', 'CPI', 'band'], cpiRows, [1, 2, 3]);
 
