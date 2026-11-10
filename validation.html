@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AERO-LAB Model Validation</title>
+  <meta name="description" content="Convergence tests, analytic checks and literature comparisons for the AERO-LAB tennis ball-flight model. Every number on this page is computed live from physics.js." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f5f1;
+      --surface-1: #fcfcfb;
+      --text-primary: #0b0b0b;
+      --text-secondary: #52514e;
+      --text-muted: #7a7974;
+      --border: #e2e0da;
+      --grid: #ebe9e4;
+      --accent: #14532d;
+      --series-1: #2a78d6;
+      --series-2: #eb6834;
+      --series-3: #1baf7a;
+      --pass: #15803d;
+      --warn: #b45309;
+      --font-sans: 'Inter', system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) {
+        color-scheme: dark;
+        --bg: #121211;
+        --surface-1: #1a1a19;
+        --text-primary: #f0efec;
+        --text-secondary: #c3c2b7;
+        --text-muted: #8f8e86;
+        --border: #2e2d2a;
+        --grid: #262523;
+        --accent: #4ade80;
+        --series-1: #3987e5;
+        --series-2: #d95926;
+        --series-3: #199e70;
+        --pass: #4ade80;
+        --warn: #f59e0b;
+      }
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #121211;
+      --surface-1: #1a1a19;
+      --text-primary: #f0efec;
+      --text-secondary: #c3c2b7;
+      --text-muted: #8f8e86;
+      --border: #2e2d2a;
+      --grid: #262523;
+      --accent: #4ade80;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --pass: #4ade80;
+      --warn: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 15px;
+      line-height: 1.6;
+    }
+    main { max-width: 920px; margin: 0 auto; padding: 32px 16px 80px; }
+    header.top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+    .brand { font-family: var(--font-mono); font-weight: 600; font-size: 13px; letter-spacing: 0.04em; }
+    .lang a, .back { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
+    h1 { font-size: 30px; line-height: 1.2; margin: 28px 0 10px; letter-spacing: -0.01em; }
+    h2 { font-size: 20px; margin: 48px 0 6px; padding-top: 16px; border-top: 1px solid var(--border); }
+    h3 { font-size: 15px; margin: 22px 0 6px; }
+    p, li { color: var(--text-secondary); }
+    strong { color: var(--text-primary); }
+    a { color: var(--text-primary); text-underline-offset: 3px; }
+    code { font-family: var(--font-mono); font-size: 0.88em; background: var(--surface-1); border: 1px solid var(--border); padding: 0 4px; border-radius: 3px; }
+    .lede { font-size: 16px; max-width: 720px; }
+    .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 22px 0 6px; }
+    .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; }
+    .tile .k { font-size: 12px; color: var(--text-muted); }
+    .tile .v { font-family: var(--font-mono); font-size: 22px; font-weight: 600; color: var(--text-primary); }
+    .tile .s { font-size: 12px; color: var(--text-secondary); }
+    .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin: 14px 0; }
+    .chart-title { font-weight: 600; font-size: 14px; }
+    .chart-sub { font-size: 12.5px; color: var(--text-muted); margin-bottom: 6px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--text-secondary); margin: 6px 0; }
+    .legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+    .legend i.dash { background: repeating-linear-gradient(90deg, var(--text-muted) 0 4px, transparent 4px 7px) !important; }
+    .chart-wrap { position: relative; }
+    svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
+    svg.chart text { font-family: var(--font-mono); font-size: 11px; fill: var(--text-muted); }
+    svg.chart .axis-title { fill: var(--text-secondary); font-family: var(--font-sans); font-size: 12px; }
+    svg.chart .dlabel { fill: var(--text-secondary); font-size: 11px; }
+    .tip {
+      position: absolute; pointer-events: none; background: var(--text-primary); color: var(--surface-1);
+      font-family: var(--font-mono); font-size: 11.5px; padding: 6px 8px; border-radius: 4px; white-space: nowrap;
+      transform: translate(-50%, calc(-100% - 10px)); opacity: 0; transition: opacity 0.08s;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; }
+    th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { font-weight: 600; color: var(--text-secondary); font-size: 12px; }
+    td.num, th.num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+    .scroll { overflow-x: auto; }
+    details { margin-top: 6px; }
+    summary { cursor: pointer; font-size: 12.5px; color: var(--text-secondary); }
+    .verdict { font-family: var(--font-mono); font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .verdict.pass { color: var(--pass); }
+    .verdict.warn { color: var(--warn); }
+    .note { font-size: 13px; color: var(--text-muted); }
+    ul.tight li { margin: 4px 0; }
+    footer { margin-top: 56px; font-size: 12.5px; color: var(--text-muted); }
+    @media (max-width: 560px) {
+      h1 { font-size: 24px; }
+      .tile .v { font-size: 19px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="top">
+      <span class="brand">AERO-LAB · MODEL VALIDATION</span>
+      <span><a class="back" href="./index.html">← 返回模拟器 / Back to simulator</a></span>
+    </header>
+
+    <h1>模型验证 · Model validation</h1>
+    <p class="lede">
+      AERO-LAB 是一个<strong>教学模拟器</strong>：气动力用 Štěpánek (1988) 的拟合式，拍球与落地碰撞用 Cross 的刚体模型，
+      其余常数是手调假设。本页检查三件事：数值解是否收敛、和解析解是否一致、和公开发表的数值差多少。
+      页面上所有数字都是浏览器里用 <code>physics.js</code> 实时算出来的。
+    </p>
+    <p class="note">
+      This page checks numerical convergence, an analytic limit, and published reference values. Every number is computed
+      live from <code>physics.js</code>. Model assumptions are listed in the
+      <a href="https://github.com/zihangzeng666/aero-lab-tennis-sim#readme">README</a>.
+    </p>
+
+    <div class="summary" id="summaryTiles"></div>
+
+    <h2>1. 时间步收敛 · Time-step convergence</h2>
+    <p>
+      积分器为经典 RK4，默认步长 Δt = 2 ms（500 Hz）。过网和落地时刻不在网格点上，
+      所以用 Illinois 迭代把最后一步缩短到事件发生的精确时刻（每次试算都是完整的 RK4 步），
+      旋转衰减也在每个 RK4 子步按精确指数计算。下图是三个预设的第一落点误差（相对 Δt = 0.1 ms 的参考解）。
+      斜率 4 表示四阶收敛。
+    </p>
+    <div class="card">
+      <div class="chart-title">第一落点位置误差 vs 步长 · Landing-point error vs Δt</div>
+      <div class="chart-sub">log–log; dashed line = slope 4 reference</div>
+      <div class="legend" id="convLegend"></div>
+      <div class="chart-wrap" id="convChart"></div>
+      <details><summary>数据表 · Table</summary><div class="scroll" id="convTable"></div></details>
+    </div>
+    <p class="note" id="convNote"></p>
+
+    <h2>2. 解析解对照 · Analytic limit</h2>
+    <p>
+      把空气密度设为 0、旋转设为 0，弹道应与抛物线完全一致。这一项检查积分器与落地事件定位本身，不涉及任何经验参数。
+    </p>
+    <div class="card scroll" id="vacuumTable"></div>
+
+    <h2>3. 气动系数 · Aerodynamic coefficients</h2>
+    <p>
+      C<sub>D</sub> 与 C<sub>L</sub> 随自旋参数 S = Rω / v 变化，函数形式和常数取自 Štěpánek (1988)。
+      本模型把无旋 C<sub>D</sub> 从 Štěpánek 的 0.508 调到 0.55。
+      Cross &amp; Lindsey (2014) 用实际飞行的球测得 C<sub>D</sub> ≈ 0.507 ± 0.024，风洞测量（如 Goodwill et al. 2004）一般在 0.55–0.6 附近；
+      0.55 在这个范围内，但偏向风洞值，这是一个假设。
+    </p>
+    <div class="card">
+      <div class="chart-title">C<sub>D</sub>、C<sub>L</sub> vs 自旋参数 S</div>
+      <div class="chart-sub">shaded band at S = 0: in-flight C<sub>D</sub> = 0.507 ± 0.024 (Cross &amp; Lindsey 2014)</div>
+      <div class="legend" id="aeroLegend"></div>
+      <div class="chart-wrap" id="aeroChart"></div>
+      <details><summary>数据表 · Table</summary><div class="scroll" id="aeroTable"></div></details>
+    </div>
+    <p class="note">
+      未完成：C<sub>L</sub> 曲线还没有逐点与风洞原始数据对比（需要 Goodwill et al. 2004 的数据点）。这是下一步。
+    </p>
+
+    <h2>4. 场地反弹 · Court bounce</h2>
+    <h3>4a. ITF 球弹性标准（落球测试）</h3>
+    <p>
+      ITF 规则附录 I：球从 254 cm 高处落到刚性基座（花岗岩/混凝土）上，反弹高度须在 135–147 cm 之间
+      （对应恢复系数约 0.73–0.76）。下面把每种场地的竖直 COR 放进同样的落球测试。
+      场地不是刚性基座，所以这不是严格的同条件对比，只用来看量级。
+    </p>
+    <div class="card scroll" id="dropTable"></div>
+    <p class="note" id="dropNote"></p>
+
+    <h3>4b. 场地快慢排序</h3>
+    <p>
+      用常被引用的 Court Pace Index 形式 CPI = 100(1 − μ) + 150(0.81 − e) 检查三种场地参数的快慢顺序。
+      这不是 ITF 官方 Court Pace Rating 的测试流程，只用来确认假设参数的排序合理：红土应最慢、草地最快。
+      常用分档：约 30 以下为慢，约 40 以上为快。
+    </p>
+    <div class="card scroll" id="cpiTable"></div>
+
+    <h2>5. 拍面恢复系数 · Racket apparent COR</h2>
+    <p>
+      模型中 e<sub>A</sub> 只随穿线张力线性变化，并限制在 0.36–0.48。文献中拍面中心附近 e<sub>A</sub> 约 0.4，靠近拍框降到 0.1–0.2
+      （Brody, Cross &amp; Lindsey 2002）。本模型<strong>没有</strong>击球点位置、挥重、来球速度对 e<sub>A</sub> 的影响，
+      所以只代表“击中甜区”的情况；界面上的甜区图是示意，不参与计算。
+    </p>
+    <div class="card scroll" id="eaTable"></div>
+
+    <h2>6. 样例弹道 · Sample shots</h2>
+    <p>以下是预设的计算结果，供量级参考。预设参数为手调，并非任何球员的实测数据。</p>
+    <div class="card scroll" id="shotTable"></div>
+
+    <h2>7. 已知局限 · Known limitations</h2>
+    <ul class="tight">
+      <li>拍球碰撞只在竖直平面 (x–z) 内求解；水平方向角直接透传，侧旋是手动输入，不由拍面开闭或挥拍横向分量产生；上旋轴始终水平。</li>
+      <li>e<sub>A</sub> 不随击球点、挥重、来球速度变化；驻留时间与穿线形变是线性经验估算，界面上标为“估算”。</li>
+      <li>场地竖直 COR 为常数，真实 COR 会随法向冲击速度升高而下降；侧旋反弹保留 85%、擦网速度系数等为假设。</li>
+      <li>C<sub>D</sub> 用新球值，不考虑球毛磨损；不考虑湿度。</li>
+      <li>接球方的截击点、来球角度在回合模式中经过游戏化裁剪（为了让回合能连下去），不是物理结果。</li>
+    </ul>
+
+    <h2>参考文献 · References</h2>
+    <ol class="tight">
+      <li>A. Štěpánek, “The aerodynamics of tennis balls — The topspin lob,” <em>Am. J. Phys.</em> 56, 138–142 (1988).</li>
+      <li>S. R. Goodwill, S. B. Chin, S. J. Haake, “Aerodynamics of spinning and non-spinning tennis balls,” <em>J. Wind Eng. Ind. Aerodyn.</em> 92, 935–958 (2004).</li>
+      <li>R. Cross, C. Lindsey, “Measurements of drag and lift on tennis balls in flight,” <em>Sports Engineering</em> (2014).</li>
+      <li>H. Brody, R. Cross, C. Lindsey, <em>The Physics and Technology of Tennis</em>, Racquet Tech Publishing (2002).</li>
+      <li>R. Cross, “Measurements of the horizontal and vertical speeds of tennis courts,” <em>Sports Engineering</em> (2003).</li>
+      <li>International Tennis Federation, <em>Rules of Tennis</em>, Appendix I (ball specification) and court dimensions.</li>
+    </ol>
+
+    <footer>
+      AERO-LAB · Jason Zeng · 本页由 <code>validation.js</code> 生成，可在 <code>npm test</code> 中找到对应的自动化断言。
+    </footer>
+  </main>
+  <script type="module" src="./validation.js?v=11"></script>
+</body>
+</html>

@@ -215,6 +215,9 @@ body {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.12s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
 }
 
 .mini-action-btn:hover {
@@ -1011,7 +1014,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
   font-variant-numeric: tabular-nums;
 }
 
-/* Modal Dialog for ATP Telemetry Import */
+/* Modal dialog for launch-data import */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1588,6 +1591,17 @@ input[type="range"]::-webkit-slider-thumb:hover {
   line-height: 1.55;
   color: var(--ink-secondary);
   margin-bottom: 4px;
+}
+
+.loading-doc-link {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  margin: 2px 0 8px;
 }
 
 .loading-mode-cards {

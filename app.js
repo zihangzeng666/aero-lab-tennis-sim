@@ -1,10 +1,9 @@
 /**
- * Main Application Controller for AERO-LAB // ATP Tour Rally & Ballistics Simulator
- * Features:
- * 1. Bidirectional Physics Coupling (Racket <-> Launch HUD via 3x3 Jacobian Inverse Solver)
- * 2. Turn-Based Two-Player Rally System (Player A vs Player B with automatic post-bounce handoff)
- * 3. Authentic ATP Match Rallies & Custom Hawk-Eye CSV/JSON Telemetry Importer
- * 4. Horizontal 16x19 Racket Blueprint & Zero-Clipping 3D Biomechanics Integration
+ * Main application controller for AERO-LAB, a tennis ball-flight teaching simulator.
+ * 1. Two-way coupling between racket sliders and launch HUD (3x3 Jacobian inverse solver)
+ * 2. Turn-based two-player rallies with automatic post-bounce hand-off
+ * 3. Illustrative (hand-tuned) player presets and rally scripts, plus a CSV / JSON importer
+ * 4. 3D racket / player visualisation
  */
 
 import {
@@ -12,275 +11,286 @@ import {
   computeRacketBallImpact,
   solveRacketFromTargetLaunch,
   simulateTrajectory,
+  samplePointAtTime,
+  airDensityFromConditions,
+  chainRallyTurns
+} from './physics.js?v=11';
+import {
   SHOT_PRESETS,
   INCOMING_PRESETS,
-  ATP_RALLIES,
+  EXAMPLE_RALLIES,
   TACTICAL_LESSONS,
   evaluateTacticalAttempt
-} from './physics.js?v=9';
-import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=9';
+} from './presets.js?v=11';
+import { TennisScene3D, RacketImpact3DStudio } from './scene3d.js?v=11';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;
 
 const I18N = {
   zh: {
-    loadKicker: '3D 个人球速合成 · 正反手生物力学 · 气动弹道实验室',
-    loadModeSoloTag: 'DEFAULT // 核心初衷',
-    loadModeSoloTitle: '🎯 单人球速与正反手实验室',
-    loadModeSoloDesc:
-      '单球员纯粹弹道模拟 · 拍头主动发力 vs 来球借力分解 · 正手 / 双反 / 单反 / 发球全动作及完整二跳落点',
-    loadModeRallyTag: 'TURN-BASED // 对抗模拟',
-    loadModeRallyTitle: '⇄ 双人多拍回合对抗',
-    loadModeRallyDesc:
-      'ATP 经典多拍回合 · 远端球员跑动预判引拍 · 触球瞬间精准截断与来球物理继承',
-    loadModeTacticsTag: 'MASTERCLASS // 互动解谜',
-    loadModeTacticsTitle: '🏆 大满贯技战术名场面教学',
-    loadModeTacticsDesc:
-      '4 大传奇实战名场面 · 球场 3D 金色战术靶区与扇形线路走廊 · 实时评分教练反馈',
-    btnEnterLab: '进入实验室 // LAUNCH LAB →',
+    loadKicker: '3D 个人球速合成 · 正反手生物力学实验室',
+    loadModeSoloTag: 'DEFAULT',
+    loadModeSoloTitle: '🎯 单人球速实验室',
+    loadModeSoloDesc: '主动发力 vs 来球借力 · 正手 / 双反 / 单反 / 发球',
+    loadModeRallyTag: 'RALLY',
+    loadModeRallyTitle: '⇄ 双人多拍回合',
+    loadModeRallyDesc: '示例多拍回合 · 跑动预判与触球截断',
+    loadModeTacticsTag: 'TACTICS',
+    loadModeTacticsTitle: '🏆 战术教学',
+    loadModeTacticsDesc: '战术示例 · 3D 球场靶区挑战',
+    btnEnterLab: '进入实验室 // LAUNCH →',
     btnWelcomePage: '启动页',
-    soloSectionTitle: '单人球速与正反手弹道实验室',
-    modeBtnSolo: '🎯 单人球速模拟',
-    modeBtnRally: '⇄ 双人多拍回合',
-    modeBtnTactics: '🏆 技战术教学',
-    lblStrokeType: '击球技术动作 (3D Biomechanics)',
+    btnValidation: '验证',
+    linkValidation: '模型说明与验证 →',
+    loadHeadline: '3D 网球<span>弹道与击球教学模拟器</span>',
+    loadSubtext:
+      '调节挥拍与来球参数，看球速、旋转和落点如何变化。气动力采用 Štěpánek (1988) 拟合式，拍球与落地碰撞采用 Cross 刚体模型；球员预设为手调示例，并非实测数据。',
+    soloSectionTitle: '模式与球员预设',
+    modeBtnSolo: '🎯 单人球速',
+    modeBtnRally: '⇄ 双人回合',
+    modeBtnTactics: '🏆 战术教学',
+    lblStrokeType: '击球动作',
     strokeFH: '正手 FH',
-    strokeBH2: '双手反拍 2H-BH',
-    strokeBH1: '单手反拍 1H-BH',
+    strokeBH2: '双反 2H',
+    strokeBH1: '单反 1H',
     strokeServe: '发球 Serve',
-    sscTitle: '个人球速物理合成剖析 (Impact Speed Synthesis)',
-    sscActiveLbl: '拍头主动发力',
-    sscBorrowLbl: '来球借力反弹',
-    sscCorLbl: '表观恢复系数 e_A',
-    sscDwellLbl: '驻留 / 穿线形变',
-    sscSecondBounceLbl: '二跳落点深度',
+    sscTitle: '球速合成剖析',
+    sscActiveLbl: '主动发力',
+    sscBorrowLbl: '来球借力',
+    sscCorLbl: '恢复系数 e_A',
+    sscDwellLbl: '驻留/形变 (估算)',
+    sscSecondBounceLbl: '二跳深度',
     unitSpeedLabel: '速度单位',
     unitTensionLabel: '穿线张力',
-    rallySectionTitle: 'ATP 赛事回合与球员技术档案',
-    btnReset: '一键重置',
-    btnImportAtp: '导入实测',
-    lblRallyPreset: 'ATP 经典多拍回合回放',
-    shotPresetLabel: 'ATP 单拍球员实测技术档案 (正手 / 双反 / 单反 / 发球)',
-    btnNextTurn: '+ 续写下一拍回击',
-    racketVizTitle: '3D 拍面咬球与甜区穿线形变',
-    rViewIso: '3D 斜视',
-    rViewFront: '拍面甜区',
-    rViewSide: '侧面攻角',
-    racket3DHint: '支持鼠标拖拽 360° 旋转观察',
-    rmFace: '拍面倾角',
-    rmSwing: '挥拍仰角',
-    rmAttack: '刷球攻角',
-    rmAim: '水平瞄准',
-    tabRacket: '挥拍与拍面',
-    tabIncoming: '来球与借力',
-    tabPosition: '站位与场地',
-    bidirectionalHint:
-      '双向物理耦合：调节下方挥拍滑块或直接拖动左上角【初速度 / 旋转 RPM / 过网仰角】，系统均会实时双向逆向解算同步。',
-    lblRacketSpeed: '拍头挥拍速度',
-    lblSwingPath: '挥拍轨迹仰角 (低向高提拉+)',
-    lblFaceAngle: '触球拍面倾角 (仰开+ / 闭合压拍-)',
-    lblAimAngle: '水平出球方向角 (斜线 / 直线)',
-    lblStringTension: '球拍穿线磅数 / 张力',
-    lblIncomingPreset: '对手来球性质预设 (或由上一拍自动传递)',
-    lblIncomingSpeed: '对手来球速度',
-    lblIncomingAngle: '来球垂直入射角 (下落- / 上升期+)',
-    lblIncomingSpin: '对手来球旋转 (上旋+ / 切削下旋-)',
-    incomingEffectTitle: '来球借力与旋转耦合效应 (对比定点抛球)',
-    effBorrowSpeed: '借力球速增量',
-    effLaunchAngle: '出球仰角偏移',
-    effSpinChange: '转速耦合变化',
-    lblCourtMode: '有效判罚界线',
-    optSingles: '单打界线 (Singles)',
-    optDoubles: '双打界线 (Doubles)',
-    optServeDeuce: '平分发球区 (Deuce)',
-    optServeAd: '占先发球区 (Ad)',
-    lblSurface: '球场表面材质',
+    rallySectionTitle: '赛事回合与球员预设',
+    btnReset: '重置',
+    btnImportAtp: '导入',
+    lblRallyPreset: '示例多拍回合',
+    shotPresetLabel: '风格预设 (手调参数)',
+    btnNextTurn: '+ 下一拍回击',
+    racketVizTitle: '3D 拍面触球几何 (示意)',
+    rViewIso: '斜视',
+    rViewFront: '拍面',
+    rViewSide: '侧面',
+    racket3DHint: '拖拽旋转',
+    rmFace: '拍面',
+    rmSwing: '轨迹',
+    rmAttack: '攻角',
+    rmAim: '方向',
+    tabRacket: '挥拍',
+    tabIncoming: '来球',
+    tabPosition: '场地',
+    lblRacketSpeed: '挥拍速度',
+    lblSwingPath: '挥拍仰角',
+    lblFaceAngle: '拍面倾角',
+    lblAimAngle: '水平方向',
+    lblStringTension: '穿线张力',
+    lblIncomingPreset: '来球预设',
+    lblIncomingSpeed: '来球速度',
+    lblIncomingAngle: '入射仰角',
+    lblIncomingSpin: '来球旋转',
+    incomingEffectTitle: '借力增量 (对比定点球)',
+    effBorrowSpeed: '借力球速',
+    effLaunchAngle: '仰角偏移',
+    effSpinChange: '转速变化',
+    lblCourtMode: '判罚界线',
+    optSingles: '单打 (Singles)',
+    optDoubles: '双打 (Doubles)',
+    optServeDeuce: '平分跳发 (Deuce)',
+    optServeAd: '占先发球 (Ad)',
+    lblSurface: '场地材质',
     optHard: '硬地 (Hard)',
     optClay: '红土 (Clay)',
     optGrass: '草地 (Grass)',
-    lblHitX: '前后击球站位 X (底线 -11.89m)',
-    lblHitY: '左右击球站位 Y (单打边线 ±4.12m)',
-    lblHitZ: '击球点高度 Z (发球 > 2.0m)',
-    lblSidespin: '侧旋转速 (弧线侧拐)',
-    lblWind: '赛场环境风速 (顺风+ / 逆风-)',
-    hudTitleCall: '鹰眼判罚 // 第一落点',
-    hudTitleSpeed: '出球初速度 // VELOCITY',
-    hudTitleSpin: '旋转转速 // SPIN RPM',
-    hudTitleNet: '过网净空高度 // NET CLEARANCE',
-    btnJumpBounce: '聚焦落点',
-    btnJumpNet: '过网瞬间',
-    camCloseup: '挥拍特写',
-    camBroadcast: '转播全景',
-    camSide: '侧面剖面',
-    camPov: '球员主视角',
-    camHawkeye: '鹰眼落点',
-    camTop: '俯视平面',
-    chkVectors: '显示速度与马格努斯力矢量',
-    chkGhost: '显示无旋转基准轨迹',
-    chkTrueScale: '1:1 真实网球尺寸',
-    legIncoming: '来球 / 二跳或接球点',
-    legPreBounce: '出球飞行轨迹',
-    legPostBounce: '落地反弹与球速矢量',
-    legMagnus: '马格努斯气动力',
-    legNoSpin: '无旋转对照基准',
-    btnPlayFullRally: '连播整回合',
-    btnRestart: '重播本拍',
-    btnSnapImpact: '定格触球 t=0',
-    spd015: '0.15x 极慢动作',
-    spd025: '0.25x 慢动作',
-    spd040: '0.40x 慢动作',
-    spd100: '1.00x 真实原速',
-    telTurn: '当前击球方',
-    telSpeed: '实时球速',
-    telHeight: '实时高度 Z',
-    telPos: '空间坐标',
-    telSpin: '实时转速',
-    telAero: '气动系数',
-    modalImportTitle: '导入 ATP Hawk-Eye / TrackMan 实测数据 (CSV / JSON)',
+    lblHitX: '前后站位 X',
+    lblHitY: '左右站位 Y',
+    lblHitZ: '击球高度 Z',
+    lblSidespin: '侧旋转速',
+    lblWind: '纵向风 (+ 吹向远端)',
+    lblCrossWind: '横向风 (+ 吹向左侧)',
+    lblTemperature: '气温',
+    lblAltitude: '海拔',
+    hudTitleCall: '落点判罚',
+    hudTitleSpeed: '出球速度',
+    hudTitleSpin: '旋转转速',
+    hudTitleNet: '过网净空',
+    btnJumpBounce: '落点',
+    btnJumpNet: '过网',
+    camCloseup: '特写',
+    camBroadcast: '全景',
+    camSide: '侧面',
+    camPov: '主视角',
+    camHawkeye: '判线',
+    camTop: '俯视',
+    chkVectors: '物理矢量',
+    chkGhost: '无旋对比',
+    chkTrueScale: '真实球径',
+    legIncoming: '来球',
+    legPreBounce: '飞行',
+    legPostBounce: '反弹',
+    legMagnus: '马格努斯力',
+    legNoSpin: '无旋基准',
+    btnPlayFullRally: '连播回合',
+    btnRestart: '重播',
+    btnSnapImpact: '触球 t=0',
+    spd015: '0.15x',
+    spd025: '0.25x',
+    spd040: '0.40x',
+    spd100: '1.00x',
+    telTurn: '球员',
+    telSpeed: '球速',
+    telHeight: '高度 Z',
+    telPos: '坐标',
+    telSpin: '转速',
+    telAero: '气动',
+    modalImportTitle: '导入出球参数 (CSV / JSON)',
     modalImportDesc:
-      '每行输入一拍实测数据（格式：出球速度km/h, 转速RPM, 出球仰角°, 水平角°, 击球X, 击球Y, 击球Z），系统将自动逆向反推每一拍所需的拍头挥速与拍面倾角并生成回合：',
+      '每行一拍（速度km/h, 转速RPM, 仰角°, 水平角°, X, Y, Z），系统用逆解算反推挥拍参数。示例数据为虚构：',
     btnCancel: '取消',
-    btnApplyImport: '解析并生成回合',
-    tabTactics: '技战术教学',
-    lblTacticalSelect: '选择大满贯实战技战术名场面',
-    btnTacticDemo: '▶ 演示原版名场面 (Pro Demo)',
-    btnTacticChallenge: '🎯 动手挑战决胜拍 (Challenge)',
-    btnExitTactics: '退出教学',
-    tacticalTheoryTitle: '技战术几何与物理原理剖析',
-    tacticalMissionTitle: '交互实操挑战 · 命中球场金色靶区',
-    btnGoTuneShot: '前往【挥拍与拍面】调参解谜 →',
-    btnShortDemo: '原版演示',
-    btnShortChallenge: '动手挑战',
+    btnApplyImport: '解析生成',
+    tabTactics: '战术',
+    lblTacticalSelect: '选择名场面',
+    btnTacticDemo: '▶ 演示 (Demo)',
+    btnTacticChallenge: '🎯 挑战 (Challenge)',
+    btnExitTactics: '退出',
+    tacticalTheoryTitle: '战术要点',
+    tacticalMissionTitle: '挑战目标 · 命中金色靶区',
+    btnGoTuneShot: '前往【挥拍】调参解谜 →',
+    btnShortDemo: '演示',
+    btnShortChallenge: '挑战',
     btnMobileExpand3D: '全屏球场'
   },
   en: {
-    loadKicker: '3D BALL SPEED SYNTHESIS · FH/BH BIOMECHANICS · RK4 BALLISTICS LAB',
-    loadModeSoloTag: 'DEFAULT // CORE LAB',
-    loadModeSoloTitle: '🎯 Solo Ball Speed & Stroke Lab',
-    loadModeSoloDesc:
-      'Single-player ballistics · Active vs Borrowed speed breakdown · Forehand, 2H-BH, 1H-BH & Serve 3D IK + full 2nd bounce',
-    loadModeRallyTag: 'TURN-BASED // RALLY',
-    loadModeRallyTitle: '⇄ Two-Player Turn-Based Rally',
-    loadModeRallyDesc:
-      'ATP multi-shot rallies · Opponent footwork & interception · Exact racket-contact truncation & incoming handoff',
-    loadModeTacticsTag: 'MASTERCLASS // CHALLENGE',
-    loadModeTacticsTitle: '🏆 Grand Slam Tactical Masterclass',
-    loadModeTacticsDesc:
-      '4 iconic Grand Slam points · 3D court target rings & corridors · Real-time coaching score',
-    btnEnterLab: 'LAUNCH SIMULATOR →',
+    loadKicker: '3D BALL SPEED SYNTHESIS · FH/BH BIOMECHANICS LAB',
+    loadModeSoloTag: 'DEFAULT',
+    loadModeSoloTitle: '🎯 Solo Ball Speed Lab',
+    loadModeSoloDesc: 'Active vs Borrowed Pace · FH, 2H-BH, 1H-BH & Serve',
+    loadModeRallyTag: 'RALLY',
+    loadModeRallyTitle: '⇄ 2-Player Rally',
+    loadModeRallyDesc: 'Example Rallies · Footwork & Interception',
+    loadModeTacticsTag: 'TACTICS',
+    loadModeTacticsTitle: '🏆 Tactical Masterclass',
+    loadModeTacticsDesc: 'Tactical Examples · 3D Court Target Challenge',
+    btnEnterLab: 'LAUNCH LAB →',
     btnWelcomePage: 'WELCOME',
-    soloSectionTitle: 'SOLO BALL SPEED & STROKE BIOMECHANICS LAB',
+    btnValidation: 'VALIDATION',
+    linkValidation: 'Model notes & validation →',
+    loadHeadline: '3D Tennis<span>Ball-Flight Teaching Simulator</span>',
+    loadSubtext:
+      'Change the swing and the incoming ball and watch speed, spin and landing point respond. Aerodynamics use the Štěpánek (1988) fits; racket and court impacts use Cross-style rigid-body models. Player presets are hand-tuned examples, not measured data.',
+    soloSectionTitle: 'MODE & PLAYER PRESET',
     modeBtnSolo: '🎯 Solo Lab',
     modeBtnRally: '⇄ 2P Rally',
     modeBtnTactics: '🏆 Tactics',
-    lblStrokeType: '3D Stroke Biomechanics (FH / 2H-BH / 1H-BH / Serve)',
+    lblStrokeType: 'Stroke',
     strokeFH: 'Forehand',
-    strokeBH2: '2H-Backhand',
-    strokeBH1: '1H-Backhand',
+    strokeBH2: '2H-BH',
+    strokeBH1: '1H-BH',
     strokeServe: 'Serve',
-    sscTitle: 'BALL SPEED SYNTHESIS BREAKDOWN',
-    sscActiveLbl: 'Active Swing Power',
+    sscTitle: 'SPEED SYNTHESIS',
+    sscActiveLbl: 'Active Power',
     sscBorrowLbl: 'Borrowed Pace',
-    sscCorLbl: 'Apparent COR e_A',
-    sscDwellLbl: 'Dwell / Deflection',
-    sscSecondBounceLbl: '2nd Bounce Depth',
+    sscCorLbl: 'COR e_A',
+    sscDwellLbl: 'Dwell/Defl (est.)',
+    sscSecondBounceLbl: '2nd Bounce',
     unitSpeedLabel: 'SPEED',
     unitTensionLabel: 'TENSION',
-    rallySectionTitle: 'ATP TOUR RALLIES & PLAYER BENCHMARKS',
+    rallySectionTitle: 'RALLY & PRESET',
     btnReset: 'RESET',
-    btnImportAtp: 'IMPORT CSV',
-    lblRallyPreset: 'ATP Multi-Shot Rally Replay',
-    shotPresetLabel: 'Pro Player Single-Shot Profile (FH / 2H-BH / 1H-BH / Serve)',
-    btnNextTurn: '+ Append Return Shot',
-    racketVizTitle: '3D STRINGBED POCKETING & IMPACT GEOMETRY',
-    rViewIso: '3D Oblique',
-    rViewFront: 'Stringbed',
-    rViewSide: 'Side Profile',
-    racket3DHint: 'Drag to orbit 3D impact in 360°',
-    rmFace: 'Face Tilt',
-    rmSwing: 'Swing Path',
-    rmAttack: 'Attack Angle',
-    rmAim: 'Horiz Aim',
-    tabRacket: 'Racket & Swing',
-    tabIncoming: 'Incoming Ball',
-    tabPosition: 'Stance & Court',
-    bidirectionalHint:
-      'Bidirectional Physics: Adjusting Racket sliders OR Top-Left HUD (Speed / Spin / Angle) automatically back-solves & syncs both.',
-    lblRacketSpeed: 'Racket Head Speed',
-    lblSwingPath: 'Swing Path Angle (Low-to-High +)',
-    lblFaceAngle: 'Racket Face Tilt (Open + / Closed -)',
-    lblAimAngle: 'Horizontal Aim Angle (Cross / DTL)',
-    lblStringTension: 'String Bed Tension',
-    lblIncomingPreset: 'Incoming Ball Preset (or Chained from Prev Shot)',
-    lblIncomingSpeed: 'Incoming Ball Speed',
-    lblIncomingAngle: 'Incoming Angle (Falling - / Rising +)',
-    lblIncomingSpin: 'Incoming Spin (Topspin + / Slice -)',
-    incomingEffectTitle: 'Incoming Ball Impact Delta (vs Stationary Toss)',
-    effBorrowSpeed: 'Borrowed Pace',
+    btnImportAtp: 'IMPORT',
+    lblRallyPreset: 'Example Rally',
+    shotPresetLabel: 'Style Preset (hand-tuned)',
+    btnNextTurn: '+ Next Shot',
+    racketVizTitle: '3D IMPACT GEOMETRY (ILLUSTRATIVE)',
+    rViewIso: '3D',
+    rViewFront: 'Face',
+    rViewSide: 'Side',
+    racket3DHint: 'Drag 360°',
+    rmFace: 'Face',
+    rmSwing: 'Swing',
+    rmAttack: 'Attack',
+    rmAim: 'Aim',
+    tabRacket: 'Swing',
+    tabIncoming: 'Incoming',
+    tabPosition: 'Court',
+    lblRacketSpeed: 'Swing Speed',
+    lblSwingPath: 'Swing Path',
+    lblFaceAngle: 'Face Tilt',
+    lblAimAngle: 'Horiz Aim',
+    lblStringTension: 'Tension',
+    lblIncomingPreset: 'Incoming Preset',
+    lblIncomingSpeed: 'Incoming Speed',
+    lblIncomingAngle: 'Incoming Angle',
+    lblIncomingSpin: 'Incoming Spin',
+    incomingEffectTitle: 'Borrowed Pace Delta',
+    effBorrowSpeed: 'Pace Gain',
     effLaunchAngle: 'Angle Shift',
     effSpinChange: 'Spin Delta',
-    lblCourtMode: 'Target Court Lines',
-    optSingles: 'Singles Court',
-    optDoubles: 'Doubles Court',
-    optServeDeuce: 'Serve: Deuce Box',
-    optServeAd: 'Serve: Ad Box',
-    lblSurface: 'Court Surface',
-    optHard: 'Hard Court',
-    optClay: 'Clay Court',
-    optGrass: 'Grass Court',
-    lblHitX: 'Contact Depth X (Baseline -11.89m)',
-    lblHitY: 'Lateral Position Y (Sideline ±4.12m)',
-    lblHitZ: 'Contact Height Z (Serve > 2.0m)',
-    lblSidespin: 'Sidespin RPM (Lateral Curve)',
-    lblWind: 'Court Wind (Headwind - / Tailwind +)',
-    hudTitleCall: 'LINE CALL // 1ST BOUNCE',
-    hudTitleSpeed: 'LAUNCH VELOCITY',
-    hudTitleSpin: 'SPIN RATE (RPM)',
+    lblCourtMode: 'Court Lines',
+    optSingles: 'Singles',
+    optDoubles: 'Doubles',
+    optServeDeuce: 'Deuce Box',
+    optServeAd: 'Ad Box',
+    lblSurface: 'Surface',
+    optHard: 'Hard',
+    optClay: 'Clay',
+    optGrass: 'Grass',
+    lblHitX: 'Depth X',
+    lblHitY: 'Lateral Y',
+    lblHitZ: 'Height Z',
+    lblSidespin: 'Sidespin',
+    lblWind: 'Head/Tail Wind (+ to far end)',
+    lblCrossWind: 'Cross Wind (+ to left)',
+    lblTemperature: 'Temperature',
+    lblAltitude: 'Altitude',
+    hudTitleCall: 'LINE CALL // BOUNCE',
+    hudTitleSpeed: 'VELOCITY',
+    hudTitleSpin: 'SPIN RPM',
     hudTitleNet: 'NET CLEARANCE',
     btnJumpBounce: 'FOCUS',
     btnJumpNet: 'FOCUS',
-    camCloseup: 'Swing Close-Up',
+    camCloseup: 'Close-Up',
     camBroadcast: 'Broadcast',
-    camSide: 'Side Profile',
-    camPov: 'Player POV',
-    camHawkeye: 'Hawk-Eye',
-    camTop: 'Top Ortho',
-    chkVectors: 'Force & Velocity Vectors',
-    chkGhost: 'No-Spin Baseline',
-    chkTrueScale: '1:1 True Ball Scale',
-    legIncoming: 'Incoming / 2nd Bounce',
-    legPreBounce: 'Outgoing Flight',
-    legPostBounce: 'Post-Bounce / Vel',
-    legMagnus: 'Magnus Force',
-    legNoSpin: 'No-Spin Baseline',
-    btnPlayFullRally: 'Play Full Rally',
-    btnRestart: 'Replay Turn',
+    camSide: 'Side',
+    camPov: 'POV',
+    camHawkeye: 'Line Cam',
+    camTop: 'Top',
+    chkVectors: 'Vectors',
+    chkGhost: 'No-Spin',
+    chkTrueScale: '1:1 Ball',
+    legIncoming: 'Incoming',
+    legPreBounce: 'Flight',
+    legPostBounce: 'Rebound',
+    legMagnus: 'Magnus',
+    legNoSpin: 'No-Spin',
+    btnPlayFullRally: 'Full Rally',
+    btnRestart: 'Replay',
     btnSnapImpact: 'Impact t=0',
-    spd015: '0.15x Ultra-Slow',
-    spd025: '0.25x Slow',
-    spd040: '0.40x Slow',
-    spd100: '1.00x Real-Time',
-    telTurn: 'Active Hitter',
-    telSpeed: 'Velocity',
+    spd015: '0.15x',
+    spd025: '0.25x',
+    spd040: '0.40x',
+    spd100: '1.00x',
+    telTurn: 'Player',
+    telSpeed: 'Speed',
     telHeight: 'Height Z',
     telPos: 'Coords',
-    telSpin: 'Spin Rate',
-    telAero: 'Aero Coeff',
-    modalImportTitle: 'Import ATP Hawk-Eye / TrackMan Telemetry (CSV / JSON)',
+    telSpin: 'Spin',
+    telAero: 'Aero',
+    modalImportTitle: 'Import Launch Data (CSV / JSON)',
     modalImportDesc:
-      'Enter one shot per line (speedKmh, topspinRpm, launchAngleDeg, aimAngleDeg, hitX, hitY, hitZ). The inverse solver automatically reconstructs the required racket swing & builds a turn-based rally:',
+      'One shot per line (speedKmh, topspinRpm, launchAngleDeg, aimAngleDeg, hitX, hitY, hitZ); racket parameters are back-solved. Sample rows are made up:',
     btnCancel: 'Cancel',
-    btnApplyImport: 'Parse & Build Rally',
-    tabTactics: 'Tactics Lab',
-    lblTacticalSelect: 'Select Grand Slam Tactical Masterclass',
-    btnTacticDemo: '▶ Pro Demo Replay',
-    btnTacticChallenge: '🎯 Interactive Challenge',
-    btnExitTactics: 'Exit Lab',
-    tacticalTheoryTitle: 'TACTICAL GEOMETRY & BIOMECHANICS',
-    tacticalMissionTitle: 'CHALLENGE · HIT THE GOLD BULLSEYE',
-    btnGoTuneShot: 'Tune Racket Sliders to Solve →',
-    btnShortDemo: 'Pro Demo',
+    btnApplyImport: 'Build Rally',
+    tabTactics: 'Tactics',
+    lblTacticalSelect: 'Select Masterclass',
+    btnTacticDemo: '▶ Demo',
+    btnTacticChallenge: '🎯 Challenge',
+    btnExitTactics: 'Exit',
+    tacticalTheoryTitle: 'TACTICAL KEY',
+    tacticalMissionTitle: 'TARGET · HIT GOLD ZONE',
+    btnGoTuneShot: 'Tune Swing Sliders →',
+    btnShortDemo: 'Demo',
     btnShortChallenge: 'Challenge',
     btnMobileExpand3D: 'Expand 3D'
   }
@@ -330,8 +340,10 @@ class TennisSimApp {
       topspinRpm: 3250,
       sidespinRpm: 200,
 
-      airDensity: 1.21,
-      windSpeedKmh: 0
+      temperatureC: 20,
+      altitudeM: 0,
+      windSpeedKmh: 0,
+      crossWindKmh: 0
     };
 
     this.lastImpactInfo = null;
@@ -385,13 +397,13 @@ class TennisSimApp {
     if (rallySelect) {
       const curRally = rallySelect.value || this.currentRallyKey;
       rallySelect.innerHTML = '';
-      for (const [k, r] of Object.entries(ATP_RALLIES)) {
+      for (const [k, r] of Object.entries(EXAMPLE_RALLIES)) {
         const opt = document.createElement('option');
         opt.value = k;
         opt.textContent = this.lang === 'zh' ? r.nameZh : r.nameEn;
         rallySelect.appendChild(opt);
       }
-      if (ATP_RALLIES[curRally]) {
+      if (EXAMPLE_RALLIES[curRally]) {
         rallySelect.value = curRally;
       }
     }
@@ -450,6 +462,13 @@ class TennisSimApp {
         el.textContent = dict[key];
       }
     });
+    document.querySelectorAll('[data-i18n-html]').forEach((el) => {
+      const key = el.getAttribute('data-i18n-html');
+      if (dict[key]) {
+        el.innerHTML = dict[key];
+      }
+    });
+    document.documentElement.lang = this.lang === 'zh' ? 'zh-CN' : 'en';
     this._populatePresetSelects();
     this._updatePlayButtonUI();
     this._renderTurnChainUI();
@@ -458,10 +477,10 @@ class TennisSimApp {
   }
 
   /**
-   * Loads a multi-shot turn-based ATP rally and chains each turn's incoming ball from the previous turn's bounce.
+   * Loads a multi-shot example rally and chains each turn's incoming ball from the previous turn's bounce.
    */
   loadRally(rallyKey) {
-    const rally = ATP_RALLIES[rallyKey];
+    const rally = EXAMPLE_RALLIES[rallyKey];
     if (!rally) return;
 
     this.activeTacticalKey = null;
@@ -727,16 +746,16 @@ class TennisSimApp {
         pctText.textContent = '76%';
         statusText.textContent =
           this.lang === 'zh'
-            ? '正在校准 3D 双骨 IK 正反手动作与 16x19 穿线咬球刚度...'
-            : 'CALIBRATING 3D FOREHAND/BACKHAND IK & 16x19 STRINGBED...';
+            ? '校准 3D 正反手 IK 与 16x19 穿线刚度...'
+            : 'CALIBRATING 3D IK & 16x19 STRINGBED...';
       }, 180);
       setTimeout(() => {
         barFill.style.width = '100%';
         pctText.textContent = '100%';
         statusText.textContent =
           this.lang === 'zh'
-            ? '系统就绪 // 默认模式：单人球速与正反手弹道实验室 (READY)'
-            : 'ENGINE READY // DEFAULT: SOLO BALL SPEED & BIOMECHANICS LAB';
+            ? 'READY // 单人球速与正反手实验室'
+            : 'READY // SOLO BALL SPEED & BIOMECHANICS LAB';
       }, 420);
     }
   }
@@ -744,7 +763,7 @@ class TennisSimApp {
   /**
    * Switches between the 3 Core Modes:
    * - 'solo' (DEFAULT): Single-player ball speed synthesis & Forehand/Backhand/Serve biomechanics lab (no opponent cutoff, full 2nd bounce)
-   * - 'rally': Two-player turn-based ATP rally with receiver running interception
+   * - 'rally': Two-player turn-based example rally with receiver running interception
    * - 'tactics': Grand Slam interactive tactical masterclass
    */
   setAppMode(mode = 'solo') {
@@ -780,10 +799,10 @@ class TennisSimApp {
       this.state.side = 'A';
       const activePresetKey = document.getElementById('presetSelect')?.value || 'alcaraz_fh';
       const activePreset = SHOT_PRESETS[activePresetKey];
-      const playerTitleZh = activePreset ? activePreset.labelZh.split('·')[0].trim() : '单人球速实验室';
-      const playerTitleEn = activePreset ? activePreset.labelEn.split('·')[0].trim() : 'Solo Ballistics Lab';
-      this.rallyMeta.playerAZh = `${playerTitleZh} (单人模拟)`;
-      this.rallyMeta.playerAEn = `${playerTitleEn} (Solo Lab)`;
+      const playerTitleZh = activePreset ? activePreset.labelZh.split('·')[0].trim() : 'C. Alcaraz';
+      const playerTitleEn = activePreset ? activePreset.labelEn.split('·')[0].trim() : 'C. Alcaraz';
+      this.rallyMeta.playerAZh = playerTitleZh;
+      this.rallyMeta.playerAEn = playerTitleEn;
 
       // Ensure we are on a physics control tab if previously in tactics
       const activeTab = document.querySelector('#sidebarNavTabs .nav-tab.active')?.getAttribute('data-tab');
@@ -828,7 +847,7 @@ class TennisSimApp {
       if (fullRallyBtn) fullRallyBtn.style.display = 'inline-flex';
       if (sectionTitle) {
         sectionTitle.textContent =
-          this.lang === 'zh' ? 'ATP 大满贯技战术实操教学' : 'ATP TACTICAL MASTERCLASS LAB';
+          this.lang === 'zh' ? '技战术名场面教学' : 'TACTICAL MASTERCLASS';
       }
 
       document.querySelectorAll('#sidebarNavTabs .nav-tab').forEach((b) =>
@@ -854,8 +873,8 @@ class TennisSimApp {
     if (!fromPreset) {
       if (strokeType === 'serve') {
         const presetSelect = document.getElementById('presetSelect');
-        if (presetSelect) presetSelect.value = 'sinner_serve';
-        this.applyPreset('sinner_serve');
+        if (presetSelect) presetSelect.value = 'shelton_serve';
+        this.applyPreset('shelton_serve');
         return;
       }
 
@@ -931,7 +950,7 @@ class TennisSimApp {
     if (dwellEl) {
       const dwellMs = Number(impact.dwellTimeMs ?? 4.6).toFixed(1);
       const deflMm = Number(impact.stringDeflectionMm ?? 12.8).toFixed(1);
-      dwellEl.textContent = `${dwellMs} ms / ${deflMm} mm`;
+      dwellEl.textContent = `≈${dwellMs} ms / ≈${deflMm} mm`;
     }
 
     const sbEl = document.getElementById('sscSecondBounceVal');
@@ -952,8 +971,10 @@ class TennisSimApp {
   resetAll() {
     this.isPlayingFullRally = false;
     this.activeTacticalKey = null;
-    this.windSpeedKmh = 0;
     this.state.windSpeedKmh = 0;
+    this.state.crossWindKmh = 0;
+    this.state.temperatureC = 20;
+    this.state.altitudeM = 0;
     this.state.stringTensionKg = 23;
     if (this.appMode === 'solo') {
       const presetSelect = document.getElementById('presetSelect');
@@ -975,64 +996,13 @@ class TennisSimApp {
    * Propagates post-bounce intercept coordinates and incoming ball state from Turn k to Turn k+1.
    */
   _rechainRallyFromTurn(startIdx = 0) {
-    for (let i = startIdx; i < this.rallyTurns.length; i++) {
-      const turn = this.rallyTurns[i];
-      if (i > startIdx && turn.targetSpeedKmh !== undefined) {
-        const solved = solveRacketFromTargetLaunch({
-          targetSpeedKmh: turn.targetSpeedKmh,
-          targetLaunchAngleDeg: turn.targetLaunchAngleDeg,
-          targetTopspinRpm: turn.targetTopspinRpm,
-          incomingSpeedKmh: turn.incomingSpeedKmh,
-          incomingAngleDeg: turn.incomingAngleDeg,
-          incomingSpinRpm: turn.incomingSpinRpm,
-          stringTensionKg: turn.stringTensionKg ?? 23,
-          hitZ: turn.hitZ
-        });
-        turn.racketSpeedKmh = solved.racketSpeedKmh;
-        turn.swingPathDeg = solved.swingPathDeg;
-        turn.faceAngleDeg = solved.faceAngleDeg;
-      } else if (i === 0 && turn.targetSpeedKmh !== undefined && startIdx === 0) {
-        const solved = solveRacketFromTargetLaunch({
-          targetSpeedKmh: turn.targetSpeedKmh,
-          targetLaunchAngleDeg: turn.targetLaunchAngleDeg,
-          targetTopspinRpm: turn.targetTopspinRpm,
-          incomingSpeedKmh: turn.incomingSpeedKmh,
-          incomingAngleDeg: turn.incomingAngleDeg,
-          incomingSpinRpm: turn.incomingSpinRpm,
-          stringTensionKg: turn.stringTensionKg ?? 23,
-          hitZ: turn.hitZ
-        });
-        turn.racketSpeedKmh = solved.racketSpeedKmh;
-        turn.swingPathDeg = solved.swingPathDeg;
-        turn.faceAngleDeg = solved.faceAngleDeg;
-      }
-
-      const impact = computeRacketBallImpact(turn);
-      turn.speedKmh = impact.launchSpeedKmh;
-      turn.launchAngleDeg = impact.launchAngleDeg;
-      turn.topspinRpm = impact.topspinRpm;
-
-      const sim = simulateTrajectory({
-        ...turn,
-        surfaceKey: this.state.surfaceKey,
-        airDensity: this.state.airDensity,
-        windSpeedKmh: this.state.windSpeedKmh
-      });
-      turn.callCode = sim.firstBounce ? (sim.firstBounce.isIn ? 'IN' : 'OUT') : 'OUT';
-      turn.interceptPoint = sim.interceptPoint;
-
-      if (i + 1 < this.rallyTurns.length && sim.interceptPoint) {
-        const nextTurn = this.rallyTurns[i + 1];
-        const ip = sim.interceptPoint;
-        nextTurn.side = ip.nextSide;
-        nextTurn.hitX = ip.nextHitX;
-        nextTurn.hitY = ip.nextHitY;
-        nextTurn.hitZ = ip.nextHitZ;
-        nextTurn.incomingSpeedKmh = ip.nextIncomingSpeedKmh;
-        nextTurn.incomingAngleDeg = ip.nextIncomingAngleDeg;
-        nextTurn.incomingSpinRpm = ip.nextIncomingSpinRpm;
-      }
-    }
+    chainRallyTurns(this.rallyTurns, startIdx, {
+      surfaceKey: this.state.surfaceKey,
+      temperatureC: this.state.temperatureC,
+      altitudeM: this.state.altitudeM,
+      windSpeedKmh: this.state.windSpeedKmh,
+      crossWindKmh: this.state.crossWindKmh
+    });
   }
 
   /**
@@ -1409,7 +1379,18 @@ class TennisSimApp {
       },
       { id: 'stringTensionKg', key: 'stringTensionKg', fmt: (v) => this.formatTension(v) },
       { id: 'sidespinRpm', key: 'sidespinRpm', fmt: (v) => `${v >= 0 ? '+' : ''}${Math.round(v)} RPM` },
-      { id: 'windSpeedKmh', key: 'windSpeedKmh', fmt: (v) => this.formatSpeed(v, 0) }
+      { id: 'windSpeedKmh', key: 'windSpeedKmh', fmt: (v) => this.formatSpeed(v, 0) },
+      { id: 'crossWindKmh', key: 'crossWindKmh', fmt: (v) => this.formatSpeed(v, 0) },
+      {
+        id: 'temperatureC',
+        key: 'temperatureC',
+        fmt: (v) => `${v.toFixed(0)} °C · ρ ${airDensityFromConditions(v, this.state.altitudeM).toFixed(3)}`
+      },
+      {
+        id: 'altitudeM',
+        key: 'altitudeM',
+        fmt: (v) => `${v.toFixed(0)} m · ρ ${airDensityFromConditions(this.state.temperatureC, v).toFixed(3)}`
+      }
     ];
 
     this.sliderBindings.forEach((b) => {
@@ -1540,7 +1521,7 @@ class TennisSimApp {
       this.playbackSpeed = parseFloat(e.target.value);
     });
 
-    // 11. Custom ATP CSV / JSON Import Modal
+    // 11. CSV / JSON launch-data import modal
     const modal = document.getElementById('importModalBackdrop');
     const closeModal = () => {
       if (modal) modal.style.display = 'none';
@@ -1552,16 +1533,16 @@ class TennisSimApp {
     document.getElementById('btnCancelImport')?.addEventListener('click', closeModal);
     document.getElementById('btnConfirmImport')?.addEventListener('click', () => {
       const raw = document.getElementById('atpImportTextarea')?.value || '';
-      if (this._parseAndImportAtpTelemetry(raw)) {
+      if (this._parseAndImportLaunchData(raw)) {
         closeModal();
       }
     });
   }
 
   /**
-   * Parses custom ATP Hawk-Eye / TrackMan CSV or JSON telemetry and reconstructs a full turn-based rally.
+   * Parses user-supplied launch data (CSV or JSON) and rebuilds a turn-based rally from it.
    */
-  _parseAndImportAtpTelemetry(rawText) {
+  _parseAndImportLaunchData(rawText) {
     const trimmed = rawText.trim();
     if (!trimmed) return false;
 
@@ -1584,8 +1565,8 @@ class TennisSimApp {
           });
           parsedTurns.push({
             side,
-            titleZh: `#${idx + 1} 实测拍 (${Math.round(item.speedKmh || 135)}km/h)`,
-            titleEn: `#${idx + 1} Telemetry (${Math.round(item.speedKmh || 135)}km/h)`,
+            titleZh: `#${idx + 1} 导入拍 (${Math.round(item.speedKmh || 135)}km/h)`,
+            titleEn: `#${idx + 1} Imported (${Math.round(item.speedKmh || 135)}km/h)`,
             courtMode: hitZ > 1.95 ? 'serve_deuce' : 'singles',
             hitX: Number(item.hitX ?? -11.75),
             hitY: Number(item.hitY ?? -1.5),
@@ -1627,7 +1608,7 @@ class TennisSimApp {
           });
           parsedTurns.push({
             side,
-            titleZh: `#${idx + 1} 导入实测 (${Math.round(spd)}km/h)`,
+            titleZh: `#${idx + 1} 导入拍 (${Math.round(spd)}km/h)`,
             titleEn: `#${idx + 1} Imported (${Math.round(spd)}km/h)`,
             courtMode: isServe ? 'serve_deuce' : 'singles',
             hitX: hx,
@@ -1648,7 +1629,7 @@ class TennisSimApp {
         });
       }
     } catch (err) {
-      console.error('ATP Import parse error:', err);
+      console.error('Import parse error:', err);
       return false;
     }
 
@@ -1656,8 +1637,8 @@ class TennisSimApp {
 
     this.setAppMode('rally');
     this.rallyMeta = {
-      playerAZh: 'ATP 导入球员 A',
-      playerBZh: 'ATP 导入球员 B',
+      playerAZh: '导入球员 A',
+      playerBZh: '导入球员 B',
       playerAEn: 'Imported Player A',
       playerBEn: 'Imported Player B'
     };
@@ -1668,7 +1649,7 @@ class TennisSimApp {
   }
 
   /**
-   * Applies a single-shot ATP player preset to the currently active turn.
+   * Applies a single-shot style preset to the currently active turn.
    */
   applyPreset(presetKey) {
     const p = SHOT_PRESETS[presetKey];
@@ -1696,8 +1677,8 @@ class TennisSimApp {
     if (this.appMode === 'solo') {
       const playerTitleZh = p.labelZh.split('·')[0].trim();
       const playerTitleEn = p.labelEn.split('·')[0].trim();
-      this.rallyMeta.playerAZh = `${playerTitleZh} (单人模拟)`;
-      this.rallyMeta.playerAEn = `${playerTitleEn} (Solo Lab)`;
+      this.rallyMeta.playerAZh = playerTitleZh;
+      this.rallyMeta.playerAEn = playerTitleEn;
     }
 
     const courtSelect = document.getElementById('courtModeSelect');
@@ -1872,9 +1853,7 @@ class TennisSimApp {
       return;
     }
 
-    const dt = 0.002;
-    const idx = Math.min(pts.length - 1, Math.max(0, Math.floor(t / dt)));
-    const pt = pts[idx];
+    const pt = samplePointAtTime(pts, t);
 
     this.scene3d.updateBallAtFrame(pt, null);
 
@@ -1900,17 +1879,17 @@ class TennisSimApp {
     const hudTurnBadge = document.getElementById('hudTurnBadge');
     if (hudTurnBadge) {
       if (this.appMode === 'solo') {
-        const strokeMapZh = { fh: '正手 FH', bh2: '双反 2H-BH', bh1: '单反 1H-BH', serve: '发球 SERVE' };
+        const strokeMapZh = { fh: '正手 FH', bh2: '双反 2H', bh1: '单反 1H', serve: '发球 SERVE' };
         const strokeMapEn = { fh: 'FH', bh2: '2H-BH', bh1: '1H-BH', serve: 'SERVE' };
         const st = this.state.strokeType || 'fh';
         hudTurnBadge.textContent =
           this.lang === 'zh'
-            ? `单人 ${strokeMapZh[st] || '正手'} // 第一落点`
-            : `SOLO ${strokeMapEn[st] || 'FH'} // 1ST BOUNCE`;
+            ? `${strokeMapZh[st] || '正手'} · 落点判罚`
+            : `${strokeMapEn[st] || 'FH'} · LINE CALL`;
       } else {
         const turnTag = `#${this.currentTurnIndex + 1} (${this.state.side})`;
         hudTurnBadge.textContent =
-          this.lang === 'zh' ? `${turnTag} 鹰眼判罚 // 第一落点` : `${turnTag} LINE CALL // 1ST BOUNCE`;
+          this.lang === 'zh' ? `${turnTag} · 落点判罚` : `${turnTag} · LINE CALL`;
       }
     }
 
@@ -1931,8 +1910,8 @@ class TennisSimApp {
     document.getElementById('hudSpinTypePill').textContent =
       this.lang === 'zh'
         ? isTop
-          ? '上旋 TOPSPIN'
-          : '切削 SLICE'
+          ? '上旋'
+          : '切削'
         : isTop
         ? 'TOPSPIN'
         : 'SLICE';
@@ -1940,8 +1919,8 @@ class TennisSimApp {
     const sideSign = sidespinRpm >= 0 ? '+' : '';
     document.getElementById('hudMagnusInfo').textContent =
       this.lang === 'zh'
-        ? `侧旋 ${sideSign}${Math.round(sidespinRpm)} RPM`
-        : `Side ${sideSign}${Math.round(sidespinRpm)} RPM`;
+        ? `侧旋 ${sideSign}${Math.round(sidespinRpm)}`
+        : `Side ${sideSign}${Math.round(sidespinRpm)}`;
 
     const hudSpinSlider = document.getElementById('hudSpinSlider');
     if (hudSpinSlider && document.activeElement !== hudSpinSlider) {
@@ -1959,11 +1938,10 @@ class TennisSimApp {
       netEl.className = 'tel-big-mono text-err';
     }
 
-    const netHAtPass = res.netPassPoint ? (res.netPassPoint.netHeightAtY * 100).toFixed(1) : '91.4';
     document.getElementById('hudLaunchAngleInfo').textContent =
       this.lang === 'zh'
-        ? `仰角 ${launchAngleDeg >= 0 ? '+' : ''}${launchAngleDeg.toFixed(1)}° (网高 ${netHAtPass}cm)`
-        : `Launch ${launchAngleDeg >= 0 ? '+' : ''}${launchAngleDeg.toFixed(1)}° (Net ${netHAtPass}cm)`;
+        ? `仰角 ${launchAngleDeg >= 0 ? '+' : ''}${launchAngleDeg.toFixed(1)}°`
+        : `Launch ${launchAngleDeg >= 0 ? '+' : ''}${launchAngleDeg.toFixed(1)}°`;
 
     const hudAngleSlider = document.getElementById('hudAngleSlider');
     if (hudAngleSlider && document.activeElement !== hudAngleSlider) {
@@ -1986,23 +1964,23 @@ class TennisSimApp {
       const distFromBaselineM = ITF_COURT.halfLength - b.localX;
       if (this.lang === 'zh') {
         detail.textContent = b.isIn
-          ? `界内余量 ${b.marginCm} cm · 距底线 ${distFromBaselineM.toFixed(2)} m`
-          : `出界幅度 ${b.marginCm} cm · 距底线 ${Math.abs(distFromBaselineM).toFixed(2)} m`;
+          ? `余量 ${b.marginCm} cm · 距底线 ${distFromBaselineM.toFixed(1)}m`
+          : `出界 ${b.marginCm} cm · 距底线 ${Math.abs(distFromBaselineM).toFixed(1)}m`;
       } else {
         detail.textContent = b.isIn
-          ? `Margin ${b.marginCm} cm · Baseline ${distFromBaselineM.toFixed(2)} m`
-          : `Out by ${b.marginCm} cm · Baseline ${Math.abs(distFromBaselineM).toFixed(2)} m`;
+          ? `Margin ${b.marginCm} cm · Base ${distFromBaselineM.toFixed(1)}m`
+          : `Out ${b.marginCm} cm · Base ${Math.abs(distFromBaselineM).toFixed(1)}m`;
       }
 
-      landEl.textContent = `X ${b.x.toFixed(2)} / Y ${b.y.toFixed(2)}m`;
+      landEl.textContent = `X ${b.x.toFixed(1)} / Y ${b.y.toFixed(1)}m`;
       bounceSpeedEl.textContent = `${this.formatSpeed(b.speedBeforeKmh, 0)} → ${this.formatSpeed(
         b.speedAfterKmh,
         0
-      )} (${b.reboundAngleDeg.toFixed(1)}°)`;
+      )}`;
     } else {
       badge.textContent = this.lang === 'zh' ? 'OUT (出界)' : 'OUT (LONG)';
       badge.className = 'call-tag call-out';
-      detail.textContent = this.lang === 'zh' ? '飞出球场围栏范围' : 'Beyond court boundary';
+      detail.textContent = this.lang === 'zh' ? '飞出球场范围' : 'Beyond boundary';
       landEl.textContent = '—';
       bounceSpeedEl.textContent = '—';
     }

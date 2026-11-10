@@ -1,11 +1,18 @@
 /**
  * High-End 3D Tennis Stadium, Dual Articulated Players (Turn-Based Rally A vs B),
- * Zero-Clipping Biomechanical IK Rig, Pro Tour Racket & Hawk-Eye Visualizer
+ * Articulated IK player rigs, racket model and line-call visualiser
  */
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=6';
+import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=11';
+
+// Net profile drawn with singles sticks in place (matches the physics for singles play):
+// 0.914 m at the centre rising to 1.07 m at the sticks, then level out to the posts.
+function drawnNetHeightAtY(y) {
+  const stickY = ITF_COURT.halfSinglesWidth + ITF_COURT.netPostOffset;
+  return Math.abs(y) >= stickY ? ITF_COURT.netHeightPost : getNetHeightAtY(y, true);
+}
 
 export function physToThree(x, y, z) {
   return new THREE.Vector3(x, z, -y);
@@ -309,7 +316,7 @@ export class TennisScene3D {
     floorMesh.receiveShadow = true;
     this.courtGroup.add(floorMesh);
 
-    // Tournament Run-Off Apron (36.6m x 18.3m official ITF Grand Slam enclosure)
+    // Tournament Run-Off Apron (36.6m x 18.3m surround)
     const surroundGeo = new THREE.PlaneGeometry(38.0, 19.6);
     surroundGeo.rotateX(-Math.PI / 2);
     this.surroundMat = new THREE.MeshStandardMaterial({
@@ -457,7 +464,7 @@ export class TennisScene3D {
     sctx.font = '700 40px "JetBrains Mono", "Inter", sans-serif';
     sctx.textAlign = 'center';
     sctx.textBaseline = 'middle';
-    sctx.fillText('AERO-LAB  ·  MADE BY JASON ZENG  ·  ATP TOUR', 512, 64);
+    sctx.fillText('AERO-LAB  ·  MADE BY JASON ZENG', 512, 64);
 
     const signTex = new THREE.CanvasTexture(signCanvas);
     signTex.colorSpace = THREE.SRGBColorSpace;
@@ -502,7 +509,7 @@ export class TennisScene3D {
     chairGroup.add(seatMesh, backMesh, canopyMesh);
     archGroup.add(chairGroup);
 
-    // Hawk-Eye Optical Tracking Sensor Pods on the 4 corners
+    // Decorative camera pods on the 4 corners
     const podGeo = new THREE.BoxGeometry(0.28, 0.18, 0.18);
     [
       [-rx + 0.1, wallH + 0.12, -rz + 0.4],
@@ -536,7 +543,7 @@ export class TennisScene3D {
     this.netGroup.add(rightPost);
 
     const stickY = ITF_COURT.halfSinglesWidth + ITF_COURT.netPostOffset;
-    const stickH = getNetHeightAtY(stickY);
+    const stickH = drawnNetHeightAtY(stickY);
     const stickGeo = new THREE.CylinderGeometry(0.018, 0.018, stickH, 12);
     const stickMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.7, roughness: 0.3 });
     const leftStick = new THREE.Mesh(stickGeo, stickMat);
@@ -560,7 +567,7 @@ export class TennisScene3D {
     for (let i = 0; i <= segments; i++) {
       const frac = i / segments;
       const y = -postY + frac * (2 * postY);
-      const h = getNetHeightAtY(y);
+      const h = drawnNetHeightAtY(y);
       positions.push(0, 0, -y);
       positions.push(0, h - 0.052, -y);
     }
@@ -589,7 +596,7 @@ export class TennisScene3D {
     const wirePoints = [];
     for (let i = 0; i <= segments; i++) {
       const y = -postY + (i / segments) * (2 * postY);
-      const h = getNetHeightAtY(y) - 0.052;
+      const h = drawnNetHeightAtY(y) - 0.052;
       wirePoints.push(new THREE.Vector3(0, 0, -y), new THREE.Vector3(0, h, -y));
     }
     for (let r = 1; r <= 7; r++) {
@@ -597,8 +604,8 @@ export class TennisScene3D {
       for (let i = 0; i < segments; i++) {
         const y0 = -postY + (i / segments) * (2 * postY);
         const y1 = -postY + ((i + 1) / segments) * (2 * postY);
-        const h0 = (getNetHeightAtY(y0) - 0.052) * rFrac;
-        const h1 = (getNetHeightAtY(y1) - 0.052) * rFrac;
+        const h0 = (drawnNetHeightAtY(y0) - 0.052) * rFrac;
+        const h1 = (drawnNetHeightAtY(y1) - 0.052) * rFrac;
         wirePoints.push(new THREE.Vector3(0, h0, -y0), new THREE.Vector3(0, h1, -y1));
       }
     }
@@ -610,7 +617,7 @@ export class TennisScene3D {
     const tapeIdx = [];
     for (let i = 0; i <= segments; i++) {
       const y = -postY + (i / segments) * (2 * postY);
-      const h = getNetHeightAtY(y);
+      const h = drawnNetHeightAtY(y);
       tapePos.push(0, h - 0.058, -y);
       tapePos.push(0, h, -y);
     }
@@ -1496,7 +1503,7 @@ export class TennisScene3D {
         rotZ = faceRad + 0.15 * u;
       }
     } else {
-      // MODERN ATP TOPSPIN FOREHAND (Zero-Clipping Circular Wrap Over Left Shoulder)
+      // MODERN TOPSPIN FOREHAND (Zero-Clipping Circular Wrap Over Left Shoulder)
       const baseRx = -0.25;
       if (s < 0) {
         const u = -s / 0.35;
