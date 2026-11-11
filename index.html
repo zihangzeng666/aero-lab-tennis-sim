@@ -16,7 +16,7 @@
       if (localStorage.getItem('aerolab-theme') === 'light') document.documentElement.dataset.theme = 'light';
     } catch (e) {}
   </script>
-  <link rel="stylesheet" href="./styles.css?v=54" />
+  <link rel="stylesheet" href="./styles.css?v=59" />
   <script type="importmap">
     {
       "imports": {
@@ -570,9 +570,11 @@
       <div class="viewport-wrapper">
         <div id="viewport3d"></div>
         <div class="tactics-board" id="tacticsBoard" hidden></div>
-        <div class="seg-control view-switch" id="viewSwitch" hidden>
+        <section class="impact-studio" id="impactStudio" hidden aria-label="Impact studio"></section>
+        <div class="seg-control view-switch" id="viewSwitch">
           <button class="seg-btn active" data-view="3d">3D</button>
-          <button class="seg-btn" data-view="board" data-i18n="viewBoard">平面图</button>
+          <button class="seg-btn" data-view="studio" data-i18n="viewStudio">击球台</button>
+          <button class="seg-btn" data-view="board" data-i18n="viewBoard" hidden>平面图</button>
         </div>
         <span class="viewport-corner viewport-corner-tl" aria-hidden="true"></span>
         <span class="viewport-corner viewport-corner-tr" aria-hidden="true"></span>
@@ -688,6 +690,6 @@
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=54"></script>
+  <script type="module" src="./app.js?v=59"></script>
 </body>
 </html>

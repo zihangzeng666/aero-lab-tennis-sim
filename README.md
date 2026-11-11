@@ -13,7 +13,7 @@ An interactive 3D simulator for tennis ball flight. Change the swing and the inc
 - **Rally mode**: two players take turns. The ball's state where the next player meets it becomes their incoming ball; a turn can volley it before the bounce or step in and take it inside the court.
 - **Tactics mode**: nine lessons grouped by game situation (serving, returning, baseline, net, defence, transition): serve + 1, serve and volley, the deep return, cross-court then down the line (Wardlaw directionals), topspin to the backhand, the run-around forehand, approach and volley, high deep defence, and the drop shot. Some are inspired by well-known points; none are reconstructions. Every shot in a lesson was tuned against the physics, so each ball lands where its explanation says.
 - **Court map** (rally and tactics): the rally drawn from above, shot by shot. For the selected shot it shows the opponent's widest replies, their bisector and your recovery spot on it (Cochet's angle rule), how far the opponent has to run and how much time they have, the lesson's target, and the common mistake as a ghost path. Opponent movement assumes a 4 m/s recovery speed.
-- **Impact diagram**: arrows are vectors you can drag. Direction is the angle, length is the speed: swing (path + racket speed), incoming ball (angle + speed), launch (angle + speed, back-solved), face angle, and aim in the top view.
+- **Impact studio** (击球台, the main control surface; opens first in the solo lab on desktop): a large side view of the contact where every arrow is a draggable vector (direction = angle, length = speed) for the swing, the incoming ball and the launch (back-solved), plus the face angle; an inset splits the ball's velocity relative to the racket into the normal part (pace) and the part along the strings (spin) with the attack angle; a top view for direction, a to-scale flight profile and a landing map; and exact number fields for every input and for the launch target. Shift or the Fine toggle gives quarter-speed drags; knobs work from the keyboard (arrows, Shift for ×10).
 - **Inverse solver**: drag the launch speed, angle or spin on the HUD and the racket speed, swing path and face angle are back-solved (damped Newton on a 3×3 Jacobian).
 
 ## Model
@@ -124,7 +124,8 @@ They cover the vacuum limit, 4th-order convergence, A/B mirror symmetry, line ca
 | `presets.js` | Hand-tuned style presets, example rallies, tactics lessons and their scoring |
 | `lessonMap.js` | Small top-down map in the tactics card |
 | `tacticsBoard.js` | Court map: rally from above, recovery bisector, opponent run and time |
-| `racketDiagram.js` | Impact diagram with draggable vectors |
+| `racketDiagram.js` | Impact diagram with draggable vectors (compact and detailed) |
+| `impactStudio.js` | Impact studio: large diagram, flight profile, landing map, number fields |
 | `mocap/` | Converted motion-capture strokes (3DTennisDS; Tennis-MoCap, CC BY-SA 3.0) and the conversion scripts |
 | `app.js` | UI controller: sliders, HUD, modes, playback |
 | `scene3d.js` | three.js court, player rigs and racket views |

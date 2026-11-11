@@ -56,21 +56,25 @@ const KNOB_OF = {
 const normDeg = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const W = 360;
-const H = 196;
-const C = { x: 168, y: 100 };
+// Compact (sidebar) and detailed (studio) canvases; the studio adds an inset on the right
+const GEOM = {
+  compact: { W: 360, H: 196, C: { x: 168, y: 100 } },
+  detail: { W: 540, H: 250, C: { x: 196, y: 125 } }
+};
 const DEG = Math.PI / 180;
 
 const T = {
   zh: {
     face: '拍面', swing: '挥拍轨迹', incoming: '来球', toss: '抛球', out: '出球', aim: '出球方向',
     net: '网', hitter: '击球者', left: '左', right: '右', top: '上旋', back: '下旋',
-    curveR: '侧旋 · 右曲', curveL: '侧旋 · 左曲'
+    curveR: '侧旋 · 右曲', curveL: '侧旋 · 左曲',
+    rel: '相对来球', normal: '法向', tangential: '切向', attack: '攻角'
   },
   en: {
     face: 'Face', swing: 'Swing path', incoming: 'Incoming', toss: 'Toss', out: 'Launch', aim: 'Launch direction',
     net: 'Net', hitter: 'Hitter', left: 'Left', right: 'Right', top: 'Topspin', back: 'Backspin',
-    curveR: 'Sidespin · curves right', curveL: 'Sidespin · curves left'
+    curveR: 'Sidespin · curves right', curveL: 'Sidespin · curves left',
+    rel: 'Ball vs racket', normal: 'Normal', tangential: 'Along strings', attack: 'Attack'
   }
 };
 
@@ -79,12 +83,22 @@ const signed = (v, d = 1) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(d)}`;
 const vec = (len, angDeg) => [len * Math.cos(angDeg * DEG), -len * Math.sin(angDeg * DEG)];
 
 export class RacketDiagram {
-  constructor(containerEl) {
+  /**
+   * @param {HTMLElement} containerEl
+   * @param {object} [opts]
+   * @param {boolean} [opts.detail] draw the full instrument: relative velocity split into
+   *   normal / tangential parts, attack angle, angle values and vector speeds
+   * @param {'side'|'top'} [opts.mode] initial view
+   */
+  constructor(containerEl, { detail = false, mode = 'side' } = {}) {
     this.el = containerEl;
-    this.mode = 'side';
+    this.detail = detail;
+    this.fine = false; // touch-friendly fine mode (Shift does the same with a mouse)
+    this.mode = mode;
+    this.geom = detail && mode === 'side' ? GEOM.detail : GEOM.compact;
     this.state = null;
     this.svg = document.createElementNS(SVG_NS, 'svg');
-    this.svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    this.svg.setAttribute('viewBox', `0 0 ${this.geom.W} ${this.geom.H}`);
     this.svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     this.svg.setAttribute('class', 'racket-diagram-svg');
     this.svg.setAttribute('role', 'img');
@@ -100,7 +114,32 @@ export class RacketDiagram {
     pt.x = e.clientX;
     pt.y = e.clientY;
     const p = pt.matrixTransform(this.svg.getScreenCTM().inverse());
+    const { C } = this.geom;
     return { theta: Math.atan2(-(p.y - C.y), p.x - C.x) / DEG, r: Math.hypot(p.x - C.x, p.y - C.y) };
+  }
+
+  /** Values a knob sets for a pointer at polar (theta, r). */
+  _valuesFromPolar(kind, theta, r) {
+    if (kind === 'face') return { updates: { faceAngleDeg: normDeg(theta - 90) }, source: 'racket' };
+    if (kind === 'aim') return { updates: { aimAngleDeg: normDeg(theta) }, source: 'racket' };
+    if (kind === 'swing') {
+      // the tail sits behind the contact point, opposite the travel direction
+      return { updates: { swingPathDeg: normDeg(theta - 180), racketSpeedKmh: speedOf('swing', r) }, source: 'racket' };
+    }
+    if (kind === 'incoming') {
+      return { updates: { incomingAngleDeg: -normDeg(theta), incomingSpeedKmh: speedOf('incoming', r) }, source: 'racket' };
+    }
+    if (kind === 'launch') {
+      return { updates: { launchAngleDeg: normDeg(theta), speedKmh: speedOf('launch', r) }, source: 'hud' };
+    }
+    return null;
+  }
+
+  _emit(updates, source) {
+    const clean = {};
+    for (const [k, v] of Object.entries(updates)) clean[k] = clampStep(k, v);
+    const changed = Object.entries(clean).some(([k, v]) => Math.abs((this.state[k] ?? 0) - v) > 1e-9);
+    if (changed && typeof this.onChange === 'function') this.onChange(clean, source);
   }
 
   _bindDials() {
@@ -108,7 +147,12 @@ export class RacketDiagram {
       const knob = e.target.closest('[data-dial]');
       if (!knob || !this.state) return;
       e.preventDefault();
-      this._drag = { key: knob.getAttribute('data-dial') };
+      const kind = knob.getAttribute('data-dial');
+      const { theta, r } = this._polarAt(e);
+      const base = this._valuesFromPolar(kind, theta, r);
+      const startVals = {};
+      for (const k of Object.keys(base.updates)) startVals[k] = this.state[k] ?? 0;
+      this._drag = { key: kind, base: base.updates, startVals };
       try {
         this.svg.setPointerCapture(e.pointerId);
       } catch (err) {
@@ -120,34 +164,17 @@ export class RacketDiagram {
     this.svg.addEventListener('pointermove', (e) => {
       if (!this._drag) return;
       const { theta, r } = this._polarAt(e);
-      const kind = this._drag.key;
-      let updates;
-      let source = 'racket';
-      if (kind === 'face') {
-        updates = { faceAngleDeg: clampStep('faceAngleDeg', normDeg(theta - 90)) };
-      } else if (kind === 'aim') {
-        updates = { aimAngleDeg: clampStep('aimAngleDeg', normDeg(theta)) };
-      } else if (kind === 'swing') {
-        // the tail sits behind the contact point, opposite the travel direction
-        updates = {
-          swingPathDeg: clampStep('swingPathDeg', normDeg(theta - 180)),
-          racketSpeedKmh: clampStep('racketSpeedKmh', speedOf('swing', r))
-        };
-      } else if (kind === 'incoming') {
-        updates = {
-          incomingAngleDeg: clampStep('incomingAngleDeg', -normDeg(theta)),
-          incomingSpeedKmh: clampStep('incomingSpeedKmh', speedOf('incoming', r))
-        };
-      } else if (kind === 'launch') {
-        updates = {
-          launchAngleDeg: clampStep('launchAngleDeg', normDeg(theta)),
-          speedKmh: clampStep('speedKmh', speedOf('launch', r))
-        };
-        source = 'hud';
+      const res = this._valuesFromPolar(this._drag.key, theta, r);
+      if (!res) return;
+      // Fine mode: a quarter of the pointer's movement, relative to where the drag started
+      if (e.shiftKey || this.fine) {
+        for (const k of Object.keys(res.updates)) {
+          let delta = res.updates[k] - this._drag.base[k];
+          if (k.endsWith('Deg')) delta = normDeg(delta);
+          res.updates[k] = this._drag.startVals[k] + delta * 0.25;
+        }
       }
-      if (!updates) return;
-      const changed = Object.entries(updates).some(([k, v]) => Math.abs((this.state[k] ?? 0) - v) > 1e-9);
-      if (changed && typeof this.onChange === 'function') this.onChange(updates, source);
+      this._emit(res.updates, res.source);
     });
     const end = () => {
       if (!this._drag) return;
@@ -158,6 +185,38 @@ export class RacketDiagram {
     this.svg.addEventListener('pointerup', end);
     this.svg.addEventListener('pointercancel', end);
     this.svg.addEventListener('lostpointercapture', end);
+
+    // Keyboard: Tab to a knob; Left/Right turn it, Up/Down change its speed (or the angle for
+    // face and aim); Shift moves 10 steps at a time.
+    this.svg.addEventListener('focusin', (e) => {
+      const knob = e.target.closest('[data-dial]');
+      this._focusKey = knob ? knob.getAttribute('data-dial') : null;
+    });
+    this.svg.addEventListener('focusout', () => {
+      if (!this._rendering) this._focusKey = null;
+    });
+    this.svg.addEventListener('keydown', (e) => {
+      const knob = e.target.closest('[data-dial]');
+      if (!knob || !this.state) return;
+      const kind = knob.getAttribute('data-dial');
+      const n = e.shiftKey ? 10 : 1;
+      const keyMap = {
+        face: { ArrowUp: ['faceAngleDeg', 1], ArrowDown: ['faceAngleDeg', -1], ArrowRight: ['faceAngleDeg', 1], ArrowLeft: ['faceAngleDeg', -1] },
+        aim: { ArrowUp: ['aimAngleDeg', 1], ArrowDown: ['aimAngleDeg', -1], ArrowLeft: ['aimAngleDeg', 1], ArrowRight: ['aimAngleDeg', -1] },
+        swing: { ArrowUp: ['racketSpeedKmh', 1], ArrowDown: ['racketSpeedKmh', -1], ArrowRight: ['swingPathDeg', 1], ArrowLeft: ['swingPathDeg', -1] },
+        incoming: { ArrowUp: ['incomingSpeedKmh', 1], ArrowDown: ['incomingSpeedKmh', -1], ArrowRight: ['incomingAngleDeg', 1], ArrowLeft: ['incomingAngleDeg', -1] },
+        launch: { ArrowUp: ['speedKmh', 1], ArrowDown: ['speedKmh', -1], ArrowRight: ['launchAngleDeg', 1], ArrowLeft: ['launchAngleDeg', -1] }
+      };
+      const hit = keyMap[kind] && keyMap[kind][e.key];
+      if (!hit) return;
+      e.preventDefault();
+      const [k, dir] = hit;
+      this._emit({ [k]: (this.state[k] ?? 0) + dir * n * DIALS[k].step }, kind === 'launch' ? 'hud' : 'racket');
+    });
+  }
+
+  setFine(on) {
+    this.fine = !!on;
   }
 
   setViewMode(mode) {
@@ -192,6 +251,7 @@ export class RacketDiagram {
 
   _render() {
     if (!this.state) return;
+    const { W, H, C } = this.geom;
     const s = this.state;
     const L = T[s.lang === 'en' ? 'en' : 'zh'];
     const parts = [];
@@ -234,11 +294,11 @@ export class RacketDiagram {
     const knob = (x, y, key, label, readout = '') => {
       const active = this._drag && this._drag.key === key;
       const flash = this._flashKey === key;
-      if (active && readout) {
+      if ((active || (this.detail && this._focusKey === key)) && readout) {
         const right = x < W / 2;
         parts.push(`<text x="${(x + (right ? 12 : -12)).toFixed(1)}" y="${(y - 10).toFixed(1)}" text-anchor="${right ? 'start' : 'end'}" class="rd-text rd-readout" font-size="11">${readout}</text>`);
       }
-      parts.push(`<g class="rd-knob${active ? ' active' : ''}${flash ? ' flash' : ''}" data-dial="${key}" role="slider" aria-label="${label}">`
+      parts.push(`<g class="rd-knob${active ? ' active' : ''}${flash ? ' flash' : ''}" data-dial="${key}" role="slider" tabindex="0" aria-label="${label}"${readout ? ` aria-valuetext="${readout}"` : ''}>`
         + `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="18" fill="transparent"/>`
         + `<rect x="${(x - 5).toFixed(1)}" y="${(y - 5).toFixed(1)}" width="10" height="10" rx="1" fill="${active ? 'var(--accent)' : 'var(--panel)'}" stroke="var(--ink)" stroke-width="1.25"/>`
         + `</g>`);
@@ -274,7 +334,7 @@ export class RacketDiagram {
       line(C.x, 12, C.x, H - 12, 'var(--edge)', 1, '3 3');
 
       // Direction labels
-      text(W - 14, H - 12, `${L.net} →`, 'var(--ink-3)', 'end');
+      text(W - (this.detail ? 160 : 14), H - 12, `${L.net} →`, 'var(--ink-3)', 'end');
       text(14, H - 12, `← ${L.hitter}`, 'var(--ink-3)', 'start');
 
       // Dial ranges (drawn first, under everything)
@@ -333,9 +393,61 @@ export class RacketDiagram {
       const spin = s.topspinRpm ?? 0;
       spinArc(spin, spin >= 0 ? L.top : L.back);
 
-      // Knobs (on top). Each arrow's knob sets its direction and its length (speed).
       const kmh = (v) => `${Math.round(v)} km/h`;
       const deg = (v) => `${signed(v)}°`;
+
+      if (this.detail) {
+        // String bed: crosses along the face
+        for (let k = -3; k <= 3; k++) {
+          const [px, py] = vec(k * 12, 90 + f);
+          const [nx, ny] = vec(4, f);
+          line(C.x + px - nx, C.y + py - ny, C.x + px + nx, C.y + py + ny, 'var(--ink-3)', 1);
+        }
+        // Inset: the ball's velocity relative to the racket, split along the face normal
+        // (becomes pace) and along the strings (becomes spin). r = -Vn·n + Vt·t.
+        if (!isToss) {
+          const Vr = vR / 3.6;
+          const Vb = vIn / 3.6;
+          const rx = -Vb * Math.cos(aIn * DEG) - Vr * Math.cos(sw * DEG);
+          const rz = Vb * Math.sin(aIn * DEG) - Vr * Math.sin(sw * DEG);
+          const n = [Math.cos(f * DEG), Math.sin(f * DEG)];
+          const t = [-Math.sin(f * DEG), Math.cos(f * DEG)];
+          const vn = -(rx * n[0] + rz * n[1]);
+          const vt = rx * t[0] + rz * t[1];
+          const attack = (Math.atan2(Math.abs(vt), Math.max(0.01, vn)) * 180) / Math.PI;
+
+          const ix = W - 150;
+          const iw = 140;
+          parts.push(`<rect x="${ix}" y="12" width="${iw}" height="${H - 24}" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>`);
+          text(ix + 10, 30, L.rel, 'var(--ink-2)', 'start', 10.5);
+          // mini contact: face through (ox, oy), relative velocity arriving from the net side
+          const ox = ix + 46;
+          const oy = 92;
+          const k = 1.25;
+          const [fx2, fy2] = vec(30, 90 + f);
+          line(ox - fx2, oy - fy2, ox + fx2, oy + fy2, 'var(--ink)', 4);
+          const sxi = ox - rx * k;
+          const syi = oy + rz * k;
+          const mxi = sxi - vn * n[0] * k;
+          const myi = syi + vn * n[1] * k;
+          arrow(sxi, syi, ox, oy, 'var(--ink-3)', 1.25, '2 2');
+          line(sxi, syi, mxi, myi, 'var(--accent)', 2);
+          line(mxi, myi, ox, oy, 'var(--accent)', 2, '2 2');
+          parts.push(`<circle cx="${ox}" cy="${oy}" r="5" fill="var(--ball)" stroke="var(--ink)" stroke-width="1"/>`);
+          const rows = [
+            [L.normal, `${vn.toFixed(1)} m/s`],
+            [L.tangential, `${Math.abs(vt).toFixed(1)} m/s`],
+            [L.attack, `${attack.toFixed(1)}°`]
+          ];
+          rows.forEach(([kName, v], i) => {
+            const y = H - 70 + i * 18;
+            text(ix + 10, y, kName, 'var(--ink-3)', 'start', 10);
+            text(ix + iw - 10, y, v, i < 2 ? 'var(--accent)' : 'var(--ink)', 'end', 10.5);
+          });
+        }
+      }
+
+      // Knobs (on top). Each arrow's knob sets its direction and its length (speed).
       knob(C.x + fx, C.y + fy, 'face', L.face, deg(f));
       knob(tailX, tailY, 'swing', L.swing, `${kmh(vR)} · ${deg(sw)}`);
       if (inTail) knob(inTail[0], inTail[1], 'incoming', L.incoming, `${kmh(vIn)} · ${deg(aIn)}`);
@@ -379,6 +491,10 @@ export class RacketDiagram {
         ? `Side view: face ${s.faceAngleDeg}°, swing ${s.swingPathDeg}°, launch ${s.launchAngleDeg?.toFixed?.(1)}°`
         : `Top view: aim ${s.aimAngleDeg}°`
     );
+    const hadFocus = this._focusKey && this.svg.contains(document.activeElement);
+    this._rendering = true;
     this.svg.innerHTML = parts.join('');
+    if (hadFocus) this.svg.querySelector(`[data-dial="${this._focusKey}"]`)?.focus({ preventScroll: true });
+    this._rendering = false;
   }
 }

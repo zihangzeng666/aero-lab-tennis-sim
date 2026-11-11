@@ -15,7 +15,7 @@ import {
   airDensityFromConditions,
   chainRallyTurns,
   handoffFromPoint
-} from './physics.js?v=54';
+} from './physics.js?v=59';
 import {
   SHOT_PRESETS,
   INCOMING_PRESETS,
@@ -23,11 +23,12 @@ import {
   TACTICAL_LESSONS,
   evaluateTacticalAttempt,
   describeTacticalGoal
-} from './presets.js?v=54';
-import { TennisScene3D } from './scene3d.js?v=54';
-import { RacketDiagram } from './racketDiagram.js?v=54';
-import { LessonMap } from './lessonMap.js?v=54';
-import { TacticsBoard } from './tacticsBoard.js?v=54';
+} from './presets.js?v=59';
+import { TennisScene3D } from './scene3d.js?v=59';
+import { RacketDiagram } from './racketDiagram.js?v=59';
+import { LessonMap } from './lessonMap.js?v=59';
+import { TacticsBoard } from './tacticsBoard.js?v=59';
+import { ImpactStudio } from './impactStudio.js?v=59';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;
@@ -170,6 +171,7 @@ const I18N = {
     btnShortChallenge: '自己打',
     btnTacticReset: '重来',
     viewBoard: '平面图',
+    viewStudio: '击球台',
     btnTacticAnswer: '看答案',
     tacticalHowTo: '用挥拍滑块或示意图里的旋钮调这一拍；长按 3D 里的球员可以换站位。',
     tacDecisive: '关键拍',
@@ -320,6 +322,7 @@ const I18N = {
     btnShortChallenge: 'Your turn',
     btnTacticReset: 'Reset',
     viewBoard: 'Court map',
+    viewStudio: 'Impact studio',
     btnTacticAnswer: 'Show answer',
     tacticalHowTo: 'Tune this shot with the swing sliders or the dials in the diagram. Long-press the player in 3D to move them.',
     tacDecisive: 'Key shot',
@@ -458,6 +461,14 @@ class TennisSimApp {
       // Dragging a dial in the diagram behaves exactly like moving the matching slider
       // Diagram knobs: { key: value } updates; 'hud' = a launch target to back-solve
       this.racket3d.onChange = (updates, source = 'racket') => {
+        Object.assign(this.state, updates);
+        this.recomputeSimulation({ source });
+      };
+    }
+    const studioEl = document.getElementById('impactStudio');
+    if (studioEl) {
+      this.studio = new ImpactStudio(studioEl);
+      this.studio.onChange = (updates, source = 'racket') => {
         Object.assign(this.state, updates);
         this.recomputeSimulation({ source });
       };
@@ -1047,6 +1058,7 @@ class TennisSimApp {
     row?.classList.remove('flash-target');
     void row?.offsetWidth;
     row?.classList.add('flash-target');
+    if (this.courtView === 'studio') this.studio?.flash(controlId);
     const view = this.racket3d?.flashDial?.(controlId);
     if (view) {
       const details = document.getElementById('racketVizDetails');
@@ -1253,18 +1265,16 @@ class TennisSimApp {
    */
   setAppMode(mode = 'solo') {
     this.appMode = mode;
-    const viewSwitch = document.getElementById('viewSwitch');
-    if (viewSwitch) viewSwitch.hidden = mode === 'solo';
+    const boardBtn = document.querySelector('#viewSwitch [data-view="board"]');
+    if (boardBtn) boardBtn.hidden = mode === 'solo';
     if (mode === 'solo' && this.boardView) this.setCourtView('3d');
-    if (mode === 'tactics' && !this._courtViewChosen) {
-      this._courtViewChosen = true;
-      this.boardView = true;
-      const boardEl = document.getElementById('tacticsBoard');
-      if (boardEl) boardEl.hidden = false;
-      window.addEventListener('resize', () => this._renderBoard());
-    document.querySelectorAll('#viewSwitch [data-view]').forEach((b) =>
-        b.classList.toggle('active', b.getAttribute('data-view') === 'board')
-      );
+    // First visit to a mode, unless the user has picked a view: open the view built for it
+    this._viewDefaults = this._viewDefaults || {};
+    if (!this._viewDefaults[mode] && !this._courtViewChosen) {
+      this._viewDefaults[mode] = true;
+      const wide = typeof matchMedia === 'function' && matchMedia('(min-width: 900px)').matches;
+      if (mode === 'tactics') this._pendingView = 'board';
+      else if (mode === 'solo' && wide) this._pendingView = 'studio';
     }
 
     // Sync top-level mode buttons
@@ -1356,6 +1366,7 @@ class TennisSimApp {
       );
       this.loadTacticalLesson(this._lessonKey(), this.tacticalMode || 'demo');
     }
+    this._applyPendingView();
   }
 
   /**
@@ -1993,6 +2004,7 @@ class TennisSimApp {
       this.updateScrubberFrame();
     });
 
+    window.addEventListener('resize', () => this._renderBoard());
     document.querySelectorAll('#viewSwitch [data-view]').forEach((b) =>
       b.addEventListener('click', () => {
         this._courtViewChosen = true;
@@ -2314,15 +2326,32 @@ class TennisSimApp {
     paintAllRanges();
   }
 
-  /** Shows the 3D court or the top-down tactics board (rally and tactics modes only). */
+  /**
+   * What fills the court area: '3d', 'studio' (impact studio, the main control surface)
+   * or 'board' (top-down rally map, rally and tactics modes only).
+   */
   setCourtView(view) {
-    this.boardView = view === 'board' && this.appMode !== 'solo';
+    if (view === 'board' && this.appMode === 'solo') view = '3d';
+    this.courtView = view === 'studio' || view === 'board' ? view : '3d';
+    this.boardView = this.courtView === 'board';
     const boardEl = document.getElementById('tacticsBoard');
     if (boardEl) boardEl.hidden = !this.boardView;
+    const studioEl = document.getElementById('impactStudio');
+    if (studioEl) studioEl.hidden = this.courtView !== 'studio';
+    document.body.classList.toggle('view-studio', this.courtView === 'studio');
     document.querySelectorAll('#viewSwitch [data-view]').forEach((b) =>
-      b.classList.toggle('active', b.getAttribute('data-view') === (this.boardView ? 'board' : '3d'))
+      b.classList.toggle('active', b.getAttribute('data-view') === this.courtView)
     );
     this._renderBoard();
+    this._updateRacketImpact3D();
+  }
+
+  /** Applies a mode's default court view (first visit to the mode only). */
+  _applyPendingView() {
+    if (!this._pendingView) return;
+    const v = this._pendingView;
+    this._pendingView = null;
+    this.setCourtView(v);
   }
 
   _renderBoard() {
@@ -2806,6 +2835,9 @@ class TennisSimApp {
   _updateRacketImpact3D() {
     if (this.racket3d) {
       this.racket3d.updateFromState({ ...this.state, lang: this.lang });
+    }
+    if (this.studio && this.courtView === 'studio' && this.simResult) {
+      this.studio.update({ state: this.state, sim: this.simResult, ghost: this.ghostSimResult, lang: this.lang });
     }
 
     const { swingPathDeg, faceAngleDeg, aimAngleDeg } = this.state;

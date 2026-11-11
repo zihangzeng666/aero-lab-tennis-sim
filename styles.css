@@ -454,6 +454,7 @@ input[type="range"]::-moz-range-thumb {
 .rd-knob { cursor: grab; touch-action: none; }      /* knobs own the drag; the sheet still scrolls elsewhere */
 .racket-diagram.dialing, .racket-diagram.dialing .rd-knob { cursor: grabbing; }
 .rd-knob:focus { outline: none; }
+.rd-knob:focus-visible rect { stroke: var(--accent); stroke-width: 2.5; }
 .racket-metrics-bar { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--edge); border-top: none; }
 .rm-cell { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 0; border-left: 1px solid var(--rule-soft); }
 .rm-cell:first-child { border-left: none; }
@@ -749,6 +750,99 @@ input[type="range"]::-moz-range-thumb {
 .slider-group.flash-target { animation: flash-target 1.6s var(--ease); }
 .rd-knob.flash rect { stroke: var(--accent); stroke-width: 2.5; }
 @media (prefers-reduced-motion: reduce) { .slider-group.flash-target { animation-duration: 0.01s; } }
+
+/* =========================================================================
+   Impact studio (the contact as the main control surface)
+   ========================================================================= */
+.impact-studio {
+  position: absolute; inset: 0; z-index: 5; background: var(--canvas); color: var(--ink);
+  display: grid; grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas: "head head" "main aside" "fields fields";
+  padding-top: 52px;
+}
+.impact-studio[hidden] { display: none; }
+body.view-studio #racketVizDetails { display: none; } /* one diagram at a time */
+
+.is-head { grid-area: head; display: flex; align-items: center; gap: 16px; padding: 0 16px 8px; }
+.is-title { font-size: 15px; font-weight: 600; letter-spacing: -0.005em; white-space: nowrap; }
+.is-hint { flex: 1 1 auto; min-width: 0; max-width: 75ch; font-size: 12.5px; line-height: 1.5; color: var(--ink-3); }
+.is-fine {
+  flex: none; height: 32px; padding: 0 12px; font-size: 13px; color: var(--ink-2);
+  background: var(--panel); border: 1px solid var(--edge); border-radius: var(--r-ctl);
+  transition: background-color 120ms var(--ease), transform 80ms var(--ease);
+}
+.is-fine[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.is-fine:active { transform: scale(0.97); }
+.is-fine:focus-visible, .is-input:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.is-main { grid-area: main; min-height: 0; position: relative; overflow: hidden; }
+/* out of flow: the diagram fills whatever the fields leave, it never pushes them out */
+.is-side { position: absolute; inset: 4px 16px 8px; width: auto; height: auto; }
+.is-big .rd-text { font-size: 10px; }
+
+.is-aside {
+  grid-area: aside; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 16px; padding: 12px 16px;
+  background: var(--panel); border-left: 1px solid var(--rule);
+}
+.is-panel { margin: 0; }
+.is-cap { font-size: 12px; color: var(--ink-3); margin-bottom: 6px; }
+.is-top { height: auto; aspect-ratio: 360 / 196; border: 1px solid var(--rule); background: var(--panel-2); }
+.is-profile { border: 1px solid var(--rule); background: var(--panel-2); }
+.fp-svg { display: block; width: 100%; height: auto; aspect-ratio: 28 / 12; }
+.fp-ground { stroke: var(--edge); stroke-width: 0.08; }
+.fp-tick { stroke: var(--edge); stroke-width: 0.06; }
+.fp-net { stroke: var(--ink-2); stroke-width: 0.18; }
+.fp-path { fill: none; stroke: var(--traj-pre); stroke-width: 0.14; stroke-linejoin: round; stroke-linecap: round; }
+.fp-ghost { fill: none; stroke: var(--traj-ghost); stroke-width: 0.08; stroke-dasharray: 0.3 0.25; }
+.fp-bounce { fill: var(--ball); stroke: var(--ink); stroke-width: 0.06; }
+.fp-bounce.is-out { fill: var(--out); }
+.fp-label { font-family: var(--font-mono); font-size: 0.75px; fill: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+.is-fields {
+  grid-area: fields; display: grid; grid-template-columns: 4fr 3fr 3fr;
+  background: var(--panel); border-top: 1px solid var(--rule);
+}
+.is-group { border: none; margin: 0; padding: 8px 12px 10px; min-width: 0; }
+.is-row { clear: both; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
+.is-group + .is-group { border-left: 1px solid var(--rule-soft); }
+.is-group legend { float: left; width: 100%; padding: 0; margin-bottom: 6px; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.is-group-out legend { color: var(--accent); }
+.is-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 2px; border-radius: var(--r-ctl); }
+.is-flabel { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.is-input {
+  display: flex; align-items: center; gap: 4px; height: 32px; padding: 0 8px;
+  background: var(--canvas); border: 1px solid var(--edge); border-radius: var(--r-ctl);
+}
+.is-input input {
+  flex: 1 1 auto; min-width: 0; width: 100%; border: 0; background: transparent; color: var(--ink);
+  font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; outline: none;
+  -moz-appearance: textfield; appearance: textfield;
+}
+.is-input input::-webkit-inner-spin-button, .is-input input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.is-unit { flex: none; font-size: 11px; color: var(--ink-3); }
+.is-field.flash-target { animation: flash-target 1.6s var(--ease); }
+
+@media (max-width: 1100px) {
+  .impact-studio { grid-template-columns: minmax(0, 1fr) 240px; }
+  .is-fields { grid-template-columns: 1fr; }
+  .is-group + .is-group { border-left: none; border-top: 1px solid var(--rule-soft); }
+  .impact-studio { overflow-y: auto; grid-template-rows: auto minmax(320px, 1fr) auto; }
+}
+@media (max-width: 767px) {
+  .impact-studio { display: block; overflow-y: auto; overscroll-behavior: contain; padding-top: 52px; }
+  .is-head { flex-wrap: wrap; gap: 8px 12px; }
+  .is-hint { order: 3; flex-basis: 100%; }
+  .is-fine { height: 44px; margin-left: auto; }
+  .is-main { padding: 0 8px 8px; overflow: visible; }
+  .is-side { position: static; height: auto; aspect-ratio: 540 / 250; }
+  .is-row { grid-auto-flow: row; grid-template-columns: 1fr 1fr; }
+  .is-aside { border-left: none; border-top: 1px solid var(--rule); overflow: visible; }
+  .is-fields { grid-template-columns: 1fr; }
+  .is-input { height: 44px; }
+  .is-input input { font-size: 16px; } /* 16px stops iOS zooming into the field */
+}
 
 /* =========================================================================
    Tactics board (top-down rally map over the 3D viewport)
