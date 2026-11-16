@@ -1,0 +1,10 @@
+# Repo-only files. Do not exclude anything the static site serves:
+# lab/mocap/*.json, lab/vendor/, assets/, or the HTML/JS/CSS.
+tests/
+.github/
+package.json
+README.md
+.gitignore
+.nojekyll
+*.py
+**/__pycache__/
