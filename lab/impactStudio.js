@@ -10,8 +10,8 @@
  * contract as the small diagram: 'racket' for inputs, 'hud' for a launch target that the
  * app back-solves into a swing.
  */
-import { RacketDiagram } from './racketDiagram.js?v=60';
-import { LessonMap } from './lessonMap.js?v=60';
+import { RacketDiagram } from './racketDiagram.js?v=61';
+import { LessonMap } from './lessonMap.js?v=61';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -33,6 +33,8 @@ const T = {
     title: '击球台',
     hint: '拖动箭头：方向是角度，长度是速度。按住 Shift 或打开精调，拖动只走四分之一。',
     fine: '精调',
+    contact3d: '3D 触球调整',
+    contact3dAria: '在 3D 触球瞬间调整拍面、旋转和挥速',
     swing: '挥拍', in: '来球', out: '出球（改这里会反解挥拍）',
     profile: '飞行剖面', map: '落点', top: '方向（俯视）',
     clear: '过网', apex: '最高', land: '落点', out_: '出界', net_: '下网', ghost: '无旋对比'
@@ -41,6 +43,8 @@ const T = {
     title: 'Impact studio',
     hint: 'Drag an arrow: direction is the angle, length is the speed. Hold Shift or turn on Fine for quarter-speed drags.',
     fine: 'Fine',
+    contact3d: 'Adjust at contact · 3D',
+    contact3dAria: 'Adjust face, spin and swing speed in 3D at contact',
     swing: 'Swing', in: 'Incoming ball', out: 'Launch (editing back-solves the swing)',
     profile: 'Flight profile', map: 'Landing', top: 'Direction (from above)',
     clear: 'Net', apex: 'Apex', land: 'Lands', out_: 'Out', net_: 'Net', ghost: 'No-spin ghost'
@@ -100,12 +104,14 @@ export class ImpactStudio {
   constructor(container) {
     this.el = container;
     this.onChange = null;
+    this.onOpenContact = null; // () => void: open the 3D contact close-up
     this.lang = 'zh';
     this.el.innerHTML = `
       <header class="is-head">
         <h3 class="is-title"></h3>
         <p class="is-hint"></p>
         <button type="button" class="is-fine" aria-pressed="false"></button>
+        <button type="button" class="is-contact"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6l5.6 3.2v6.4L8 14.4l-5.6-3.2V4.8z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M2.4 4.8L8 8l5.6-3.2M8 8v6.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><span></span></button>
       </header>
       <div class="is-main"><div class="is-side racket-diagram is-big"></div></div>
       <aside class="is-aside">
@@ -122,6 +128,10 @@ export class ImpactStudio {
     this.top.onChange = relay;
     this.profile = new FlightProfile(this.el.querySelector('.is-profile'));
     this.map = new LessonMap(this.el.querySelector('.is-map'));
+
+    this.side.setTapAction(() => this.onOpenContact?.());
+    this.contactBtn = this.el.querySelector('.is-contact');
+    this.contactBtn.addEventListener('click', () => this.onOpenContact?.());
 
     this.fineBtn = this.el.querySelector('.is-fine');
     this.fineBtn.addEventListener('click', () => {
@@ -180,6 +190,9 @@ export class ImpactStudio {
     this.el.querySelector('.is-title').textContent = L.title;
     this.el.querySelector('.is-hint').textContent = L.hint;
     this.fineBtn.textContent = L.fine;
+    this.contactBtn.querySelector('span').textContent = L.contact3d;
+    this.contactBtn.setAttribute('aria-label', L.contact3dAria);
+    this.contactBtn.title = L.contact3dAria;
     this.el.querySelectorAll('[data-cap]').forEach((n) => (n.textContent = L[n.getAttribute('data-cap')]));
     this.el.querySelectorAll('legend[data-group]').forEach((n) => (n.textContent = L[n.dataset.group]));
     for (const { f } of Object.values(this.inputs || {})) {
