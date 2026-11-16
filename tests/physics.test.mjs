@@ -16,8 +16,8 @@ import {
   chainRallyTurns,
   computeCourtBounce,
   handoffFromPoint
-} from '../physics.js';
-import { SHOT_PRESETS, EXAMPLE_RALLIES, TACTICAL_LESSONS, evaluateTacticalAttempt } from '../presets.js';
+} from '../lab/physics.js';
+import { SHOT_PRESETS, EXAMPLE_RALLIES, TACTICAL_LESSONS, evaluateTacticalAttempt } from '../lab/presets.js';
 
 const R = ITF_COURT.ballRadius;
 const g = 9.80665;
@@ -265,8 +265,8 @@ test('every surface passes the ITF drop test (254 cm drop -> 135–147 cm reboun
 test('motion-capture clips are well formed', async () => {
   const { readFile } = await import('node:fs/promises');
   const read = async (f) => JSON.parse(await readFile(new URL(f, import.meta.url), 'utf8'));
-  const c3d = await read('../mocap/strokes.json');
-  const bvh = await read('../mocap/strokes_bvh.json');
+  const c3d = await read('../lab/mocap/strokes.json');
+  const bvh = await read('../lab/mocap/strokes_bvh.json');
   assert.ok(c3d.source.includes('tennisdb.cs.pollub.pl'));
   assert.ok(bvh.license.includes('CC BY-SA 3.0') && bvh.citation.includes('10.1007/978-3-319-52277-7_38'));
   const data = { clips: [...c3d.clips, ...bvh.clips] };
@@ -283,4 +283,138 @@ test('motion-capture clips are well formed', async () => {
     assert.ok(Math.abs(Math.hypot(...q) - 1) < 1e-3, `${c.id}: unit quaternion`);
     assert.ok(c.headSpeed > 15 && c.headSpeed < 35, `${c.id}: racket head speed ${c.headSpeed}`);
   }
+});
+
+/* ------------------------------------------------------------------------- */
+/* Coaching presets: incoming balls flown with the physics                    */
+/* ------------------------------------------------------------------------- */
+import { resolveIncomingBall, solveFaceAngleForDepth, describeShotOutcome } from '../lab/physics.js';
+import { INCOMING_PRESETS } from '../lab/presets.js';
+import { buildCoachFeedback, incomingSpinLaunchEffect } from '../lab/coachFeedback.js';
+
+const COACH_BALLS = Object.keys(INCOMING_PRESETS).filter((k) => !INCOMING_PRESETS[k].manual);
+const ball = (k, surfaceKey = 'hard') => resolveIncomingBall(INCOMING_PRESETS[k], { surfaceKey });
+const stockSwing = (k, r) => ({
+  racketSpeedKmh: 100, swingPathDeg: 25, faceAngleDeg: -4, stringTensionKg: 23, sidespinRpm: 0,
+  courtMode: 'singles', aimAngleDeg: INCOMING_PRESETS[k].hitterAimDeg,
+  hitX: r.hitX, hitY: r.hitY, hitZ: r.hitZ,
+  incomingSpeedKmh: r.incomingSpeedKmh, incomingAngleDeg: r.incomingAngleDeg, incomingSpinRpm: r.incomingSpinRpm
+});
+
+test('the eight coaching balls exist and every one bounces in on every surface at a playable contact', () => {
+  for (const k of ['fast_flat', 'heavy_topspin', 'low_slice', 'moonball', 'short_ball', 'kick_serve', 'flat_serve', 'deep_backhand']) {
+    assert.ok(COACH_BALLS.includes(k), k);
+  }
+  for (const surf of ['hard', 'clay', 'grass']) {
+    for (const k of COACH_BALLS) {
+      const r = ball(k, surf);
+      assert.ok(r, `${k} on ${surf} does not bounce in`);
+      assert.ok(r.contactHeightM > 0.3 && r.contactHeightM < 2.2, `${k} contact ${r.contactHeightM}`);
+      assert.ok(r.hitX > -15 && r.hitX < -5, `${k} hitX ${r.hitX}`);
+      assert.ok(Math.abs(r.hitY) < 5.2, `${k} hitY ${r.hitY}`);
+      // the incoming path ends exactly where the hitter meets the ball
+      const last = r.path[r.path.length - 1];
+      assert.ok(Math.abs(last.t) < 1e-9 && Math.abs(last.z - r.hitZ) < 0.01, k);
+    }
+  }
+});
+
+test('heavy topspin bounces higher than slice; slice stays low; the moonball is highest', () => {
+  const top = ball('heavy_topspin');
+  const slice = ball('low_slice');
+  const flat = ball('fast_flat');
+  const moon = ball('moonball');
+  assert.ok(top.bouncePeakM > slice.bouncePeakM + 0.5, `${top.bouncePeakM} vs ${slice.bouncePeakM}`);
+  assert.ok(top.contactHeightM > 1.1, `topspin met at ${top.contactHeightM}`);
+  assert.ok(slice.bouncePeakM < 0.6 && slice.contactHeightM < 0.6, `slice ${slice.bouncePeakM}`);
+  for (const k of COACH_BALLS) if (k !== 'low_slice') assert.ok(slice.bouncePeakM < ball(k).bouncePeakM, k);
+  assert.ok(flat.bouncePeakM < top.bouncePeakM, 'flat drive stays lower than topspin');
+  assert.ok(moon.bouncePeakM > 1.8 && COACH_BALLS.every((k) => ball(k).bouncePeakM <= moon.bouncePeakM));
+  // slice: the opponent's ball has backspin and the least topspin when it reaches the hitter
+  assert.ok(INCOMING_PRESETS.low_slice.opponent.topspinRpm < 0);
+  assert.ok(COACH_BALLS.every((k) => k === 'low_slice' || ball(k).incomingSpinRpm > slice.incomingSpinRpm));
+});
+
+test('serves are fast and land in the service box; the flat serve is the fastest ball to meet', () => {
+  for (const k of ['kick_serve', 'flat_serve']) {
+    const p = INCOMING_PRESETS[k];
+    const sim = simulateTrajectory({ side: 'A', sidespinRpm: 0, ...p.opponent });
+    assert.ok(sim.firstBounce.isIn && sim.firstBounce.localX < ITF_COURT.serviceLineDist, `${k} lands ${sim.firstBounce.localX}`);
+    const r = ball(k);
+    assert.ok(r.opponentSpeedKmh >= 150 && r.bounceSpeedKmh > 90, `${k} ${r.bounceSpeedKmh}`);
+  }
+  const flatServe = ball('flat_serve');
+  for (const k of COACH_BALLS) if (k !== 'flat_serve') assert.ok(flatServe.contactSpeedKmh > ball(k).contactSpeedKmh, k);
+  assert.ok(ball('kick_serve').bouncePeakM > flatServe.bouncePeakM, 'kick jumps higher than the flat serve');
+  assert.ok(flatServe.flightTime < ball('fast_flat').flightTime, 'less time to react on the serve');
+});
+
+test('short ball is met inside the court; the deep backhand ball is deep and on the backhand side', () => {
+  const short = ball('short_ball');
+  assert.ok(short.bounceInsideM > ITF_COURT.halfLength - ITF_COURT.serviceLineDist - 1.5, `short lands ${short.bounceInsideM} m inside`);
+  assert.ok(short.hitX > -8, `short met at ${short.hitX}`);
+  const bh = ball('deep_backhand');
+  assert.ok(bh.hitY > 0.8, 'right-hander backhand side is +y');
+  assert.ok(bh.bounceInsideM < 2.0, `lands ${bh.bounceInsideM} m from the baseline`);
+  assert.equal(INCOMING_PRESETS.deep_backhand.strokeType, 'bh2');
+  const flat = ball('fast_flat');
+  assert.ok(flat.netClearanceM < 0.5 && flat.bounceSpeedKmh > ball('heavy_topspin').bounceSpeedKmh);
+});
+
+test('suggested face angle lands every ball 1.5 m inside the baseline, and slice needs a more open face than topspin', () => {
+  const faces = {};
+  for (const k of COACH_BALLS) {
+    const st = stockSwing(k, ball(k));
+    const sug = solveFaceAngleForDepth(st);
+    assert.ok(sug.reachable, k);
+    const o = describeShotOutcome(sug.sim);
+    assert.equal(o.verdict, 'IN', k);
+    assert.ok(Math.abs(o.depthM - 1.5) < 0.2, `${k} depth ${o.depthM}`);
+    faces[k] = sug.faceAngleDeg;
+  }
+  assert.ok(faces.low_slice > faces.heavy_topspin + 5, JSON.stringify(faces));
+});
+
+test('face angle drives the verdict: too closed goes in the net, too open goes long', () => {
+  const st = stockSwing('fast_flat', ball('fast_flat'));
+  const shoot = (face) => {
+    const imp = computeRacketBallImpact({ ...st, faceAngleDeg: face });
+    return simulateTrajectory({ ...st, speedKmh: imp.launchSpeedKmh, launchAngleDeg: imp.launchAngleDeg, topspinRpm: imp.topspinRpm });
+  };
+  assert.equal(describeShotOutcome(shoot(-18)).verdict, 'NET');
+  assert.equal(describeShotOutcome(shoot(12)).verdict, 'LONG');
+});
+
+test('coach feedback is tied to the simulated result', () => {
+  const r = ball('heavy_topspin');
+  const st = stockSwing('heavy_topspin', r);
+  const run = (face) => {
+    const s2 = { ...st, faceAngleDeg: face };
+    const impact = computeRacketBallImpact(s2);
+    const sim = simulateTrajectory({ ...s2, speedKmh: impact.launchSpeedKmh, launchAngleDeg: impact.launchAngleDeg, topspinRpm: impact.topspinRpm });
+    return buildCoachFeedback({ state: s2, impact, sim, suggestion: solveFaceAngleForDepth(s2), lang: 'en' });
+  };
+  // the claim behind "open face vs topspin = the ball climbs": incoming topspin raises the launch angle
+  assert.ok(incomingSpinLaunchEffect(st) > 1);
+  const long = run(6);
+  assert.equal(long.outcome.verdict, 'LONG');
+  assert.match(long.lines[0].text, /too open/);
+  assert.match(long.lines.find((l) => l.kind === 'fix').text, /^Close the face/);
+  assert.match(long.lines.find((l) => l.kind === 'incoming').text, /Open face vs topspin/);
+  const net = run(-18);
+  assert.equal(net.outcome.verdict, 'NET');
+  assert.match(net.lines[0].text, /Too closed/);
+  assert.match(net.lines.find((l) => l.kind === 'fix').text, /^Open the face/);
+  const zh = buildCoachFeedback({ ...{ state: st }, impact: computeRacketBallImpact(st), sim: simulateTrajectory({ ...st }), lang: 'zh' });
+  assert.ok(zh.lines.length > 0);
+});
+
+test('heavy topspin and kick serve use realistic inputs and reach the heights their captions state', () => {
+  const top = INCOMING_PRESETS.heavy_topspin.opponent;
+  assert.ok(top.speedKmh >= 110 && top.speedKmh <= 130 && top.topspinRpm >= 3000 && top.topspinRpm <= 3800);
+  const t = ball('heavy_topspin');
+  assert.ok(t.netClearanceM >= 1.0 && t.netClearanceM <= 1.8, `net ${t.netClearanceM}`);
+  assert.ok(t.bouncePeakM >= 1.3, `topspin peak ${t.bouncePeakM}`); // "about chest height"
+  const k = ball('kick_serve');
+  assert.ok(k.bouncePeakM >= 1.4, `kick peak ${k.bouncePeakM}`); // "about shoulder height"
 });

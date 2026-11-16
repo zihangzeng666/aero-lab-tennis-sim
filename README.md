@@ -1,20 +1,54 @@
-# AERO-LAB · Tennis Ball-Flight Teaching Simulator
+# Rackets Lab · Tennis Ball-Flight Teaching Simulator
 
-An interactive 3D simulator for tennis ball flight. Change the swing and the incoming ball and watch launch speed, spin, net clearance and the landing point respond.
+An interactive 3D simulator for tennis coaches. Pick the ball coming at your player, tilt the racket face, change the swing path, and watch net clearance, depth, spin and the landing point respond.
 
-**Live:** https://zihangzeng666.github.io/aero-lab-tennis-sim/ · **Validation:** [validation.html](https://zihangzeng666.github.io/aero-lab-tennis-sim/validation.html)
+**Live:** https://zihangzeng666.github.io/aero-lab-tennis-sim/ · **Validation:** [lab/validation.html](https://zihangzeng666.github.io/aero-lab-tennis-sim/lab/validation.html)
+
+The site root (`index.html`) is a landing page; the simulator lives in [`lab/`](lab/). The old `/validation.html` address redirects to `lab/validation.html`.
 
 > This is a **teaching simulator**, not a tracking system. Player presets and rallies are hand-tuned examples that imitate a playing style. They are not measured data and have no connection to Hawk-Eye, the ATP or the ITF.
 
 ## What it does
 
+- **Coach view** (opens first): the lesson flow for a phone or tablet at the court.
+  1. Pick the **incoming ball**: flat fast drive, heavy topspin high bouncer, low skidding slice, moonball, short ball, kick serve return, flat serve return, deep ball to the backhand. Each chip's thumbnail is that ball's simulated flight.
+  2. Turn the **racket-face dial** (closed ↔ open; the dial is geared 0.4° per degree of finger turn so a single degree is easy to hit; arrow keys work too) and set the **swing path** (high-to-low ↔ low-to-high) and **swing speed**. The path redraws while you drag (one recompute per frame).
+  3. Read the **result**: In / Long / Wide / Net, net clearance, depth from the baseline, spin and speed, and **coaching lines** built from the simulation (see below). The previous path stays as a dashed ghost in 3D and in the to-scale side view; **Pin** keeps one path for comparison. **Suggest face** keeps the swing and finds the face angle that lands the ball 1.5 m inside the baseline (bisection on the forward model). The swing is kept when you switch balls on purpose: the same swing against a different ball is the lesson.
 - **Solo lab**: forehand, two- and one-handed backhand and serve. The racket–ball impact splits launch speed into the swing's own contribution and the pace "borrowed" from the incoming ball.
 - **Hit it from here** (solo lab): pause at any instant after the ball crosses the net and hand the ball to the player at the other end. Its position, velocity and topspin at that instant become their contact point and incoming ball; the camera follows to that end and the previous player fades out. "Previous shot" goes back.
 - **Rally mode**: two players take turns. The ball's state where the next player meets it becomes their incoming ball; a turn can volley it before the bounce or step in and take it inside the court.
 - **Tactics mode**: nine lessons grouped by game situation (serving, returning, baseline, net, defence, transition): serve + 1, serve and volley, the deep return, cross-court then down the line (Wardlaw directionals), topspin to the backhand, the run-around forehand, approach and volley, high deep defence, and the drop shot. Some are inspired by well-known points; none are reconstructions. Every shot in a lesson was tuned against the physics, so each ball lands where its explanation says.
 - **Court map** (rally and tactics): the rally drawn from above, shot by shot. For the selected shot it shows the opponent's widest replies, their bisector and your recovery spot on it (Cochet's angle rule), how far the opponent has to run and how much time they have, the lesson's target, and the common mistake as a ghost path. Opponent movement assumes a 4 m/s recovery speed.
-- **Impact studio** (击球台, the main control surface; opens first in the solo lab on desktop): a large side view of the contact where every arrow is a draggable vector (direction = angle, length = speed) for the swing, the incoming ball and the launch (back-solved), plus the face angle; an inset splits the ball's velocity relative to the racket into the normal part (pace) and the part along the strings (spin) with the attack angle; a top view for direction, a to-scale flight profile and a landing map; and exact number fields for every input and for the launch target. Shift or the Fine toggle gives quarter-speed drags; knobs work from the keyboard (arrows, Shift for ×10).
+- **Impact studio** (击球台; opens first in the solo lab on desktop): a large side view of the contact where every arrow is a draggable vector (direction = angle, length = speed) for the swing, the incoming ball and the launch (back-solved), plus the face angle; an inset splits the ball's velocity relative to the racket into the normal part (pace) and the part along the strings (spin) with the attack angle; a top view for direction, a to-scale flight profile and a landing map; and exact number fields for every input and for the launch target. Shift or the Fine toggle gives quarter-speed drags; knobs work from the keyboard (arrows, Shift for ×10).
 - **Inverse solver**: drag the launch speed, angle or spin on the HUD and the racket speed, swing path and face angle are back-solved (damped Newton on a 3×3 Jacobian).
+
+## Incoming-ball presets (coach view)
+
+Each preset in `INCOMING_PRESETS` ([lab/presets.js](lab/presets.js)) is an **opponent's shot**, not a hand-typed incoming ball. `resolveIncomingBall()` ([lab/physics.js](lab/physics.js)) flies it with the same model as everything else, then the hitter meets it at the top of its bounce, or at the preset's `maxDepth` on the way up if the top is further back (a coaching choice, listed as `MODEL_ASSUMPTIONS.incomingBallContact`). Speed, angle and spin at that point become the incoming ball, exactly like a rally hand-off. Launch angles were tuned (bisection) so each shot lands where that kind of ball usually lands; nothing in `MODEL_ASSUMPTIONS` was changed to make them look better.
+
+Hard court, 20 °C, sea level:
+
+| Ball | Opponent hits | Lands (from hitter's baseline) | Bounce speed / peak | Met at | Speed at contact |
+|---|---|---|---|---|---|
+| Flat fast drive | 140 km/h, 5.3°, 1200 rpm | 2.3 m inside | 87 km/h / 0.65 m | 0.60 m | 55 km/h |
+| Heavy topspin | 110 km/h, 16.0°, 3800 rpm (1.74 m over the net) | 0.6 m inside | 59 km/h / 1.32 m | 1.16 m, 2.9 m behind the baseline | 42 km/h |
+| Low slice | 100 km/h, 4.3°, −2600 rpm | 2.3 m inside | 58 km/h / 0.49 m | 0.49 m | 36 km/h |
+| Moonball | 82 km/h, 27.1°, 2300 rpm | 1.1 m inside | 48 km/h / 2.03 m | 1.80 m | 26 km/h |
+| Short ball | 68 km/h, 20.1°, 1500 rpm | 7.1 m inside | 47 km/h / 1.24 m | 0.96 m, 6.6 m from the net | 28 km/h |
+| Kick serve | 160 km/h, −1.9°, 4400 rpm from a 2.9 m contact (tall server), deuce box wide | in the box | 101 km/h / 1.45 m | 1.45 m | 59 km/h |
+| Flat serve | 190 km/h, −5.7°, 900 rpm, down the T | in the box | 131 km/h / 1.17 m | 1.17 m | 72 km/h |
+| Deep to the backhand | 122 km/h, 11.2°, 2800 rpm | 1.3 m inside | 68 km/h / 1.05 m | 0.82 m | 46 km/h |
+
+Change the surface in the lab and the balls are flown again (clay bounces a little higher, grass a little lower and faster). The tests check the physical claims: topspin bounces higher than slice, slice is the lowest ball, the moonball is the highest, serves bounce faster than 90 km/h and land in the box, the flat serve is the fastest ball to meet, the short ball is met inside the court, the deep backhand ball is deep and on the backhand side, and the suggested face lands every ball 1.5 m deep (and needs a more open face against slice than against topspin).
+
+### Coaching lines
+
+[lab/coachFeedback.js](lab/coachFeedback.js) only says what the simulation shows:
+
+- the verdict and depth/clearance from the flight (`describeShotOutcome`);
+- the face fix ("Close the face about 3.5° (to −7.6°)") from `solveFaceAngleForDepth`, the same model searched over face angle;
+- the incoming-ball effect ("Their topspin sends your ball off 7° higher than a ball with no spin would. Open face vs topspin = the ball climbs") from the racket impact run with and without the incoming spin, shown only when that difference is at least 1°;
+- the comparison with the ghost path.
 
 ## Model
 
@@ -29,8 +63,9 @@ An interactive 3D simulator for tennis ball flight. Change the swing and the inc
 | Racket impact | Rigid oblique impact in the vertical plane: v_out,n = (1+e_A)·v_racket,n + e_A·v_in,n; contact patch grips (e_T) or slides (friction 0.48) | Brody, Cross & Lindsey (2002); e_A ≈ 0.4 near the centre |
 | Court bounce | Vertical COR + slide-or-grip tangential impulse, I = 0.55·mR², normal force acting D = k·|v_n| ahead of the centre (k = 0.64 ms) | Cross; COR calibrated to the ITF drop-test band (0.765–0.785), μ and e_T are assumptions; k fitted to one 500 fps grass bounce and checked on a clay bounce |
 | Line calls | Lines belong to the court; 10 cm baseline, 5 cm other lines; 2.2 cm mark half-width | ITF court dimensions |
+| Incoming coaching balls | Opponent shot flown with the model above; met at the bounce top or at `maxDepth` | assumption (where a player meets the ball) |
 
-Every tunable constant lives in `MODEL_ASSUMPTIONS` in [physics.js](physics.js) with a `source` field that says whether it is from the literature or an assumption.
+Every tunable constant lives in `MODEL_ASSUMPTIONS` in [lab/physics.js](lab/physics.js) with a `source` field that says whether it is from the literature or an assumption.
 
 ### Coordinate system
 
@@ -50,6 +85,7 @@ Player B hits in the mirrored frame: world `(x, y) = (−x_local, −y_local)`. 
 - The court's vertical COR is constant; real COR falls as impact speed rises. COR values are calibrated so every surface passes the ITF drop test (254 cm → 135–147 cm), so that check is a calibration, not independent validation. Surface pace differences come mainly from the friction coefficient μ.
 - Side-spin retention on the bounce (85 %), net-cord factors and the mark half-width are assumptions.
 - C_D is for a new ball; felt wear and humidity are ignored.
+- Bounces come out somewhat lower than real heavy balls: with realistic inputs a heavy topspin rally ball peaks at about 1.3 m and a kick serve at about 1.45 m, where on court ~1.5 m and ~1.5–1.8 m are common. Likely reasons are the constant vertical COR, the topspin-only spin axis (a real kick serve also carries side spin) and the ball model's simplified deformation. The presets are not pushed past realistic speeds or spins to hide this; the captions state the simulated heights.
 - In rally mode the receiver's contact point and incoming angle are clamped to a playable window so rallies can continue. That part is gameplay, not physics.
 
 ## Player motion (motion capture)
@@ -57,8 +93,8 @@ Player B hits in the mirrored frame: world `(x, y) = (−x_local, −y_local)`. 
 Topspin forehands and two-handed backhands are driven by real motion-capture data:
 13 recorded strokes (player tp2) from **3DTennisDS**, Lublin University of Technology
 (Vicon, Plug-in Gait full body + 7-marker racket, 100 Hz).
-[mocap/export_3dtennisds.py](mocap/export_3dtennisds.py) converts the C3D files into
-[mocap/strokes.json](mocap/strokes.json): joint centres and racket pose in the contact frame,
+[lab/mocap/export_3dtennisds.py](lab/mocap/export_3dtennisds.py) converts the C3D files into
+[lab/mocap/strokes.json](lab/mocap/strokes.json): joint centres and racket pose in the contact frame,
 resampled to 50 Hz.
 
 At run time the clip closest in contact height and swing angle is chosen. The body is scaled
@@ -71,13 +107,13 @@ matches the physics inputs exactly at contact.
 
 Serves and one-handed backhands come from a second dataset, **Tennis-MoCap**
 (jdpulgarin/Tennis-MoCap, 17 Caldas-Colombia league players, OptiTrack 100 Hz, BVH skeleton),
-converted by [mocap/export_tennis_mocap_bvh.py](mocap/export_tennis_mocap_bvh.py) into
-[mocap/strokes_bvh.json](mocap/strokes_bvh.json): 4 serves and 4 one-handed backhands. That dataset
+converted by [lab/mocap/export_tennis_mocap_bvh.py](lab/mocap/export_tennis_mocap_bvh.py) into
+[lab/mocap/strokes_bvh.json](lab/mocap/strokes_bvh.json): 4 serves and 4 one-handed backhands. That dataset
 has no racket markers, so the racket follows the recorded wrist rotation, calibrated to the expected
 contact pose at impact. Serves may leave the ground (the recorded players jump into the ball).
 Only slices still use the procedural keyframe swing.
 
-> Tennis-MoCap is licensed under CC BY-SA 3.0; `mocap/strokes_bvh.json` is a derived work shared
+> Tennis-MoCap is licensed under CC BY-SA 3.0; `lab/mocap/strokes_bvh.json` is a derived work shared
 > under the same licence. Pulgarin-Giraldo J.D., Alvarez-Meza A.M., Melo-Betancourt L.G.,
 > Ramos-Bermudez S., Castellanos-Dominguez G. *A Similarity Indicator for Differentiating Kinematic
 > Performance Between Qualified Tennis Players.* LNCS 10125, pp. 309–317, 2017.
@@ -88,7 +124,7 @@ Only slices still use the procedural keyframe swing.
 
 ## Validation
 
-[validation.html](validation.html) runs `physics.js` in the browser and shows:
+[lab/validation.html](lab/validation.html) runs `physics.js` in the browser and shows:
 
 1. **Time-step convergence**: landing-point error vs Δt for three shots; observed order ≈ 4.0, error at the default 2 ms step ≈ 2·10⁻¹¹ m.
 2. **Analytic limit**: with air density 0 the landing time and point match the parabola to ~10⁻¹³.
@@ -106,7 +142,9 @@ No build step. Any static file server works (ES modules need http://, not file:/
 python3 -m http.server 8000
 ```
 
-Then open http://localhost:8000.
+Then open http://localhost:8000 (landing page) or http://localhost:8000/lab/ (the simulator).
+
+Hosting: everything is static and every path is relative, so the repository root can be served as-is (GitHub Pages, Vercel with no build step, any file server). `lab/index.html` adds the trailing slash itself if it is opened as `/lab`, so relative imports keep working on hosts that do not redirect.
 
 Tests use Node's built-in runner (Node 18+, no dependencies):
 
@@ -114,24 +152,28 @@ Tests use Node's built-in runner (Node 18+, no dependencies):
 npm test
 ```
 
-They cover the vacuum limit, 4th-order convergence, A/B mirror symmetry, line calls (including the 10 cm baseline), that every preset lands in, that every example rally and tactics lesson works (the answer passes inside the slider ranges, the starting shot fails with a tip), the inverse solver, air density and cross wind.
+They cover the coaching presets (above), the face-angle suggestion, the verdicts and the coaching lines, the vacuum limit, 4th-order convergence, A/B mirror symmetry, line calls (including the 10 cm baseline), that every preset lands in, that every example rally and tactics lesson works (the answer passes inside the slider ranges, the starting shot fails with a tip), the inverse solver, air density and cross wind.
 
 ## Files
 
 | File | Contents |
 |---|---|
-| `physics.js` | Flight integrator, impact and bounce models, line calls, rally chaining, `MODEL_ASSUMPTIONS` |
-| `presets.js` | Hand-tuned style presets, example rallies, tactics lessons and their scoring |
-| `lessonMap.js` | Small top-down map in the tactics card |
-| `tacticsBoard.js` | Court map: rally from above, recovery bisector, opponent run and time |
-| `racketDiagram.js` | Impact diagram with draggable vectors (compact and detailed) |
-| `impactStudio.js` | Impact studio: large diagram, flight profile, landing map, number fields |
-| `mocap/` | Converted motion-capture strokes (3DTennisDS; Tennis-MoCap, CC BY-SA 3.0) and the conversion scripts |
-| `app.js` | UI controller: sliders, HUD, modes, playback |
-| `scene3d.js` | three.js court, player rigs and racket views |
-| `validation.html` / `validation.js` | Validation page |
-| `tests/` | `node --test` suite |
-| `vendor/three/` | three.js r165 (MIT), served locally so the site does not depend on a CDN |
+| `index.html`, `assets/` | Landing page, its stylesheet, screenshots and the animated preview (captured from the lab with Playwright) |
+| `lab/index.html` | The simulator page |
+| `lab/coach.js` | Coach view: ball chips, racket-face dial, swing sliders, result strip, side view |
+| `lab/coachFeedback.js` | Coaching lines built from the simulated shot (pure, tested) |
+| `lab/physics.js` | Flight integrator, impact and bounce models, line calls, rally chaining, coaching helpers (`resolveIncomingBall`, `solveFaceAngleForDepth`, `describeShotOutcome`), `MODEL_ASSUMPTIONS` |
+| `lab/presets.js` | Hand-tuned style presets, example rallies, tactics lessons and their scoring |
+| `lab/lessonMap.js` | Small top-down map in the tactics card |
+| `lab/tacticsBoard.js` | Court map: rally from above, recovery bisector, opponent run and time |
+| `lab/racketDiagram.js` | Impact diagram with draggable vectors (compact and detailed) |
+| `lab/impactStudio.js` | Impact studio: large diagram, flight profile, landing map, number fields |
+| `lab/mocap/` | Converted motion-capture strokes (3DTennisDS; Tennis-MoCap, CC BY-SA 3.0) and the conversion scripts |
+| `lab/app.js` | UI controller: sliders, HUD, modes, playback |
+| `lab/scene3d.js` | three.js court, player rigs and racket views |
+| `lab/validation.html` / `lab/validation.js` | Validation page |
+| `tests/` | `node --test` suite; `tests/e2e_smoke.py` is a Playwright smoke test (landing and lab, phone and desktop) |
+| `lab/vendor/three/` | three.js r165 (MIT), served locally so the site does not depend on a CDN |
 
 ## References
 
@@ -149,6 +191,6 @@ Coaching ideas behind the lessons: P. Wardlaw's "directionals" (when to keep the
 
 ## Third-party code and names
 
-three.js is MIT-licensed (see `vendor/three/LICENSE`). Player names are used only to describe playing styles; all trademarks belong to their owners.
+three.js is MIT-licensed (see `lab/vendor/three/LICENSE`). Player names are used only to describe playing styles; all trademarks belong to their owners.
 
 Made by Jason Zeng.

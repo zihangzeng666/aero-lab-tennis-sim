@@ -1,5 +1,5 @@
 /**
- * AERO-LAB physics core: ball flight, court bounce and racket-ball impact.
+ * Rackets Lab physics core: ball flight, court bounce and racket-ball impact.
  *
  * This is a teaching simulator. The aerodynamic force model uses published
  * curve fits; the impact and bounce models follow Rod Cross's rigid-body
@@ -132,6 +132,14 @@ export const MODEL_ASSUMPTIONS = {
     vyFactor: 0.65,
     spinFactor: 0.5,
     source: 'assumption — a cosmetic net-cord model, not a contact simulation'
+  },
+  incomingBallContact: {
+    // Coaching presets (INCOMING_PRESETS): the opponent's shot is flown with this model, and the
+    // hitter meets it at the top of its bounce, unless that is deeper than the preset's maxDepth
+    // (how far back the player is willing to go), in which case at maxDepth on the way up.
+    // Incoming balls fly in still air at 20 °C over the selected surface.
+    source:
+      'assumption: where a player meets the ball is a coaching choice, not physics. The opponent shots themselves are hand-picked (speed, spin, aim) with the launch angle tuned so each lands where that kind of ball usually lands.'
   }
 };
 
@@ -1184,4 +1192,147 @@ export function chainRallyTurns(turns, startIdx = 0, env = {}) {
     }
   }
   return turns;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Coaching helpers                                                           */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * Turns an incoming-ball preset into the ball the hitter actually meets.
+ *
+ * Presets with an `opponent` shot are flown with simulateTrajectory (the opponent hits from
+ * their own baseline in their canonical frame). The hitter meets the ball at the top of its
+ * bounce, or at `contact.maxDepth` (distance from the net, m) on the way up if the top is
+ * further back (see MODEL_ASSUMPTIONS.incomingBallContact). The state there becomes the
+ * hitter's contact point and incoming ball, exactly as in a chained rally (handoffFromPoint).
+ *
+ * Presets without an `opponent` (manual entries) are passed through unchanged.
+ *
+ * Returns null if the opponent's shot does not bounce in.
+ */
+export function resolveIncomingBall(preset, env = {}) {
+  if (!preset) return null;
+  if (!preset.opponent) {
+    return {
+      manual: true,
+      incomingSpeedKmh: preset.incomingSpeedKmh,
+      incomingAngleDeg: preset.incomingAngleDeg,
+      incomingSpinRpm: preset.incomingSpinRpm
+    };
+  }
+  const o = preset.opponent;
+  const sim = simulateTrajectory({
+    side: 'A',
+    courtMode: o.courtMode || 'singles',
+    sidespinRpm: 0,
+    surfaceKey: env.surfaceKey || 'hard',
+    ...o
+  });
+  const fb = sim.firstBounce;
+  const post = sim.points.filter((p) => p.phase === 1);
+  if (!fb || !fb.isIn || sim.hitNet || post.length < 3) return null;
+
+  const maxDepth = preset.contact?.maxDepth ?? 13;
+  let contact = post.find((p) => p.vz <= 0) || post[post.length - 1];
+  if (contact.localX > maxDepth) contact = post.find((p) => p.localX >= maxDepth) || contact;
+  const peak = post.reduce((a, p) => (p.z > a.z ? p : a), post[0]);
+  const h = handoffFromPoint(contact, 'A');
+
+  // The whole incoming flight in the hitter's frame, t = 0 at contact (for drawing and replay)
+  const path = [];
+  for (const p of sim.points) {
+    if (p.t > contact.t + 1e-9) break;
+    path.push({ t: p.t - contact.t, x: -p.localX, y: -p.localY, z: p.z, phase: p.phase });
+  }
+
+  return {
+    manual: false,
+    incomingSpeedKmh: h.nextIncomingSpeedKmh,
+    incomingAngleDeg: h.nextIncomingAngleDeg,
+    incomingSpinRpm: h.nextIncomingSpinRpm,
+    hitX: h.nextHitX,
+    hitY: h.nextHitY,
+    hitZ: h.nextHitZ,
+    path,
+    flightTime: contact.t,
+    opponentSpeedKmh: o.speedKmh,
+    opponentSpinRpm: o.topspinRpm,
+    netClearanceM: sim.netClearanceM,
+    // bounce, measured from the hitter's baseline (positive = inside the court)
+    bounceInsideM: ITF_COURT.halfLength - fb.localX,
+    bounceSpeedKmh: fb.speedBeforeKmh,
+    bouncePeakM: peak.z,
+    contactHeightM: contact.z,
+    contactSpeedKmh: contact.speedKmh,
+    rising: contact.vz > 0.05
+  };
+}
+
+/**
+ * Coaching summary of a simulated shot: verdict, net clearance and how deep it lands.
+ * `depthM` is measured from the far baseline: positive = inside the court, negative = long.
+ */
+export function describeShotOutcome(sim) {
+  const fb = sim?.firstBounce || null;
+  const out = {
+    verdict: 'IN',
+    netClearanceM: sim?.netClearanceM ?? null,
+    depthM: fb ? ITF_COURT.halfLength - fb.localX : null,
+    landingX: fb ? fb.localX : null,
+    landingY: fb ? fb.localY : null,
+    apexM: sim?.maxHeightM ?? null
+  };
+  if (sim?.hitNet && (!fb || fb.localX <= 0 || !fb.isIn)) out.verdict = 'NET';
+  else if (!fb) out.verdict = 'LONG'; // flew out of the simulated area without bouncing
+  else if (!fb.isIn) {
+    const overLong = fb.localX - ITF_COURT.halfLength;
+    const overWide = Math.abs(fb.localY) - ITF_COURT.halfSinglesWidth;
+    out.verdict = overLong >= overWide ? 'LONG' : 'WIDE';
+  }
+  return out;
+}
+
+/**
+ * Coaching inverse: keeps the swing (racket speed, swing path, aim, contact point and incoming
+ * ball) and finds the racket-face angle that lands the ball `targetDepthM` inside the far
+ * baseline. Bisection on the forward model (impact + flight); netted balls count as short and
+ * balls that fly out of the court as long. Returns the face angle and the shot it produces;
+ * `reachable` is false when no face angle in [minFace, maxFace] gets there (the closest end is
+ * returned).
+ */
+export function solveFaceAngleForDepth(state, { targetDepthM = 1.5, minFace = -18, maxFace = 32 } = {}) {
+  const targetX = ITF_COURT.halfLength - targetDepthM;
+  const run = (face) => {
+    const imp = computeRacketBallImpact({ ...state, faceAngleDeg: face });
+    const sim = simulateTrajectory({
+      ...state,
+      faceAngleDeg: face,
+      speedKmh: imp.launchSpeedKmh,
+      launchAngleDeg: imp.launchAngleDeg,
+      topspinRpm: imp.topspinRpm,
+      stopAtIntercept: false,
+      receive: undefined
+    });
+    const fb = sim.firstBounce;
+    let x;
+    if (sim.hitNet && (!fb || fb.localX <= 0 || !fb.isIn)) x = -100;
+    else if (!fb) x = 100;
+    else x = fb.localX;
+    return { x, sim, imp };
+  };
+  let lo = minFace;
+  let hi = maxFace;
+  const rLo = run(lo);
+  const rHi = run(hi);
+  if (rLo.x >= targetX) return { faceAngleDeg: lo, reachable: false, sim: rLo.sim, impact: rLo.imp };
+  if (rHi.x <= targetX) return { faceAngleDeg: hi, reachable: false, sim: rHi.sim, impact: rHi.imp };
+  for (let i = 0; i < 28 && hi - lo > 0.02; i++) {
+    const mid = 0.5 * (lo + hi);
+    if (run(mid).x < targetX) lo = mid;
+    else hi = mid;
+  }
+  const face = Math.round(0.5 * (lo + hi) * 10) / 10;
+  const r = run(face);
+  return { faceAngleDeg: face, reachable: true, sim: r.sim, impact: r.imp };
 }

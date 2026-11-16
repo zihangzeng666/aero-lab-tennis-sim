@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=59';
+import { ITF_COURT, COURT_SURFACES, getNetHeightAtY } from './physics.js?v=60';
 
 // Net profile drawn with singles sticks in place (matches the physics for singles play):
 // 0.914 m at the centre rising to 1.07 m at the sticks, then level out to the posts.
@@ -108,11 +108,15 @@ export class TennisScene3D {
     this.camera = new THREE.PerspectiveCamera(44, w / h, 0.05, 220);
     this.camera.position.set(-18.8, 5.2, 3.8);
 
+    // Phones and tablets: fill rate grows with the pixel ratio squared, so cap it at 1.5 there
+    // (2 elsewhere) and use the cheaper PCF shadow filter and a smaller shadow map.
+    const touchFirst = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    this.isTouchFirst = touchFirst;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setSize(w, h);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, touchFirst ? 1.5 : 2));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = touchFirst ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.02;
     containerEl.appendChild(this.renderer.domElement);
@@ -126,7 +130,9 @@ export class TennisScene3D {
     this.controls.rotateSpeed = coarse ? 0.38 : 0.5;
     this.controls.addEventListener('start', () => {
       this._camTween = null;
+      this.markActive();
     });
+    this.controls.addEventListener('change', () => this.markActive());
     this.controls.zoomSpeed = 0.6;
     this.controls.panSpeed = 0.6;
     this.controls.maxPolarAngle = Math.PI / 2 - 0.012;
@@ -165,6 +171,7 @@ export class TennisScene3D {
 
     this._onResize = () => {
       if (!this.container) return;
+      this.markActive();
       const cw = this.container.clientWidth;
       const ch = this.container.clientHeight;
       if (cw === 0 || ch === 0) return;
@@ -272,8 +279,8 @@ export class TennisScene3D {
     this.lights = { ambient, hemi, sun: sunLight };
     sunLight.position.set(-10, 24, 14);
     sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 2048;
-    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.mapSize.width = this.isTouchFirst ? 1024 : 2048;
+    sunLight.shadow.mapSize.height = this.isTouchFirst ? 1024 : 2048;
     sunLight.shadow.camera.near = 1;
     sunLight.shadow.camera.far = 65;
     const d = 19;
@@ -510,7 +517,7 @@ export class TennisScene3D {
 
     archGroup.add(backWallLeft, backWallRight, railL, railR, sideWallFar, sideWallNear);
 
-    // Championship Court Perimeter Branding Plaques ("AERO-LAB // MADE BY JASON ZENG")
+    // Championship Court Perimeter Branding Plaques ("RACKETS LAB // MADE BY JASON ZENG")
     const signCanvas = document.createElement('canvas');
     signCanvas.width = 1024;
     signCanvas.height = 128;
@@ -589,7 +596,7 @@ export class TennisScene3D {
     sctx.font = '600 38px "JetBrains Mono", "Inter", sans-serif';
     sctx.textAlign = 'center';
     sctx.textBaseline = 'middle';
-    sctx.fillText('AERO-LAB  ·  MADE BY JASON ZENG', 512, 64);
+    sctx.fillText('RACKETS LAB  ·  MADE BY JASON ZENG', 512, 64);
     if (this._signTex) this._signTex.needsUpdate = true;
   }
 
@@ -1520,6 +1527,7 @@ export class TennisScene3D {
    * Renders the 3D Tactical Target Zone & Bullseye on the court when a Tactical Lesson is active.
    */
   updateTacticalOverlay(lesson, currentTurnIndex = 0, passed = false) {
+    this.markActive();
     if (!this.tacticalZoneGroup) return;
     if (!lesson || !lesson.targetZone) {
       this.tacticalZoneGroup.visible = false;
@@ -1564,6 +1572,7 @@ export class TennisScene3D {
 
   /** Switches between the light "club" scene and the dark diagram-style "lab" scene. */
   setTheme(theme) {
+    this.markActive();
     this.theme = theme === 'dark' ? 'dark' : 'light';
     const T = SCENE_THEMES[this.theme];
     this.scene.background.setHex(T.background);
@@ -1606,10 +1615,12 @@ export class TennisScene3D {
   }
 
   setStandsVisible(visible) {
+    this.markActive();
     if (this.standGroup) this.standGroup.visible = visible;
   }
 
   setCourtSurface(surfaceKey) {
+    this.markActive();
     this.surfaceKey = surfaceKey;
     this.courtMat.map = this._createCourtTexture(surfaceKey, true);
     this.courtMat.needsUpdate = true;
@@ -1619,6 +1630,7 @@ export class TennisScene3D {
   }
 
   setTargetZone(courtMode, side = 'A') {
+    this.markActive();
     const sign = side === 'B' ? -1 : 1;
     const L2 = ITF_COURT.halfLength;
     const Ws = ITF_COURT.halfSinglesWidth;
@@ -1706,6 +1718,7 @@ export class TennisScene3D {
   }
 
   setSoloMode(isSolo) {
+    this.markActive();
     this.soloMode = Boolean(isSolo);
     if (this.playerA && this.playerA.root) this.playerA.root.visible = true;
     if (this.playerB && this.playerB.root) this.playerB.root.visible = !this.soloMode;
@@ -2830,6 +2843,7 @@ export class TennisScene3D {
    * - In Rally / Tactics Mode (`this.soloMode === false`), both players are active and the receiver runs to intercept.
    */
   updatePlayerAndRacket(params, currentTime = 0, simResult = null) {
+    this.markActive();
     if (this.soloMode) {
       // One player at a time; after "hit it from here" that can be the far-side player.
       const side = params.side === 'B' ? 'B' : 'A';
@@ -2991,6 +3005,7 @@ export class TennisScene3D {
   }
 
   updateTrajectory(simResult, ghostSimResult = null) {
+    this.markActive();
     while (this.trajGroup.children.length > 0) {
       const child = this.trajGroup.children[0];
       if (child.geometry) child.geometry.dispose();
@@ -3127,6 +3142,7 @@ export class TennisScene3D {
   }
 
   updateBallAtFrame(point, preContactState = null) {
+    this.markActive();
     if (preContactState && preContactState.t < 0) {
       const {
         side = 'A',
@@ -3143,8 +3159,23 @@ export class TennisScene3D {
       let bx = hitX;
       let by = hitY;
       let bz = hitZ;
+      const path = preContactState.incomingPath;
 
-      if (isOverhead) {
+      if (path && path.length > 1 && t >= path[0].t) {
+        // the simulated incoming flight (coach view): linear between 2 ms samples
+        let i = path.findIndex((q) => q.t >= t);
+        if (i < 1) i = 1;
+        const a = path[i - 1];
+        const b = path[i];
+        const f = b.t > a.t ? (t - a.t) / (b.t - a.t) : 0;
+        bx = a.x + (b.x - a.x) * f;
+        by = a.y + (b.y - a.y) * f;
+        bz = a.z + (b.z - a.z) * f;
+      } else if (path && path.length > 1) {
+        bx = path[0].x;
+        by = path[0].y;
+        bz = path[0].z;
+      } else if (isOverhead) {
         bz = Math.max(0.85, hitZ - 4.9 * t * t + 0.35 * t);
       } else {
         const vin = incomingSpeedKmh / 3.6;
@@ -3209,6 +3240,7 @@ export class TennisScene3D {
   }
 
   setBallVisualScale(scale) {
+    this.markActive();
     this.ballVisualScale = scale;
     this.ballMesh.scale.setScalar(scale);
   }
@@ -3259,6 +3291,17 @@ export class TennisScene3D {
       const np = simResult.netPassPoint;
       this.camera.position.set(-1.6, Math.max(1.25, np.z + 0.25), -np.y + 2.4);
       this.controls.target.set(0, np.netHeightAtY + 0.15, -np.y);
+    } else if (presetName === 'coach') {
+      // From behind the hitter's right shoulder, high enough to read the arc over the net and
+      // the depth of the bounce; pulled back on narrow screens so the far baseline stays in view.
+      const narrow = this.camera.aspect < 1.1;
+      const short = this.camera.aspect > 1.9;
+      this.camera.position.set(
+        sign * (narrow ? -22.5 : -20.5),
+        narrow ? 7.4 : short ? 5.4 : 6.2,
+        sign * (narrow ? 7.5 : 8.5)
+      );
+      this.controls.target.set(sign * (narrow ? 0.5 : -0.5), narrow ? 0.4 : 0.9, 0);
     } else if (presetName === 'top') {
       this.camera.position.set(0, 25.5, 0.01);
       this.controls.target.set(0, 0, 0);
@@ -3278,10 +3321,53 @@ export class TennisScene3D {
     this.controls.update();
   }
 
+  /**
+   * Coach view: the previous (or pinned) shot as a dashed line, kept until the compare path
+   * changes. Pass null to remove it.
+   */
+  setCompareTrajectory(sim) {
+    if (sim === this._compareSim && this.theme === this._compareTheme) return;
+    this._compareSim = sim;
+    this._compareTheme = this.theme;
+    if (this._compareLine) {
+      this.scene.remove(this._compareLine);
+      this._compareLine.geometry.dispose();
+      this._compareLine.material.dispose();
+      this._compareLine = null;
+    }
+    this.markActive();
+    if (!sim || !sim.points || sim.points.length < 2) return;
+    // a thin translucent tube: a 1 px line disappears against the court on phones
+    const pts = sim.points.map((p) => physToThree(p.x, p.y, p.z));
+    const curve = new THREE.CatmullRomCurve3(pts);
+    const geo = new THREE.TubeGeometry(curve, Math.min(160, pts.length), 0.02, 6, false);
+    const mat = new THREE.MeshBasicMaterial({
+      color: this.theme === 'dark' ? 0x7cc7a8 : 0x1b1a17,
+      transparent: true,
+      opacity: this.theme === 'dark' ? 0.75 : 0.5,
+      depthWrite: false
+    });
+    this._compareLine = new THREE.Mesh(geo, mat);
+    this.scene.add(this._compareLine);
+  }
+
+  /** Something changed on screen: keep rendering every frame for a little while. */
+  markActive() {
+    this._activeUntil = performance.now() + 1500;
+  }
+
   _animateLoop() {
     requestAnimationFrame(() => this._animateLoop());
-    this._stepAnimations(performance.now());
+    const now = performance.now();
+    this._stepAnimations(now);
+    if (this._camTween || (this._fades && this._fades.length)) this.markActive();
     this.controls.update();
+    // Idle (nothing moved for 1.5 s): skip the frame. Saves the GPU and battery on phones while a
+    // coach is talking; one frame per second still goes out as a safety net.
+    const idle = now > (this._activeUntil || 0);
+    if (idle && now - (this._lastRender || 0) < 1000) return;
+    if (this.container && this.container.offsetParent === null && idle) return;
+    this._lastRender = now;
     this.renderer.render(this.scene, this.camera);
   }
 }

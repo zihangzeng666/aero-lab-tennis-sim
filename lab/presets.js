@@ -7,45 +7,110 @@
  * Player names only describe the playing style each preset imitates.
  */
 
+/**
+ * Incoming balls for coaching. Each physics preset is an OPPONENT'S SHOT (speed, spin, aim and
+ * a launch angle tuned so it lands where that kind of ball usually lands). The app flies it with
+ * resolveIncomingBall() in physics.js, and the ball the hitter meets (contact point, speed,
+ * angle, spin) comes out of the simulation, not out of this file. `contact.maxDepth` is how far
+ * behind the net (m) the hitter is willing to meet it; see MODEL_ASSUMPTIONS.incomingBallContact.
+ *
+ * Opponent coordinates are in the opponent's own frame (their baseline at x = -11.885, y positive
+ * to their left). `hitterAimDeg` is a sensible aim for the reply (positive = hitter's left).
+ * Entries marked `manual` have fixed numbers and no opponent shot.
+ */
 export const INCOMING_PRESETS = {
-  rally_topspin: {
-    labelZh: '对手重上旋深球 (Heavy Topspin)',
-    labelEn: 'Heavy Topspin Rally Ball',
-    incomingSpeedKmh: 54,
-    incomingAngleDeg: -11,
-    incomingSpinRpm: 1950
+  fast_flat: {
+    labelZh: '平击快球',
+    labelEn: 'Flat fast drive',
+    blurbZh: '低平过网、速度快，弹起不高，球冲着你来。',
+    blurbEn: 'Low over the net and fast; it skids through below the waist.',
+    strokeType: 'fh',
+    hitterAimDeg: 2,
+    opponent: { hitX: -11.6, hitY: 0.4, hitZ: 1.0, speedKmh: 140, launchAngleDeg: 5.3, topspinRpm: 1200, aimAngleDeg: 2.6 },
+    contact: { maxDepth: 13.0 }
+  },
+  heavy_topspin: {
+    labelZh: '重上旋高弹球',
+    labelEn: 'Heavy topspin, high bounce',
+    blurbZh: '高过网、强上旋，落地后弹到胸口高度，把你逼到底线后。',
+    blurbEn: 'High over the net with heavy topspin; bounces to about chest height and pushes you back.',
+    strokeType: 'fh',
+    hitterAimDeg: 2,
+    opponent: { hitX: -11.8, hitY: 0.4, hitZ: 1.0, speedKmh: 110, launchAngleDeg: 16.0, topspinRpm: 3800, aimAngleDeg: 2.6 },
+    contact: { maxDepth: 14.8 }
   },
   low_slice: {
-    labelZh: '对手低滑行切削球 (Low Slice)',
-    labelEn: 'Low Skidding Slice Ball',
-    incomingSpeedKmh: 46,
-    incomingAngleDeg: -4.5,
-    incomingSpinRpm: -1650
+    labelZh: '低滑切削球',
+    labelEn: 'Low skidding slice',
+    blurbZh: '下旋压低，落地后贴地滑行，你要在膝盖高度击球。',
+    blurbEn: 'Backspin keeps it low; it skids and stays near knee height.',
+    strokeType: 'fh',
+    hitterAimDeg: 2,
+    opponent: { hitX: -11.5, hitY: 0.4, hitZ: 0.95, speedKmh: 100, launchAngleDeg: 4.3, topspinRpm: -2600, aimAngleDeg: 2.6 },
+    contact: { maxDepth: 13.0 }
   },
-  fast_flat: {
-    labelZh: '对手平击重炮 (Fast Flat Drive)',
-    labelEn: 'Fast Flat Heavy Drive',
-    incomingSpeedKmh: 78,
-    incomingAngleDeg: -6,
-    incomingSpinRpm: 500
+  moonball: {
+    labelZh: '高吊月亮球',
+    labelEn: 'Moonball',
+    blurbZh: '慢、高、深，落地后弹过头顶附近。',
+    blurbEn: 'Slow, very high and deep; the bounce climbs above your head.',
+    strokeType: 'fh',
+    hitterAimDeg: 2,
+    opponent: { hitX: -12.2, hitY: 0.4, hitZ: 1.0, speedKmh: 82, launchAngleDeg: 27.1, topspinRpm: 2300, aimAngleDeg: 2.5 },
+    contact: { maxDepth: 13.6 }
+  },
+  short_ball: {
+    labelZh: '浅球（上前进攻）',
+    labelEn: 'Short ball',
+    blurbZh: '落在发球线附近，你要上前在场内击球。',
+    blurbEn: 'Lands near the service line; you step in and hit from inside the court.',
+    strokeType: 'fh',
+    hitterAimDeg: 2,
+    opponent: { hitX: -11.8, hitY: 0.4, hitZ: 0.9, speedKmh: 68, launchAngleDeg: 20.1, topspinRpm: 1500, aimAngleDeg: 2.5 },
+    contact: { maxDepth: 6.6 }
+  },
+  kick_serve: {
+    labelZh: '上旋发球（接发）',
+    labelEn: 'Kick serve return',
+    blurbZh: '平分区外角上旋二发（高个子跳发，2.9 m 击球点），落地后弹到约肩高。',
+    blurbEn: 'Second serve wide to the deuce court from a tall server; kicks up to about shoulder height.',
+    strokeType: 'fh',
+    hitterAimDeg: 6,
+    opponent: { hitX: -11.95, hitY: -0.5, hitZ: 2.9, speedKmh: 160, launchAngleDeg: -1.9, topspinRpm: 4400, aimAngleDeg: 9, courtMode: 'serve_deuce' },
+    contact: { maxDepth: 12.6 }
+  },
+  flat_serve: {
+    labelZh: '平击发球（接发）',
+    labelEn: 'Flat serve return',
+    blurbZh: '一发平击中路，190 km/h，几乎没有反应时间。',
+    blurbEn: 'First serve down the T at 190 km/h; very little time to react.',
+    strokeType: 'fh',
+    hitterAimDeg: 1,
+    opponent: { hitX: -11.95, hitY: -0.5, hitZ: 2.85, speedKmh: 190, launchAngleDeg: -5.7, topspinRpm: 900, aimAngleDeg: 2.5, courtMode: 'serve_deuce' },
+    contact: { maxDepth: 13.2 }
+  },
+  deep_backhand: {
+    labelZh: '压反手深球',
+    labelEn: 'Deep ball to the backhand',
+    blurbZh: '上旋深球压到反手位，把你逼到底线后。',
+    blurbEn: 'Deep topspin into the backhand corner; pushes you behind the baseline.',
+    strokeType: 'bh2',
+    hitterAimDeg: -3,
+    opponent: { hitX: -11.7, hitY: 0.4, hitZ: 1.0, speedKmh: 122, launchAngleDeg: 11.2, topspinRpm: 2800, aimAngleDeg: -4.5 },
+    contact: { maxDepth: 13.3 }
   },
   on_the_rise: {
     labelZh: '抢上升期击球 (On the Rise)',
     labelEn: 'Rising Bounce (On-the-Rise)',
+    manual: true,
     incomingSpeedKmh: 60,
     incomingAngleDeg: 11,
     incomingSpinRpm: 1600
   },
-  moonball: {
-    labelZh: '高弹跳月亮球 (High Moonball)',
-    labelEn: 'High Deep Moonball',
-    incomingSpeedKmh: 39,
-    incomingAngleDeg: -22,
-    incomingSpinRpm: 2500
-  },
   serve_toss: {
     labelZh: '发球定点抛球 (Serve Toss)',
     labelEn: 'Serve Toss (Stationary)',
+    manual: true,
     incomingSpeedKmh: 0,
     incomingAngleDeg: 0,
     incomingSpinRpm: 0
