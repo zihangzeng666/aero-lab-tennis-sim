@@ -1,695 +1,267 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
-  <title>AERO-LAB · Tennis Ball-Flight Teaching Simulator — Jason Zeng</title>
-  <meta name="description" content="Interactive 3D teaching simulator for tennis ball flight: RK4 integration, Štěpánek drag/lift fits, Cross-style racket and court impact models. Presets are illustrative, not measured data." />
-  <meta name="theme-color" content="#1a1a1a" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-  <script>
-    // Dark is the default; a stored "light" choice is respected
-    document.documentElement.dataset.theme = 'dark';
-    try {
-      if (localStorage.getItem('aerolab-theme') === 'light') document.documentElement.dataset.theme = 'light';
-    } catch (e) {}
-  </script>
-  <link rel="stylesheet" href="./styles.css?v=59" />
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "./vendor/three/build/three.module.min.js",
-        "three/addons/": "./vendor/three/examples/jsm/"
-      }
-    }
-  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Rackets Lab · Show players what the racket face does to the ball</title>
+  <meta name="description" content="A tennis coaching simulator for phone, tablet and laptop. Pick the incoming ball, tilt the racket face, change the swing path and see the simulated shot: over the net, deep, long or into the tape." />
+  <meta name="theme-color" content="#f4f6f1" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Rackets Lab" />
+  <meta property="og:title" content="Rackets Lab · show players what the racket face does to the ball" />
+  <meta property="og:description" content="Pick the incoming ball, tilt the face, see where the shot goes. Simulated with published aerodynamics and impact models." />
+  <meta property="og:url" content="https://rackets-lab.vercel.app/" />
+  <meta property="og:image" content="https://rackets-lab.vercel.app/assets/og-rackets-lab.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://rackets-lab.vercel.app/assets/og-rackets-lab.jpg" />
+  <link rel="canonical" href="https://rackets-lab.vercel.app/" />
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/landing.css" />
 </head>
 <body>
-  <!-- ===================== Welcome / mode launch screen ===================== -->
-  <div class="aero-loading-overlay" id="aeroLoadingOverlay">
-    <div class="loading-shell">
-      <div class="loading-top-bar">
-        <div class="loading-brand">
-          <span class="brand-mark" aria-hidden="true"></span>
-          <span class="loading-brand-name">AERO-LAB</span>
-          <span class="loading-author-pill">Jason Zeng</span>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="nav">
+    <a class="brand" href="./" aria-label="Rackets Lab home">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M3 25h26M16 25v-6" stroke="currentColor" stroke-width="2.4"/><path d="M4 22C9 9 21 9 27 22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="27" cy="22" r="3.6" fill="var(--ball)" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span>Rackets Lab</span>
+    </a>
+    <nav class="nav-links" aria-label="Sections">
+      <a href="#lesson">How a lesson runs</a>
+      <a href="#balls">The balls</a>
+      <a href="#physics">Physics</a>
+    </nav>
+    <a class="btn btn-small" href="lab/">Open the lab</a>
+  </header>
+
+  <main id="main">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <h1 id="hero-title">Show your players what the racket face does to the ball.</h1>
+        <p class="lede">Pick the ball coming at them: a heavy topspin kicker, a skidding slice, a 190&nbsp;km/h serve. Tilt the racket face, change the swing path, and Rackets Lab flies the shot. Over the net and deep, long, or into the tape.</p>
+        <div class="hero-cta">
+          <a class="btn" href="lab/">Open the lab</a>
+          <span class="hero-note">Free, in the browser. Works on a phone at the court.</span>
         </div>
-        <span class="loading-spec-code">RK4 · Δt 2 ms · Štěpánek aero</span>
       </div>
 
-      <div class="loading-hero-grid">
-        <div class="loading-hero-left">
-          <div class="loading-kicker" data-i18n="loadKicker">交互式物理教学模拟</div>
-          <h1 class="loading-headline" data-i18n-html="loadHeadline">
-            3D 网球<span>弹道与击球教学模拟器</span>
-          </h1>
-          <p class="loading-subtext" data-i18n="loadSubtext">
-            调节挥拍与来球参数，看球速、旋转和落点如何变化。气动力采用 Štěpánek (1988) 拟合式，拍球与落地碰撞采用 Cross 刚体模型；球员预设为手调示例，并非实测数据。
-          </p>
+      <figure class="hero-figure">
+        <svg class="court-side" viewBox="-14.2 -7.4 36.4 9.6" role="img" aria-labelledby="hero-fig-title hero-fig-desc">
+          <title id="hero-fig-title">Three shots from the same swing</title>
+          <desc id="hero-fig-desc">Side view of a court. Against the same flat drive, with the same swing, a face angle of −12.7° puts the ball in the net, −7.7° clears the net by 51 cm and lands 1.5 m inside the baseline, and −3.7° lands 5.9 m long.</desc>
+          <rect class="cs-court" x="-11.885" y="0" width="23.77" height="0.5"/>
+          <rect class="cs-run" x="-14.2" y="0" width="2.315" height="0.5"/>
+          <rect class="cs-run" x="11.885" y="0" width="10.3" height="0.5"/>
+          <line class="cs-baseline" x1="-11.885" y1="-0.7" x2="-11.885" y2="0.5"/>
+          <line class="cs-baseline" x1="11.885" y1="-0.7" x2="11.885" y2="0.5"/>
+          <line class="cs-service" x1="-6.4" y1="-0.35" x2="-6.4" y2="0.5"/>
+          <line class="cs-service" x1="6.4" y1="-0.35" x2="6.4" y2="0.5"/>
+          <rect class="cs-net" x="-0.09" y="-2.011" width="0.18" height="2.511"/>
+          <polyline class="cs-incoming" points="11.60,-2.20 10.83,-2.35 10.08,-2.49 9.34,-2.60 8.61,-2.71 7.89,-2.80 7.18,-2.88 6.49,-2.94 5.80,-2.99 5.13,-3.03 4.47,-3.05 3.81,-3.06 3.17,-3.06 2.53,-3.05 1.91,-3.03 1.29,-2.99 0.68,-2.94 0.08,-2.88 -0.47,-2.82 -1.06,-2.74 -1.63,-2.65 -2.20,-2.55 -2.76,-2.44 -3.31,-2.32 -3.86,-2.19 -4.40,-2.05 -4.93,-1.90 -5.46,-1.74 -5.98,-1.57 -6.49,-1.39 -6.99,-1.20 -7.49,-1.01 -7.99,-0.80 -8.47,-0.59 -8.95,-0.37 -9.43,-0.14 -9.79,-0.20 -10.12,-0.37 -10.45,-0.52 -10.78,-0.67 -11.11,-0.80 -11.43,-0.91 -11.75,-1.02 -12.06,-1.11 -12.37,-1.19 -12.68,-1.26 -12.99,-1.32 -13.02,-1.32"/>
+          <polyline class="cs-shot cs-bad" style="--d:0ms" pathLength="1" points="-13.02,-1.32 -12.24,-1.45 -11.48,-1.56 -10.74,-1.66 -10.01,-1.73 -9.29,-1.79 -8.58,-1.82 -7.89,-1.85 -7.21,-1.85 -6.54,-1.84 -5.88,-1.82 -5.24,-1.78 -4.60,-1.72 -3.98,-1.65 -3.37,-1.57 -2.76,-1.47 -2.17,-1.36 -1.59,-1.24 -1.01,-1.10 -0.45,-0.95 -0.05,-0.82 -0.11,-0.80 -0.18,-0.76 -0.25,-0.72 -0.31,-0.66 -0.38,-0.60 -0.44,-0.53 -0.51,-0.45 -0.58,-0.36 -0.64,-0.27 -0.71,-0.16 -0.76,-0.08 -0.79,-0.17 -0.82,-0.24 -0.84,-0.31 -0.86,-0.36"/>
+          <polyline class="cs-shot cs-bad" style="--d:160ms" pathLength="1" points="-13.02,-1.32 -12.20,-1.70 -11.39,-2.06 -10.59,-2.40 -9.81,-2.72 -9.05,-3.02 -8.30,-3.30 -7.56,-3.56 -6.83,-3.80 -6.11,-4.02 -5.41,-4.22 -4.72,-4.41 -4.04,-4.58 -3.37,-4.73 -2.71,-4.87 -2.06,-4.99 -1.42,-5.10 -0.79,-5.19 -0.17,-5.27 0.43,-5.33 1.03,-5.38 1.62,-5.41 2.21,-5.44 2.79,-5.45 3.36,-5.44 3.92,-5.43 4.47,-5.40 5.02,-5.36 5.55,-5.31 6.09,-5.24 6.61,-5.17 7.13,-5.08 7.64,-4.98 8.14,-4.88 8.64,-4.76 9.13,-4.63 9.62,-4.49 10.09,-4.34 10.57,-4.18 11.03,-4.01 11.49,-3.83 11.95,-3.64 12.40,-3.44 12.84,-3.24 13.28,-3.02 13.72,-2.79 14.14,-2.56 14.57,-2.32 14.99,-2.07 15.40,-1.80 15.81,-1.54 16.21,-1.26 16.61,-0.97 17.00,-0.68 17.39,-0.38 17.78,-0.07 18.03,-0.31 18.28,-0.54 18.54,-0.75 18.76,-0.93"/>
+          <polyline class="cs-shot cs-good" style="--d:80ms" pathLength="1" points="-13.02,-1.32 -12.21,-1.59 -11.42,-1.83 -10.65,-2.05 -9.88,-2.26 -9.13,-2.44 -8.40,-2.61 -7.68,-2.76 -6.97,-2.89 -6.27,-3.00 -5.58,-3.09 -4.91,-3.17 -4.24,-3.24 -3.59,-3.28 -2.95,-3.32 -2.32,-3.33 -1.70,-3.34 -1.08,-3.32 -0.48,-3.30 0.06,-3.26 0.64,-3.22 1.22,-3.15 1.79,-3.08 2.35,-2.99 2.90,-2.89 3.44,-2.78 3.98,-2.66 4.51,-2.52 5.03,-2.38 5.54,-2.22 6.04,-2.05 6.54,-1.87 7.04,-1.69 7.52,-1.49 8.00,-1.28 8.47,-1.06 8.94,-0.84 9.40,-0.60 9.85,-0.35 10.30,-0.10 10.62,-0.25 10.94,-0.44 11.24,-0.61 11.55,-0.76"/>
+          <circle class="cs-mark cs-mark-bad" cx="17.78" cy="0" r="0.28"/>
+          <circle class="cs-mark cs-mark-good" cx="10.34" cy="0" r="0.32"/>
+          <circle class="cs-ball" cx="-13.02" cy="-1.32" r="0.36"/>
+          <g class="cs-labels" aria-hidden="true">
+            <text x="-0.5" y="1.55" text-anchor="end" class="cs-lab cs-lab-bad">−12.7°: in the net</text>
+            <text x="10.94" y="1.55" text-anchor="end" class="cs-lab cs-lab-good">−7.7°: 1.5 m inside</text>
+            <text x="22.1" y="1.55" text-anchor="end" class="cs-lab cs-lab-bad">−3.7°: 5.9 m long</text>
+          </g>
+        </svg>
+        <ul class="hero-key">
+          <li class="key-bad"><strong>−12.7°</strong> closed: into the net</li>
+          <li class="key-good"><strong>−7.7°</strong> deep: 51 cm over the net, lands 1.5 m inside the baseline</li>
+          <li class="key-bad"><strong>−3.7°</strong> more open: 5.9 m long</li>
+        </ul>
+        <figcaption>One flat drive, one swing (100&nbsp;km/h, 25° low to high), three face angles. The paths come from the lab's own physics; height is drawn 2.2&times; for legibility.</figcaption>
+      </figure>
+    </section>
 
-          <div class="loading-mode-cards">
-            <div class="loading-mode-card active" data-launch-mode="solo" role="button" tabindex="0">
-              <div class="lmc-top">
-                <span class="lmc-badge lmc-badge-primary" data-i18n="loadModeSoloTag">默认</span>
-                <span class="lmc-check" aria-hidden="true"></span>
-              </div>
-              <div class="lmc-title" data-i18n="loadModeSoloTitle">单人球速实验室</div>
-              <div class="lmc-desc" data-i18n="loadModeSoloDesc">正反手挥拍 · 球速合成分解</div>
-            </div>
-            <div class="loading-mode-card" data-launch-mode="rally" role="button" tabindex="0">
-              <div class="lmc-top">
-                <span class="lmc-badge" data-i18n="loadModeRallyTag">回合</span>
-                <span class="lmc-check" aria-hidden="true"></span>
-              </div>
-              <div class="lmc-title" data-i18n="loadModeRallyTitle">双人多拍回合</div>
-              <div class="lmc-desc" data-i18n="loadModeRallyDesc">跑动截击 · 连续对拉回放</div>
-            </div>
-            <div class="loading-mode-card" data-launch-mode="tactics" role="button" tabindex="0">
-              <div class="lmc-top">
-                <span class="lmc-badge lmc-badge-gold" data-i18n="loadModeTacticsTag">战术</span>
-                <span class="lmc-check" aria-hidden="true"></span>
-              </div>
-              <div class="lmc-title" data-i18n="loadModeTacticsTitle">战术教学</div>
-              <div class="lmc-desc" data-i18n="loadModeTacticsDesc">战术示例 · 靶区挑战</div>
-            </div>
-          </div>
-        </div>
+    <section class="lesson" id="lesson" aria-labelledby="lesson-title">
+      <h2 id="lesson-title">How a lesson runs</h2>
+      <div class="lesson-grid">
+        <ol class="steps">
+          <li>
+            <h3>Pick the incoming ball</h3>
+            <p>Eight balls a player has to handle, from a flat drive below the waist to a moonball that bounces past two metres. Each one is a real simulated shot from the far baseline, so its bounce, speed and spin are what the physics gives, not a sketch.</p>
+          </li>
+          <li>
+            <h3>Tilt the face, set the swing</h3>
+            <p>Turn the racket on the dial from closed to open, slide the swing path from high-to-low to low-to-high, set the swing speed. The ball path redraws while the finger moves.</p>
+          </li>
+          <li>
+            <h3>Compare and talk it through</h3>
+            <p>The previous path stays as a ghost, or pin one to compare against. The lab reads out net clearance, depth, spin and speed, and says why: &ldquo;Face too open, the ball sails long. Close it about 3°.&rdquo; Tap <em>Suggest face</em> for the angle that lands it deep.</p>
+          </li>
+        </ol>
+        <figure class="phone">
+          <img src="assets/face-sweep.webp" width="390" height="370" alt="The lab on a phone: as the racket face opens from closed, the ball path rises from the net to deep in the court and then long, and the verdict changes with it." loading="lazy" decoding="async" />
+          <figcaption>Opening the face against a heavy topspin ball, on a phone.</figcaption>
+        </figure>
+      </div>
+      <figure class="desk">
+        <img src="assets/lab-desktop.webp" width="1440" height="900" alt="Rackets Lab on a laptop: incoming-ball list and racket-face dial on the left, the verdict and coaching lines above a 3D court with the shot and the pinned compare path." loading="lazy" decoding="async" />
+        <figcaption>On a laptop or tablet: a heavy topspin ball, the face 3.5° too open, compared with the pinned deep shot.</figcaption>
+      </figure>
+    </section>
 
-        <div class="loading-blueprint-card" aria-hidden="true">
-          <div class="lbp-header">
-            <span>Ball speed synthesis</span>
-            <span>v_out = (1+e_A)·v_r + e_A·v_in</span>
-          </div>
-          <svg class="lbp-svg" viewBox="0 0 360 175" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <line x1="20" y1="145" x2="340" y2="145" stroke="#c9c1b0" stroke-width="1.5"/>
-            <line x1="180" y1="112" x2="180" y2="145" stroke="#1b1a17" stroke-width="2.5"/>
-            <path d="M 36 108 Q 148 24 275 144" stroke="#1f5b3f" stroke-width="3" stroke-linecap="round"/>
-            <path d="M 275 144 Q 308 102 336 132" stroke="#2a6fc4" stroke-width="2.4" stroke-linecap="round"/>
-            <path d="M 36 108 Q 165 48 310 144" stroke="#a39b8b" stroke-width="1.3" stroke-dasharray="4 4"/>
-            <circle cx="36" cy="108" r="5" fill="#b44a1a"/>
-            <circle cx="275" cy="144" r="4.5" fill="#1f5b3f"/>
-            <circle cx="180" cy="74" r="3.5" fill="#2a6fc4"/>
-            <text x="28" y="94" fill="#b44a1a" font-family="JetBrains Mono" font-size="9" font-weight="700">IMPACT</text>
-            <text x="154" y="62" fill="#2a6fc4" font-family="JetBrains Mono" font-size="9" font-weight="700">NET +68cm</text>
-            <text x="252" y="162" fill="#1f5b3f" font-family="JetBrains Mono" font-size="9" font-weight="700">BOUNCE IN</text>
+    <section class="balls" id="balls" aria-labelledby="balls-title">
+      <h2 id="balls-title">Eight balls to practise against</h2>
+      <p class="section-lede">Numbers are for a hard court. Change the surface in the lab and every ball bounces differently.</p>
+      <ul class="ball-list">
+        <li class="ball">
+          <svg class="ball-path" viewBox="-14 -5.2 28 5.6" preserveAspectRatio="none" aria-hidden="true">
+            <line class="bp-ground" x1="-14" y1="0" x2="14" y2="0"/>
+            <line class="bp-net" x1="0" y1="0" x2="0" y2="-2.0"/>
+            <polyline class="bp-flight" points="11.60,-2.20 10.83,-2.35 10.08,-2.49 9.34,-2.60 8.61,-2.71 7.89,-2.80 7.18,-2.88 6.49,-2.94 5.80,-2.99 5.13,-3.03 4.47,-3.05 3.81,-3.06 3.17,-3.06 2.53,-3.05 1.91,-3.03 1.29,-2.99 0.68,-2.94 0.08,-2.88 -0.47,-2.82 -1.06,-2.74 -1.63,-2.65 -2.20,-2.55 -2.76,-2.44 -3.31,-2.32 -3.86,-2.19 -4.40,-2.05 -4.93,-1.90 -5.46,-1.74 -5.98,-1.57 -6.49,-1.39 -6.99,-1.20 -7.49,-1.01 -7.99,-0.80 -8.47,-0.59 -8.95,-0.37 -9.43,-0.14 -9.79,-0.20 -10.12,-0.37 -10.45,-0.52 -10.78,-0.67 -11.11,-0.80 -11.43,-0.91 -11.75,-1.02 -12.06,-1.11 -12.37,-1.19 -12.68,-1.26 -12.99,-1.32 -13.02,-1.32"/>
           </svg>
-          <div class="lbp-formula-grid">
-            <div class="lbp-item">
-              <span>积分</span>
-              <strong>RK4 · 精确落地事件定位</strong>
-            </div>
-            <div class="lbp-item">
-              <span>动作</span>
-              <strong>FH · 2H · 1H · Serve</strong>
-            </div>
-          </div>
+          <h3 class="ball-name">Flat fast drive</h3>
+          <p class="ball-blurb">Low over the net and fast; it skids through below the waist.</p>
+          <dl class="ball-nums">
+            <div><dt>Off their racket</dt><dd>140 km/h, 1,200 rpm topspin</dd></div>
+            <div><dt>Bounces</dt><dd>87 km/h, up to 0.65 m</dd></div>
+            <div><dt>You meet it</dt><dd>0.60 m high, 55 km/h, after 0.92 s</dd></div>
+          </dl>
+        </li>
+        <li class="ball">
+          <svg class="ball-path" viewBox="-14 -5.2 28 5.6" preserveAspectRatio="none" aria-hidden="true">
+            <line class="bp-ground" x1="-14" y1="0" x2="14" y2="0"/>
+            <line class="bp-net" x1="0" y1="0" x2="0" y2="-2.0"/>
+            <polyline class="bp-flight" points="11.80,-2.20 11.22,-2.56 10.64,-2.90 10.08,-3.22 9.52,-3.52 8.97,-3.80 8.43,-4.05 7.90,-4.30 7.37,-4.52 6.86,-4.73 6.34,-4.91 5.84,-5.09 5.34,-5.24 4.85,-5.38 4.37,-5.51 3.89,-5.62 3.42,-5.71 2.96,-5.79 2.50,-5.86 2.04,-5.91 1.59,-5.95 1.15,-5.98 0.72,-5.99 0.29,-5.99 -0.13,-5.97 -0.55,-5.95 -0.96,-5.91 -1.37,-5.86 -1.78,-5.80 -2.18,-5.72 -2.58,-5.64 -2.97,-5.54 -3.35,-5.44 -3.73,-5.32 -4.11,-5.19 -4.48,-5.05 -4.85,-4.90 -5.22,-4.74 -5.58,-4.57 -5.93,-4.39 -6.28,-4.20 -6.63,-4.00 -6.98,-3.80 -7.32,-3.58 -7.65,-3.35 -7.98,-3.12 -8.31,-2.87 -8.64,-2.62 -8.96,-2.35 -9.27,-2.08 -9.59,-1.80 -9.90,-1.52 -10.20,-1.22 -10.50,-0.92 -10.80,-0.60 -11.10,-0.28 -11.36,-0.15 -11.62,-0.40 -11.87,-0.63 -12.12,-0.85 -12.37,-1.06 -12.61,-1.26 -12.86,-1.45 -13.10,-1.62 -13.34,-1.78 -13.58,-1.94 -13.82,-2.07 -14.06,-2.20 -14.29,-2.32 -14.53,-2.43 -14.76,-2.52 -14.81,-2.54"/>
+          </svg>
+          <h3 class="ball-name">Heavy topspin, high bounce</h3>
+          <p class="ball-blurb">High over the net with heavy topspin; bounces to about chest height and pushes you back.</p>
+          <dl class="ball-nums">
+            <div><dt>Off their racket</dt><dd>110 km/h, 3,800 rpm topspin</dd></div>
+            <div><dt>Bounces</dt><dd>59 km/h, up to 1.32 m</dd></div>
+            <div><dt>You meet it</dt><dd>1.16 m high, 42 km/h, after 1.40 s</dd></div>
+          </dl>
+        </li>
+        <li class="ball">
+          <svg class="ball-path" viewBox="-14 -5.2 28 5.6" preserveAspectRatio="none" aria-hidden="true">
+            <line class="bp-ground" x1="-14" y1="0" x2="14" y2="0"/>
+            <line class="bp-net" x1="0" y1="0" x2="0" y2="-2.0"/>
+            <polyline class="bp-flight" points="11.50,-2.09 10.95,-2.18 10.41,-2.26 9.88,-2.34 9.35,-2.42 8.83,-2.49 8.32,-2.55 7.82,-2.61 7.32,-2.66 6.83,-2.71 6.34,-2.75 5.87,-2.79 5.39,-2.83 4.93,-2.86 4.47,-2.88 4.01,-2.90 3.56,-2.91 3.12,-2.92 2.68,-2.92 2.25,-2.92 1.82,-2.91 1.40,-2.90 0.98,-2.88 0.57,-2.86 0.16,-2.83 -0.24,-2.80 -0.64,-2.76 -1.04,-2.71 -1.43,-2.67 -1.81,-2.61 -2.20,-2.55 -2.58,-2.49 -2.95,-2.42 -3.32,-2.35 -3.69,-2.27 -4.05,-2.18 -4.41,-2.09 -4.77,-2.00 -5.12,-1.90 -5.47,-1.80 -5.82,-1.69 -6.16,-1.57 -6.50,-1.45 -6.84,-1.33 -7.17,-1.20 -7.50,-1.06 -7.83,-0.93 -8.16,-0.78 -8.48,-0.63 -8.80,-0.48 -9.12,-0.32 -9.43,-0.15 -9.69,-0.14 -9.90,-0.26 -10.11,-0.38 -10.33,-0.48 -10.54,-0.58 -10.75,-0.66 -10.96,-0.74 -11.17,-0.81 -11.37,-0.88 -11.58,-0.93 -11.79,-0.97 -11.99,-1.01 -12.19,-1.04 -12.40,-1.06 -12.60,-1.07 -12.78,-1.07"/>
+          </svg>
+          <h3 class="ball-name">Low skidding slice</h3>
+          <p class="ball-blurb">Backspin keeps it low; it skids and stays near knee height.</p>
+          <dl class="ball-nums">
+            <div><dt>Off their racket</dt><dd>100 km/h, 2,600 rpm backspin</dd></div>
+            <div><dt>Bounces</dt><dd>58 km/h, up to 0.49 m</dd></div>
+            <div><dt>You meet it</dt><dd>0.49 m high, 36 km/h, after 1.34 s</dd></div>
+          </dl>
+        </li>
+        <li class="ball">
+          <svg class="ball-path" viewBox="-14 -5.2 28 5.6" preserveAspectRatio="none" aria-hidden="true">
+            <line class="bp-ground" x1="-14" y1="0" x2="14" y2="0"/>
+            <line class="bp-net" x1="0" y1="0" x2="0" y2="-2.0"/>
+            <polyline class="bp-flight" points="12.20,-2.20 11.80,-2.65 11.40,-3.08 11.00,-3.49 10.61,-3.89 10.22,-4.27 9.84,-4.64 9.46,-4.99 9.09,-5.33 8.71,-5.65 8.35,-5.95 7.98,-6.24 7.62,-6.52 7.26,-6.78 6.90,-7.03 6.55,-7.27 6.20,-7.49 5.86,-7.70 5.52,-7.90 5.18,-8.08 4.84,-8.25 4.51,-8.41 4.18,-8.56 3.85,-8.69 3.52,-8.81 3.20,-8.92 2.88,-9.02 2.57,-9.11 2.25,-9.18 1.94,-9.25 1.63,-9.30 1.33,-9.34 1.03,-9.37 0.73,-9.39 0.43,-9.40 0.13,-9.40 -0.15,-9.39 -0.44,-9.37 -0.73,-9.34 -1.01,-9.30 -1.29,-9.25 -1.58,-9.19 -1.85,-9.11 -2.13,-9.04 -2.40,-8.95 -2.68,-8.84 -2.95,-8.74 -3.21,-8.62 -3.48,-8.49 -3.74,-8.35 -4.00,-8.21 -4.26,-8.05 -4.52,-7.89 -4.77,-7.72 -5.02,-7.53 -5.27,-7.34 -5.52,-7.14 -5.77,-6.94 -6.01,-6.72 -6.25,-6.50 -6.49,-6.26 -6.73,-6.02 -6.96,-5.78 -7.20,-5.52 -7.43,-5.25 -7.66,-4.98 -7.88,-4.70 -8.11,-4.41 -8.33,-4.11 -8.55,-3.81 -8.77,-3.50 -8.99,-3.18 -9.20,-2.85 -9.41,-2.52 -9.62,-2.18 -9.83,-1.83 -10.04,-1.47 -10.24,-1.11 -10.45,-0.74 -10.65,-0.37 -10.83,-0.13 -10.98,-0.43 -11.12,-0.71 -11.27,-0.98 -11.42,-1.24 -11.56,-1.49 -11.71,-1.73 -11.85,-1.96 -11.99,-2.17 -12.14,-2.38 -12.28,-2.58 -12.42,-2.77 -12.56,-2.94 -12.70,-3.11 -12.84,-3.26 -12.98,-3.41 -13.12,-3.55 -13.26,-3.67 -13.40,-3.79 -13.54,-3.90 -13.61,-3.95"/>
+          </svg>
+          <h3 class="ball-name">Moonball</h3>
+          <p class="ball-blurb">Slow, very high and deep; the bounce climbs above your head.</p>
+          <dl class="ball-nums">
+            <div><dt>Off their racket</dt><dd>82 km/h, 2,300 rpm topspin</dd></div>
+            <div><dt>Bounces</dt><dd>48 km/h, up to 2.03 m</dd></div>
+            <div><dt>You meet it</dt><dd>1.80 m high, 26 km/h, after 1.99 s</dd></div>
+          </dl>
+        </li>
+        <li class="ball">
+          <svg class="ball-path" viewBox="-14 -5.2 28 5.6" preserveAspectRatio="none" aria-hidden="true">
+            <line class="bp-ground" x1="-14" y1="0" x2="14" y2="0"/>
+            <line class="bp-net" x1="0" y1="0" x2="0" y2="-2.0"/>
+            <polyline class="bp-flight" points="11.80,-1.98 11.45,-2.26 11.10,-2.53 10.75,-2.78 10.41,-3.02 10.07,-3.25 9.73,-3.46 9.39,-3.66 9.06,-3.85 8.73,-4.03 8.40,-4.20 8.08,-4.35 7.76,-4.49 7.44,-4.63 7.12,-4.75 6.81,-4.86 6.50,-4.95 6.19,-5.04 5.88,-5.12 5.58,-5.18 5.27,-5.24 4.97,-5.28 4.68,-5.32 4.38,-5.34 4.09,-5.35 3.80,-5.35 3.51,-5.35 3.22,-5.33 2.94,-5.30 2.66,-5.27 2.38,-5.22 2.10,-5.17 1.83,-5.10 1.55,-5.02 1.28,-4.94 1.02,-4.85 0.75,-4.75 0.48,-4.63 0.22,-4.51 -0.03,-4.39 -0.28,-4.25 -0.54,-4.11 -0.80,-3.95 -1.05,-3.78 -1.30,-3.61 -1.55,-3.43 -1.80,-3.24 -2.04,-3.04 -2.28,-2.83 -2.52,-2.62 -2.76,-2.40 -3.00,-2.16 -3.24,-1.92 -3.47,-1.68 -3.70,-1.42 -3.93,-1.16 -4.16,-0.89 -4.39,-0.61 -4.61,-0.32 -4.81,-0.10 -4.96,-0.32 -5.12,-0.54 -5.27,-0.74 -5.42,-0.94 -5.57,-1.12 -5.72,-1.29 -5.87,-1.45 -6.02,-1.61 -6.17,-1.75 -6.31,-1.88 -6.46,-2.01 -6.61,-2.12"/>
+          </svg>
+          <h3 class="ball-name">Short ball</h3>
+          <p class="ball-blurb">Lands near the service line; you step in and hit from inside the court.</p>
+          <dl class="ball-nums">
+            <div><dt>Off their racket</dt><dd>68 km/h, 1,500 rpm topspin</dd></div>
+            <div><dt>Bounces</dt><dd>47 km/h, up to 1.24 m</dd></div>
+            <div><dt>You meet it</dt><dd>0.96 m high, 28 km/h, after 1.42 s</dd></div>
+          </dl>
+        </li>
+        <li class="ball">
+          <svg class="ball-path" viewBox="-14 -5.2 28 5.6" preserveAspectRatio="none" aria-hidden="true">
+            <line class="bp-ground" x1="-14" y1="0" x2="14" y2="0"/>
+            <line class="bp-net" x1="0" y1="0" x2="0" y2="-2.0"/>
+            <polyline class="bp-flight" points="11.95,-6.38 11.08,-6.31 10.24,-6.21 9.41,-6.10 8.60,-5.97 7.81,-5.82 7.03,-5.66 6.28,-5.48 5.54,-5.28 4.81,-5.07 4.10,-4.84 3.40,-4.61 2.72,-4.36 2.05,-4.09 1.40,-3.82 0.76,-3.53 0.13,-3.23 -0.43,-2.95 -1.04,-2.63 -1.63,-2.29 -2.22,-1.95 -2.79,-1.60 -3.36,-1.24 -3.91,-0.87 -4.45,-0.49 -4.99,-0.10 -5.38,-0.34 -5.78,-0.63 -6.17,-0.89 -6.56,-1.14 -6.94,-1.38 -7.32,-1.60 -7.69,-1.80 -8.06,-1.99 -8.43,-2.16 -8.79,-2.32 -9.15,-2.47 -9.50,-2.60 -9.86,-2.71 -10.20,-2.82 -10.55,-2.91 -10.89,-2.99 -11.23,-3.05 -11.56,-3.10 -11.89,-3.14 -12.22,-3.17 -12.54,-3.19 -12.61,-3.19"/>
+          </svg>
+          <h3 class="ball-name">Kick serve return</h3>
+          <p class="ball-blurb">Second serve wide to the deuce court from a tall server; kicks up to about shoulder height.</p>
+          <dl class="ball-nums">
+            <div><dt>Off their racket</dt><dd>160 km/h, 4,400 rpm topspin</dd></div>
+            <div><dt>Bounces</dt><dd>101 km/h, up to 1.45 m</dd></div>
+            <div><dt>You meet it</dt><dd>1.45 m high, 59 km/h, after 0.92 s</dd></div>
+          </dl>
+        </li>
+        <li class="ball">
+          <svg class="ball-path" viewBox="-14 -5.2 28 5.6" preserveAspectRatio="none" aria-hidden="true">
+            <line class="bp-ground" x1="-14" y1="0" x2="14" y2="0"/>
+            <line class="bp-net" x1="0" y1="0" x2="0" y2="-2.0"/>
+            <polyline class="bp-flight" points="11.95,-6.27 10.91,-6.03 9.90,-5.79 8.91,-5.54 7.93,-5.28 6.98,-5.02 6.05,-4.74 5.14,-4.46 4.25,-4.18 3.37,-3.88 2.51,-3.58 1.66,-3.27 0.84,-2.95 0.02,-2.63 -0.72,-2.33 -1.50,-2.00 -2.27,-1.65 -3.03,-1.31 -3.78,-0.96 -4.51,-0.60 -5.23,-0.23 -5.79,-0.22 -6.28,-0.49 -6.77,-0.74 -7.25,-0.97 -7.72,-1.19 -8.19,-1.38 -8.65,-1.57 -9.10,-1.73 -9.55,-1.88 -10.00,-2.02 -10.43,-2.14 -10.87,-2.24 -11.30,-2.33 -11.72,-2.41 -12.13,-2.47 -12.55,-2.52 -12.95,-2.55 -13.24,-2.57"/>
+          </svg>
+          <h3 class="ball-name">Flat serve return</h3>
+          <p class="ball-blurb">First serve down the T at 190 km/h; very little time to react.</p>
+          <dl class="ball-nums">
+            <div><dt>Off their racket</dt><dd>190 km/h, 900 rpm topspin</dd></div>
+            <div><dt>Bounces</dt><dd>131 km/h, up to 1.17 m</dd></div>
+            <div><dt>You meet it</dt><dd>1.17 m high, 72 km/h, after 0.75 s</dd></div>
+          </dl>
+        </li>
+        <li class="ball">
+          <svg class="ball-path" viewBox="-14 -5.2 28 5.6" preserveAspectRatio="none" aria-hidden="true">
+            <line class="bp-ground" x1="-14" y1="0" x2="14" y2="0"/>
+            <line class="bp-net" x1="0" y1="0" x2="0" y2="-2.0"/>
+            <polyline class="bp-flight" points="11.70,-2.20 11.04,-2.48 10.40,-2.74 9.76,-2.98 9.13,-3.20 8.52,-3.40 7.91,-3.59 7.31,-3.76 6.72,-3.91 6.14,-4.04 5.57,-4.16 5.01,-4.27 4.45,-4.35 3.91,-4.43 3.37,-4.48 2.84,-4.53 2.31,-4.56 1.80,-4.57 1.29,-4.58 0.78,-4.57 0.29,-4.54 -0.19,-4.51 -0.68,-4.46 -1.15,-4.40 -1.62,-4.33 -2.09,-4.24 -2.55,-4.15 -3.00,-4.04 -3.44,-3.92 -3.89,-3.80 -4.32,-3.66 -4.75,-3.51 -5.17,-3.35 -5.59,-3.17 -6.01,-2.99 -6.41,-2.81 -6.82,-2.60 -7.22,-2.40 -7.61,-2.18 -8.00,-1.95 -8.38,-1.71 -8.76,-1.47 -9.14,-1.21 -9.51,-0.95 -9.87,-0.68 -10.23,-0.39 -10.59,-0.10 -10.84,-0.25 -11.11,-0.47 -11.37,-0.67 -11.64,-0.86 -11.90,-1.03 -12.16,-1.19 -12.41,-1.35 -12.67,-1.49 -12.92,-1.62 -13.17,-1.74 -13.32,-1.80"/>
+          </svg>
+          <h3 class="ball-name">Deep ball to the backhand</h3>
+          <p class="ball-blurb">Deep topspin into the backhand corner; pushes you behind the baseline.</p>
+          <dl class="ball-nums">
+            <div><dt>Off their racket</dt><dd>122 km/h, 2,800 rpm topspin</dd></div>
+            <div><dt>Bounces</dt><dd>68 km/h, up to 1.05 m</dd></div>
+            <div><dt>You meet it</dt><dd>0.82 m high, 46 km/h, after 1.13 s</dd></div>
+          </dl>
+        </li>
+      </ul>
+    </section>
+
+    <section class="physics" id="physics" aria-labelledby="physics-title">
+      <h2 id="physics-title">Physics, not guesses</h2>
+      <div class="physics-grid">
+        <div>
+          <h3>Flight</h3>
+          <p>Gravity, drag and Magnus lift, integrated with RK4 every 2&nbsp;ms. Drag and lift coefficients follow Štěpánek&rsquo;s fits for spinning tennis balls.</p>
+        </div>
+        <div>
+          <h3>Racket and court</h3>
+          <p>The strings and the court are rigid-body impacts after Rod Cross: the ball grips or slides, which is where spin comes from. Court bounces are calibrated to the ITF drop test.</p>
+        </div>
+        <div>
+          <h3>Coaching advice</h3>
+          <p>Every sentence the lab says is read off the simulated shot: the face change comes from searching face angles with the same model, and the incoming spin&rsquo;s effect from running the impact with and without it.</p>
+        </div>
+        <div>
+          <h3>What it leaves out</h3>
+          <p>A centre hit on the strings, the face tilted in the vertical plane only, no player error. The opponent shots are hand-picked. It is a teaching model: trust the direction of every change, not the last centimetre.</p>
         </div>
       </div>
+      <p class="physics-link"><a href="lab/validation.html">Read the validation page</a>: convergence tests, the analytic limit, and checks against published measurements.</p>
+    </section>
 
-      <div class="loading-footer-bar">
-        <span class="loading-spacer"></span>
-        <a class="loading-doc-link" href="./validation.html" data-i18n="linkValidation">模型说明与验证 →</a>
-        <button class="loading-enter-btn" id="btnEnterLab" data-i18n="btnEnterLab">进入实验室 →</button>
-      </div>
-    </div>
-  </div>
+    <section class="final" aria-labelledby="final-title">
+      <h2 id="final-title">Take it to the court.</h2>
+      <a class="btn btn-light" href="lab/">Open the lab</a>
+    </section>
+  </main>
 
-  <div class="app-layout">
-    <!-- ===================== Top app bar ===================== -->
-    <header class="topbar">
-      <div class="topbar-brand">
-        <span class="brand-mark" aria-hidden="true"></span>
-        <span class="brand-name">AERO-LAB</span>
-        <span class="brand-sub" data-i18n="brandSub">网球弹道教学模拟器</span>
-      </div>
-
-      <nav class="mode-switch-bar" id="appModeSwitchGroup" aria-label="Mode">
-        <button class="mode-switch-btn active" data-app-mode="solo" data-i18n="modeBtnSolo">单人模拟</button>
-        <button class="mode-switch-btn" data-app-mode="rally" data-i18n="modeBtnRally">双人回合</button>
-        <button class="mode-switch-btn mode-switch-gold" data-app-mode="tactics" data-i18n="modeBtnTactics">战术教学</button>
-      </nav>
-
-      <div class="topbar-actions header-right-controls">
-        <a class="ghost-btn" href="./validation.html" data-i18n="btnValidation">验证</a>
-        <button class="ghost-btn" id="btnReopenWelcome" data-i18n="btnWelcomePage">启动页</button>
-        <div class="seg-control" id="themeSwitchGroup" role="group" aria-label="Theme">
-          <button class="seg-btn active" data-theme-choice="light" data-i18n="themeLight">浅色</button>
-          <button class="seg-btn" data-theme-choice="dark" data-i18n="themeDark">深色</button>
-        </div>
-        <div class="seg-control" id="langSwitchGroup">
-          <button class="seg-btn active" data-lang="zh">中</button>
-          <button class="seg-btn" data-lang="en">EN</button>
-        </div>
-      </div>
-    </header>
-
-    <!-- ===================== Left control panel ===================== -->
-    <aside class="sidebar">
-      <section class="panel-section panel-mode">
-        <div class="section-header">
-          <span class="section-tag" id="coreModeSectionTitle" data-i18n="soloSectionTitle">模式与球员预设</span>
-          <div class="rally-actions">
-            <button class="mini-action-btn" id="btnResetRally" data-i18n="btnReset">重置</button>
-            <button class="mini-action-btn" id="btnOpenImportModal" data-i18n="btnImportAtp">导入</button>
-          </div>
-        </div>
-
-        <!-- Solo mode -->
-        <div id="soloModeContainer">
-          <div class="stroke-btn-group" id="strokeTypeGroup">
-            <button class="stroke-btn active" data-stroke="fh" data-i18n="strokeFH">正手 FH</button>
-            <button class="stroke-btn" data-stroke="bh2" data-i18n="strokeBH2">双反 2H</button>
-            <button class="stroke-btn" data-stroke="bh1" data-i18n="strokeBH1">单反 1H</button>
-            <button class="stroke-btn" data-stroke="serve" data-i18n="strokeServe">发球</button>
-          </div>
-          <select id="presetSelect" aria-label="Preset"></select>
-        </div>
-
-        <!-- Rally / tactics mode -->
-        <div id="rallyModeContainer" style="display: none;">
-          <select id="rallyPresetSelect" aria-label="Rally"></select>
-          <div class="rally-turn-box">
-            <div class="rally-turn-header">
-              <span class="rally-matchup" id="rallyMatchupLabel">C. Alcaraz (A) vs N. Djokovic (B)</span>
-              <button class="mini-action-btn active-accent" id="btnNextTurn" data-i18n="btnNextTurn">+ 下一拍</button>
-            </div>
-            <div class="turn-chain" id="turnChainContainer"></div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Ball speed breakdown -->
-      <section class="panel-section">
-        <div class="solo-speed-card" id="soloSpeedBreakdownCard">
-          <div class="ssc-header">
-            <span class="ssc-title" data-i18n="sscTitle">球速合成剖析</span>
-            <span class="ssc-total" id="sscTotalSpeed">138.2 km/h</span>
-          </div>
-          <div class="ssc-bar-wrap">
-            <div class="ssc-bar-active" id="sscBarActive" style="width: 82%;"></div>
-            <div class="ssc-bar-borrow" id="sscBarBorrow" style="width: 18%;"></div>
-          </div>
-          <div class="ssc-legend-row">
-            <span class="ssc-leg-item">
-              <i class="ssc-dot ssc-dot-active"></i>
-              <span data-i18n="sscActiveLbl">主动发力</span>
-              <strong id="sscActiveVal">113.4 km/h (82%)</strong>
-            </span>
-            <span class="ssc-leg-item">
-              <i class="ssc-dot ssc-dot-borrow"></i>
-              <span data-i18n="sscBorrowLbl">来球借力</span>
-              <strong id="sscBorrowVal">+24.8 km/h (18%)</strong>
-            </span>
-          </div>
-          <div class="ssc-metrics-grid">
-            <div class="ssc-cell">
-              <span data-i18n="sscCorLbl">拍面 e_A</span>
-              <strong id="sscCorVal">0.418</strong>
-            </div>
-            <div class="ssc-cell">
-              <span data-i18n="sscDwellLbl">驻留/形变 (估算)</span>
-              <strong id="sscDwellVal">≈5.0 ms · 13 mm</strong>
-            </div>
-            <div class="ssc-cell">
-              <span data-i18n="sscSecondBounceLbl">二跳深度</span>
-              <strong id="sscSecondBounceVal">X 18.7m</strong>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Parameter tabs -->
-      <nav class="nav-tabs" id="sidebarNavTabs">
-        <button class="nav-tab active" data-tab="tab-racket" data-i18n="tabRacket">挥拍</button>
-        <button class="nav-tab" data-tab="tab-incoming" data-i18n="tabIncoming">来球</button>
-        <button class="nav-tab" data-tab="tab-position" data-i18n="tabPosition">场地</button>
-        <button class="nav-tab nav-tab-gold" data-tab="tab-tactics" data-i18n="tabTactics">战术</button>
-      </nav>
-
-      <div class="tab-panels">
-        <!-- Swing -->
-        <div class="tab-panel active" id="tab-racket">
-          <div class="slider-group">
-            <div class="slider-header">
-              <span class="slider-label" data-i18n="lblRacketSpeed">挥拍速度</span>
-              <span class="slider-val" id="racketSpeedKmhVal">94 km/h</span>
-            </div>
-            <input type="range" id="racketSpeedKmh" min="20" max="175" step="0.5" value="94" />
-          </div>
-          <div class="slider-group">
-            <div class="slider-header">
-              <span class="slider-label" data-i18n="lblSwingPath">挥拍仰角</span>
-              <span class="slider-val" id="swingPathDegVal">+28.5°</span>
-            </div>
-            <input type="range" id="swingPathDeg" min="-30" max="45" step="0.5" value="28.5" />
-          </div>
-          <div class="slider-group">
-            <div class="slider-header">
-              <span class="slider-label" data-i18n="lblFaceAngle">拍面倾角</span>
-              <span class="slider-val" id="faceAngleDegVal">-2.2°</span>
-            </div>
-            <input type="range" id="faceAngleDeg" min="-18" max="32" step="0.2" value="-2.2" />
-          </div>
-          <div class="slider-group">
-            <div class="slider-header">
-              <span class="slider-label" data-i18n="lblAimAngle">水平方向</span>
-              <span class="slider-val" id="aimAngleDegVal">左 +8.2°</span>
-            </div>
-            <input type="range" id="aimAngleDeg" min="-28" max="28" step="0.2" value="8.2" />
-          </div>
-          <div class="slider-group">
-            <div class="slider-header">
-              <span class="slider-label" data-i18n="lblStringTension">穿线张力</span>
-              <span class="slider-val" id="stringTensionKgVal">50.7 lbs</span>
-            </div>
-            <input type="range" id="stringTensionKg" min="18" max="28" step="0.2" value="23" />
-          </div>
-        </div>
-
-        <!-- Incoming ball -->
-        <div class="tab-panel" id="tab-incoming">
-          <div class="slider-group">
-            <label class="mini-lbl" for="incomingPresetSelect" data-i18n="lblIncomingPreset">来球预设</label>
-            <select id="incomingPresetSelect"></select>
-          </div>
-          <div class="slider-group">
-            <div class="slider-header">
-              <span class="slider-label" data-i18n="lblIncomingSpeed">来球速度</span>
-              <span class="slider-val" id="incomingSpeedKmhVal">56 km/h</span>
-            </div>
-            <input type="range" id="incomingSpeedKmh" min="0" max="200" step="1" value="56" />
-          </div>
-          <div class="slider-group">
-            <div class="slider-header">
-              <span class="slider-label" data-i18n="lblIncomingAngle">入射仰角</span>
-              <span class="slider-val" id="incomingAngleDegVal">-11.0°</span>
-            </div>
-            <input type="range" id="incomingAngleDeg" min="-40" max="35" step="0.5" value="-11" />
-          </div>
-          <div class="slider-group">
-            <div class="slider-header">
-              <span class="slider-label" data-i18n="lblIncomingSpin">来球旋转</span>
-              <span class="slider-val" id="incomingSpinRpmVal">+1950 RPM</span>
-            </div>
-            <input type="range" id="incomingSpinRpm" min="-4500" max="5000" step="50" value="1950" />
-          </div>
-          <div class="incoming-effect-box">
-            <div class="effect-title" data-i18n="incomingEffectTitle">借力增量 (对比定点球)</div>
-            <div class="effect-grid">
-              <div class="effect-cell">
-                <span class="effect-lbl" data-i18n="effBorrowSpeed">借力球速</span>
-                <strong id="effDeltaSpeed">+14.2 km/h</strong>
-              </div>
-              <div class="effect-cell">
-                <span class="effect-lbl" data-i18n="effLaunchAngle">仰角偏移</span>
-                <strong id="effDeltaAngle">+2.1°</strong>
-              </div>
-              <div class="effect-cell">
-                <span class="effect-lbl" data-i18n="effSpinChange">转速变化</span>
-                <strong id="effDeltaSpin">-420 RPM</strong>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Court, position & environment -->
-        <div class="tab-panel" id="tab-position">
-          <div class="select-row">
-            <div>
-              <label class="mini-lbl" for="courtModeSelect" data-i18n="lblCourtMode">判罚界线</label>
-              <select id="courtModeSelect">
-                <option value="singles" data-i18n="optSingles">单打</option>
-                <option value="doubles" data-i18n="optDoubles">双打</option>
-                <option value="serve_deuce" data-i18n="optServeDeuce">平分发球区</option>
-                <option value="serve_ad" data-i18n="optServeAd">占先发球区</option>
-              </select>
-            </div>
-            <div>
-              <label class="mini-lbl" for="surfaceSelect" data-i18n="lblSurface">场地材质</label>
-              <select id="surfaceSelect">
-                <option value="hard" data-i18n="optHard">硬地</option>
-                <option value="clay" data-i18n="optClay">红土</option>
-                <option value="grass" data-i18n="optGrass">草地</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="group-title" data-i18n="grpPosition">击球位置</div>
-          <div class="slider-group">
-            <div class="slider-header">
-              <span class="slider-label" data-i18n="lblHitX">前后站位 X</span>
-              <span class="slider-val" id="hitXVal">-11.75 m</span>
-            </div>
-            <input type="range" id="hitX" min="-14.5" max="-1.0" step="0.05" value="-11.75" />
-          </div>
-          <div class="slider-group">
-            <div class="slider-header">
-              <span class="slider-label" data-i18n="lblHitY">左右站位 Y</span>
-              <span class="slider-val" id="hitYVal">-1.85 m</span>
-            </div>
-            <input type="range" id="hitY" min="-5.4" max="5.4" step="0.05" value="-1.85" />
-          </div>
-          <div class="slider-group">
-            <div class="slider-header">
-              <span class="slider-label" data-i18n="lblHitZ">击球高度 Z</span>
-              <span class="slider-val" id="hitZVal">1.08 m</span>
-            </div>
-            <input type="range" id="hitZ" min="0.30" max="3.10" step="0.02" value="1.08" />
-          </div>
-          <div class="slider-group">
-            <div class="slider-header">
-              <span class="slider-label" data-i18n="lblSidespin">侧旋转速</span>
-              <span class="slider-val" id="sidespinRpmVal">+280 RPM</span>
-            </div>
-            <input type="range" id="sidespinRpm" min="-2500" max="2500" step="25" value="280" />
-          </div>
-
-          <div class="group-title" data-i18n="grpEnvironment">环境</div>
-          <div class="slider-group">
-            <div class="slider-header">
-              <span class="slider-label" data-i18n="lblWind">纵向风</span>
-              <span class="slider-val" id="windSpeedKmhVal">0 km/h</span>
-            </div>
-            <input type="range" id="windSpeedKmh" min="-30" max="30" step="1" value="0" />
-          </div>
-          <div class="slider-group">
-            <div class="slider-header">
-              <span class="slider-label" data-i18n="lblCrossWind">横向风</span>
-              <span class="slider-val" id="crossWindKmhVal">0 km/h</span>
-            </div>
-            <input type="range" id="crossWindKmh" min="-30" max="30" step="1" value="0" />
-          </div>
-          <div class="slider-group">
-            <div class="slider-header">
-              <span class="slider-label" data-i18n="lblTemperature">气温</span>
-              <span class="slider-val" id="temperatureCVal">20 °C</span>
-            </div>
-            <input type="range" id="temperatureC" min="0" max="45" step="1" value="20" />
-          </div>
-          <div class="slider-group">
-            <div class="slider-header">
-              <span class="slider-label" data-i18n="lblAltitude">海拔</span>
-              <span class="slider-val" id="altitudeMVal">0 m</span>
-            </div>
-            <input type="range" id="altitudeM" min="0" max="2500" step="50" value="0" />
-          </div>
-        </div>
-
-        <!-- Tactics -->
-        <div class="tab-panel" id="tab-tactics">
-          <div class="tactical-lab-card">
-            <div class="lesson-list" id="tacticalLessonList" role="listbox" aria-label="Lessons"></div>
-
-            <div class="lesson-detail">
-              <div class="lesson-head">
-                <div class="lesson-head-text">
-                  <h3 class="lesson-name" id="tacticalLessonName"></h3>
-                  <p class="lesson-insp" id="tacticalBadgeText"></p>
-                </div>
-                <button class="mini-action-btn" id="btnExitTactics" data-i18n="btnExitTactics">退出</button>
-              </div>
-              <p class="lesson-idea" id="tacticalPrincipleText"></p>
-              <ul class="lesson-keys" id="tacticalKeyPoints"></ul>
-
-              <ol class="lesson-rally" id="tacticalRally"></ol>
-
-              <div class="tactical-mode-row">
-                <button class="tactical-mode-btn active" id="btnTacticDemo" data-i18n="btnTacticDemo">看示范</button>
-                <button class="tactical-mode-btn challenge-accent" id="btnTacticChallenge" data-i18n="btnTacticChallenge">自己打</button>
-              </div>
-
-              <div class="lesson-goal" id="tacticalChallengeBox">
-                <div class="lesson-goal-head">
-                  <p class="lesson-goal-text" id="tacticalHintText"></p>
-                  <span class="tactical-score-pill" id="tacticalScoreBadge"></span>
-                </div>
-                <div class="lesson-map" id="tacticalMap"></div>
-                <ul class="lesson-checks" id="tacticalChecks"></ul>
-                <div class="lesson-tips" id="tacticalCoachFeedback"></div>
-                <p class="lesson-howto" data-i18n="tacticalHowTo">用挥拍滑块或示意图里的旋钮调这一拍；长按 3D 里的球员可以换站位。</p>
-                <div class="lesson-actions">
-                  <span class="lesson-best" id="tacticalBest"></span>
-                  <button class="mini-action-btn" id="btnTacticReset" data-i18n="btnTacticReset">重来</button>
-                  <button class="mini-action-btn" id="btnTacticAnswer" data-i18n="btnTacticAnswer">看答案</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Racket impact view (collapsible) -->
-      <details class="panel-section viz-section" id="racketVizDetails" open>
-        <summary class="section-header">
-          <span class="section-tag" data-i18n="racketVizTitle">拍面触球示意</span>
-          <div class="seg-control mini-seg" id="racket3DViewGroup">
-            <button class="seg-btn active" data-racket-view="side" data-i18n="rViewSide">侧视</button>
-            <button class="seg-btn" data-racket-view="top" data-i18n="rViewTop">俯视</button>
-          </div>
-        </summary>
-        <div class="racket-3d-wrap">
-          <div id="racketImpactCanvas" class="racket-diagram"></div>
-        </div>
-        <div class="racket-metrics-bar">
-          <div class="rm-cell">
-            <span class="rm-lbl" data-i18n="rmFace">拍面</span>
-            <strong id="rmFaceVal">-2.1°</strong>
-          </div>
-          <div class="rm-cell">
-            <span class="rm-lbl" data-i18n="rmSwing">轨迹</span>
-            <strong id="rmSwingVal">+25.5°</strong>
-          </div>
-          <div class="rm-cell">
-            <span class="rm-lbl" data-i18n="rmAttack">攻角</span>
-            <strong id="attackAngleBadge">+27.6°</strong>
-          </div>
-          <div class="rm-cell">
-            <span class="rm-lbl" data-i18n="rmAim">方向</span>
-            <strong id="rmAimVal">左 +7.2°</strong>
-          </div>
-        </div>
-      </details>
-
-      <!-- Display units -->
-      <footer class="sidebar-footer unit-bar">
-        <div class="unit-item">
-          <span class="unit-lbl" data-i18n="unitSpeedLabel">速度单位</span>
-          <div class="seg-control" id="speedUnitGroup">
-            <button class="seg-btn active" data-speed-unit="kmh">km/h</button>
-            <button class="seg-btn" data-speed-unit="mph">mph</button>
-            <button class="seg-btn" data-speed-unit="ms">m/s</button>
-          </div>
-        </div>
-        <div class="unit-item">
-          <span class="unit-lbl" data-i18n="unitTensionLabel">张力单位</span>
-          <div class="seg-control" id="tensionUnitGroup">
-            <button class="seg-btn active" data-tension-unit="lbs">lbs</button>
-            <button class="seg-btn" data-tension-unit="kg">kg</button>
-          </div>
-        </div>
-      </footer>
-    </aside>
-
-    <!-- ===================== 3D viewport ===================== -->
-    <main class="main-area">
-      <!-- Live telemetry (docked panel) -->
-      <section class="telemetry-module" id="interactiveHudLeft" aria-label="Telemetry">
-        <div class="tel-cell tel-cell-call" id="hudCardBounce">
-          <div class="tel-cell-top">
-            <span class="tel-label" id="hudTurnBadge" data-i18n="hudTitleCall">落点判罚</span>
-            <button class="tel-action-btn" id="btnJumpBounce" data-i18n="btnJumpBounce">定位</button>
-          </div>
-          <div class="tel-verdict-row">
-            <span class="call-tag call-in" id="hawkeyeCallBadge">IN</span>
-            <span class="tel-sub-mono" id="statLandingCoord">X 8.72 / Y 0.79m</span>
-          </div>
-          <div class="tel-meta" id="hawkeyeCallDetail">余量 79 cm</div>
-          <div class="tel-meta-mono" id="statBounceSpeed">92 → 68 km/h</div>
-        </div>
-
-        <div class="tel-cell">
-          <div class="tel-cell-top">
-            <span class="tel-label" data-i18n="hudTitleSpeed">出球速度</span>
-            <button class="tel-action-btn" id="btnCycleSpeedUnit">km/h</button>
-          </div>
-          <div class="tel-main-row">
-            <span class="tel-big-mono" id="hudSpeedBig">138.2 km/h</span>
-            <span class="tel-badge-mono" id="hudApexBadge">apex 2.15 m</span>
-          </div>
-          <input type="range" class="tel-inline-slider" id="hudSpeedSlider" min="40" max="230" step="0.5" value="138.2" aria-label="Launch speed" />
-        </div>
-
-        <div class="tel-cell">
-          <div class="tel-cell-top">
-            <span class="tel-label" data-i18n="hudTitleSpin">旋转转速</span>
-            <span class="tel-badge-mono" id="hudSpinTypePill">上旋</span>
-          </div>
-          <div class="tel-media-row">
-            <canvas id="hudSpinBallCanvas" width="68" height="68"></canvas>
-            <div class="tel-media-col">
-              <span class="tel-big-mono" id="hudSpinBig">+3420 RPM</span>
-              <span class="tel-meta" id="hudMagnusInfo">侧旋 +280</span>
-            </div>
-          </div>
-          <input type="range" class="tel-inline-slider" id="hudSpinSlider" min="-3200" max="4800" step="25" value="3420" aria-label="Spin" />
-        </div>
-
-        <div class="tel-cell">
-          <div class="tel-cell-top">
-            <span class="tel-label" data-i18n="hudTitleNet">过网净空</span>
-            <button class="tel-action-btn" id="btnJumpNet" data-i18n="btnJumpNet">过网</button>
-          </div>
-          <div class="tel-media-row">
-            <canvas id="hudNetGaugeCanvas" width="68" height="60"></canvas>
-            <div class="tel-media-col">
-              <span class="tel-big-mono" id="statNetClearance">+68.4 cm</span>
-              <span class="tel-meta" id="hudLaunchAngleInfo">仰角 +8.4°</span>
-            </div>
-          </div>
-          <input type="range" class="tel-inline-slider" id="hudAngleSlider" min="-10" max="32" step="0.2" value="8.4" aria-label="Launch angle" />
-        </div>
-      </section>
-
-      <!-- Tactics lesson status (docked; shown by the app during lessons) -->
-      <div class="tactical-hud-banner" id="tacticalHudBanner" style="display: none;">
-        <div class="thb-top">
-          <span class="thb-badge" id="thbTitle">Lesson 01</span>
-          <div class="thb-actions">
-            <span class="tactical-score-pill" id="thbScorePill">100 / 100</span>
-            <button class="mini-action-btn" id="thbBtnDemo" data-i18n="btnShortDemo">示范</button>
-            <button class="mini-action-btn active-accent" id="thbBtnChallenge" data-i18n="btnShortChallenge">自己打</button>
-            <button class="mini-action-btn icon-btn" id="thbBtnClose" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5"/></svg></button>
-          </div>
-        </div>
-        <div class="thb-feedback" id="thbFeedback"></div>
-      </div>
-
-      <!-- 3D wind-tunnel viewport -->
-      <div class="viewport-wrapper">
-        <div id="viewport3d"></div>
-        <div class="tactics-board" id="tacticsBoard" hidden></div>
-        <section class="impact-studio" id="impactStudio" hidden aria-label="Impact studio"></section>
-        <div class="seg-control view-switch" id="viewSwitch">
-          <button class="seg-btn active" data-view="3d">3D</button>
-          <button class="seg-btn" data-view="studio" data-i18n="viewStudio">击球台</button>
-          <button class="seg-btn" data-view="board" data-i18n="viewBoard" hidden>平面图</button>
-        </div>
-        <span class="viewport-corner viewport-corner-tl" aria-hidden="true"></span>
-        <span class="viewport-corner viewport-corner-tr" aria-hidden="true"></span>
-        <span class="viewport-corner viewport-corner-bl" aria-hidden="true"></span>
-        <span class="viewport-corner viewport-corner-br" aria-hidden="true"></span>
-        <!-- Phone only: fullscreen court -->
-        <button class="m-fab m-fab-enter" id="btnImmersive" aria-label="全屏查看球场"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M2 7V2h5M11 2h5v5M16 11v5h-5M7 16H2v-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
-        <div class="m-immersive-bar">
-          <button class="m-fab" id="btnImmersivePlay" aria-label="播放或暂停"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M5 3l10 6-10 6z" fill="currentColor"/></svg></button>
-          <button class="m-fab" id="btnImmersiveExit" aria-label="退出全屏"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M7 2v5H2M16 7h-5V2M11 16v-5h5M2 11h5v5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
-        </div>
-      </div>
-
-      <!-- View toolbar: cameras, layers, legend -->
-      <div class="view-toolbar">
-        <div class="cam-strip" role="group" aria-label="Camera">
-          <button class="cam-btn" data-cam="player_closeup" data-i18n="camCloseup">特写</button>
-          <button class="cam-btn" data-cam="broadcast" data-i18n="camBroadcast">全景</button>
-          <button class="cam-btn" data-cam="side" data-i18n="camSide">侧面</button>
-          <button class="cam-btn" data-cam="player_pov" data-i18n="camPov">主视角</button>
-          <button class="cam-btn" data-cam="hawkeye" data-i18n="camHawkeye">判线</button>
-          <button class="cam-btn" data-cam="top" data-i18n="camTop">俯视</button>
-        </div>
-        <div class="layer-strip">
-          <label class="toggle-label">
-            <input type="checkbox" id="toggleVectors" checked />
-            <span data-i18n="chkVectors">物理矢量</span>
-          </label>
-          <label class="toggle-label">
-            <input type="checkbox" id="toggleGhost" checked />
-            <span data-i18n="chkGhost">无旋对比</span>
-          </label>
-          <label class="toggle-label">
-            <input type="checkbox" id="toggleTrueScale" />
-            <span data-i18n="chkTrueScale">真实球径</span>
-          </label>
-          <label class="toggle-label">
-            <input type="checkbox" id="toggleStands" checked />
-            <span data-i18n="chkStands">观众席</span>
-          </label>
-          <button class="mobile-sheet-toggle" id="btnMobileExpand3D" data-i18n="btnMobileExpand3D">全屏球场</button>
-          <span class="toolbar-hint" data-i18n="hintDragPlayer">长按球员可拖动站位</span>
-        </div>
-        <div class="legend-strip" aria-label="Legend">
-          <div class="legend-item"><span class="legend-swatch legend-swatch-in"></span><span data-i18n="legIncoming">来球</span></div>
-          <div class="legend-item"><span class="legend-swatch legend-swatch-pre"></span><span data-i18n="legPreBounce">飞行</span></div>
-          <div class="legend-item"><span class="legend-swatch legend-swatch-post"></span><span data-i18n="legPostBounce">反弹</span></div>
-          <div class="legend-item"><span class="legend-swatch legend-swatch-magnus"></span><span data-i18n="legMagnus">马格努斯力</span></div>
-          <div class="legend-item"><span class="legend-swatch legend-swatch-dash"></span><span data-i18n="legNoSpin">无旋基准</span></div>
-        </div>
-      </div>
-
-      <!-- Playback bar -->
-      <footer class="scrubber-bar">
-        <div class="scrubber-controls">
-          <button class="play-btn" id="btnPlayPause">暂停</button>
-          <button class="secondary-btn active-rally-btn" id="btnPlayFullRally" data-i18n="btnPlayFullRally">连播回合</button>
-          <button class="secondary-btn" id="btnRestart" data-i18n="btnRestart">重播</button>
-          <button class="secondary-btn" id="btnSnapImpact" data-i18n="btnSnapImpact">触球 t=0</button>
-          <button class="secondary-btn active-accent" id="btnHandoff" data-i18n="btnHandoff" hidden>从这一刻接球</button>
-          <button class="secondary-btn" id="btnHandoffBack" data-i18n="btnHandoffBack" hidden>上一拍</button>
-          <button class="secondary-btn" id="btnResetAll" data-i18n="btnReset">重置</button>
-          <select id="speedSelect" aria-label="Playback speed">
-            <option value="0.15" data-i18n="spd015">0.15x</option>
-            <option value="0.25" data-i18n="spd025">0.25x</option>
-            <option value="0.4" selected data-i18n="spd040">0.40x</option>
-            <option value="1.0" data-i18n="spd100">1.00x</option>
-          </select>
-          <div class="timeline-slider-wrap">
-            <input type="range" id="timelineSlider" class="ruler-range" min="-0.35" max="1.8" step="0.002" value="-0.35" aria-label="Timeline" />
-            <span class="time-readout" id="timeDisplay">0.00s / 1.40s</span>
-          </div>
-        </div>
-        <div class="instant-telemetry">
-          <span><span data-i18n="telTurn">球员</span> <strong id="instActivePlayer">C. Alcaraz</strong></span>
-          <span><span data-i18n="telSpeed">球速</span> <strong id="instSpeed">--</strong></span>
-          <span><span data-i18n="telHeight">高度</span> <strong id="instHeight">--</strong></span>
-          <span><span data-i18n="telPos">坐标</span> <strong id="instPos">--</strong></span>
-          <span><span data-i18n="telSpin">转速</span> <strong id="instSpin">--</strong></span>
-          <span><span data-i18n="telAero">气动</span> <strong id="instAero">--</strong></span>
-        </div>
-      </footer>
-    </main>
-  </div>
-
-  <!-- Phone only: bottom sheet. The app moves the playback bar, telemetry, view toolbar and
-       control panel in here below 768px and puts them back on wider screens. -->
-  <div class="m-sheet" id="mobileSheet" hidden>
-    <div class="m-sheet-handle" id="mobileSheetHandle" role="button" tabindex="0" aria-label="展开或收起参数面板"><span></span></div>
-    <div class="m-sheet-peek" id="mobileSheetPeek"></div>
-    <div class="m-sheet-body" id="mobileSheetBody"></div>
-  </div>
-
-  <!-- CSV / JSON launch-data import modal -->
-  <div class="modal-backdrop" id="importModalBackdrop" style="display: none;">
-    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="importModalTitle">
-      <div class="modal-header">
-        <span class="modal-title" id="importModalTitle" data-i18n="modalImportTitle">导入出球参数 (CSV / JSON)</span>
-        <button class="mini-action-btn" id="btnCloseImportModal" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5"/></svg></button>
-      </div>
-      <div class="modal-body">
-        <p class="modal-desc" data-i18n="modalImportDesc">每行输入一拍：出球速度km/h, 转速RPM, 出球仰角°, 水平角°, X, Y, Z</p>
-        <textarea id="atpImportTextarea" rows="6" spellcheck="false">194, 1850, -4.4, 7.2, -11.88, -0.90, 2.74
-134, 2750, 7.0, 4.5, -11.60, -2.10, 1.05
-142, 3350, 6.8, 7.5, -11.40, -1.50, 1.08
-104, -1650, 4.2, 5.5, -11.80, -2.40, 0.98
-148, 3250, 5.8, -3.5, -11.00, 0.50, 1.08</textarea>
-      </div>
-      <div class="modal-footer">
-        <button class="secondary-btn" id="btnCancelImport" data-i18n="btnCancel">取消</button>
-        <button class="play-btn" id="btnConfirmImport" data-i18n="btnApplyImport">导入生成</button>
-      </div>
-    </div>
-  </div>
-
-  <script type="module" src="./app.js?v=59"></script>
+  <footer class="foot">
+    <span>Rackets Lab, made by Jason Zeng.</span>
+    <a href="lab/validation.html">Validation</a>
+    <a href="https://github.com/zihangzeng666/aero-lab-tennis-sim">Source</a>
+    <span>3D by three.js. Motion capture from 3DTennisDS and Tennis-MoCap.</span>
+  </footer>
 </body>
 </html>

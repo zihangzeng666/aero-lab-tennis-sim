@@ -1,0 +1,210 @@
+/* Rackets Lab landing page.
+   Chalk paper, ink, one deep court green, the optic yellow of a ball used only as a marker,
+   and a fault red for shots that miss. Barlow Condensed for display (scoreboard lettering),
+   Barlow for reading. One orchestrated moment: the three hero shots draw in on load. */
+:root {
+  --paper: #f4f6f1;
+  --paper-2: #e9ede6;
+  --ink: #13201a;
+  --ink-2: #44524a;
+  --ink-3: #66726b;
+  --rule: #c7d0c9;
+  --court: #1f4d3a;
+  --court-2: #2c6b50;
+  --ball: #d9ef3b;
+  --fault: #b23a26;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --text: "Barlow", "Helvetica Neue", Arial, sans-serif;
+  --wrap: min(1120px, 100% - 2 * var(--gutter));
+  --gutter: clamp(18px, 5vw, 40px);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  scroll-behavior: smooth;
+}
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 1.0625rem/1.6 var(--text);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+img, svg { display: block; max-width: 100%; }
+a { color: inherit; }
+:focus-visible { outline: 2.5px solid var(--court); outline-offset: 3px; }
+.skip { position: absolute; left: -999px; top: 8px; background: var(--ink); color: var(--paper); padding: 8px 12px; z-index: 10; }
+.skip:focus { left: 8px; }
+
+h1, h2, h3 { font-family: var(--display); font-weight: 700; line-height: 1; letter-spacing: -0.005em; }
+h2 { font-size: clamp(2.1rem, 6vw, 3.4rem); margin-bottom: 0.4em; max-width: 18ch; }
+h3 { font-size: 1.45rem; font-weight: 600; line-height: 1.1; }
+p { max-width: 62ch; }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 52px; padding: 0 28px;
+  background: var(--court); color: #fff;
+  font: 700 1.25rem/1 var(--display); letter-spacing: 0.01em;
+  text-decoration: none; border-radius: 2px;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  transition: background-color 140ms var(--ease-out), transform 120ms var(--ease-out);
+}
+.btn:active { transform: scale(0.97); }
+.btn-small { min-height: 44px; padding: 0 16px; font-size: 1.05rem; }
+.btn-light { background: var(--ball); color: var(--ink); }
+
+/* Nav */
+.nav {
+  width: var(--wrap); margin: 0 auto;
+  display: flex; align-items: center; gap: 16px;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 0 14px;
+  border-bottom: 1px solid var(--rule);
+}
+.brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font: 700 1.5rem/1 var(--display); min-height: 44px; }
+.brand-mark { width: 30px; height: 30px; color: var(--ink); }
+.nav-links { display: none; gap: 24px; margin-left: auto; }
+.nav-links a { text-decoration: none; color: var(--ink-2); font-weight: 500; padding: 10px 0; }
+.nav .btn-small { margin-left: auto; }
+
+/* Hero */
+.hero { width: var(--wrap); margin: 0 auto; padding: clamp(28px, 6vw, 64px) 0 clamp(36px, 6vw, 72px); }
+.hero h1 { font-size: clamp(2.7rem, 10.5vw, 5.6rem); line-height: 0.94; max-width: 13ch; }
+.lede { margin-top: 20px; font-size: clamp(1.08rem, 2.4vw, 1.25rem); color: var(--ink-2); max-width: 52ch; }
+.hero-cta { margin-top: 28px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+.hero-note { color: var(--ink-3); font-size: 0.98rem; }
+
+.hero-figure { margin-top: clamp(32px, 6vw, 56px); }
+.court-side { width: 100%; height: auto; overflow: visible; }
+.cs-court { fill: var(--court); }
+.cs-run { fill: var(--court-2); opacity: 0.55; }
+.cs-baseline { stroke: #fff; stroke-width: 0.16; }
+.cs-service { stroke: #fff; stroke-width: 0.1; opacity: 0.8; }
+.cs-net { fill: var(--ink); }
+.cs-incoming { fill: none; stroke: var(--ink-3); stroke-width: 0.07; stroke-dasharray: 0.22 0.22; }
+.cs-shot { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.cs-good { stroke: var(--court); stroke-width: 0.2; }
+.cs-bad { stroke: var(--fault); stroke-width: 0.11; opacity: 0.9; }
+.cs-ball { fill: var(--ball); stroke: var(--ink); stroke-width: 0.08; }
+.cs-mark { stroke: var(--paper); stroke-width: 0.08; }
+.cs-mark-good { fill: var(--ball); stroke: var(--ink); }
+.cs-mark-bad { fill: var(--fault); }
+.cs-lab { font: 600 0.86px var(--text); fill: var(--ink); }
+.cs-lab-good { fill: var(--court); font-weight: 700; }
+.cs-lab-bad { fill: var(--fault); }
+.cs-lab-quiet { fill: var(--ink-3); font-weight: 500; }
+.hero-figure figcaption, .lesson figcaption { margin-top: 12px; font-size: 0.92rem; color: var(--ink-3); max-width: 70ch; }
+
+/* The one orchestrated moment: the three shots draw in from the racket */
+@media (prefers-reduced-motion: no-preference) {
+  .cs-shot { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 1100ms var(--ease-out) forwards; animation-delay: calc(250ms + var(--d, 0ms)); }
+  .cs-mark, .cs-labels { opacity: 0; animation: appear 300ms var(--ease-out) 1150ms forwards; }
+}
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes appear { to { opacity: 1; } }
+
+/* Lesson */
+.lesson, .balls, .physics { width: var(--wrap); margin: 0 auto; padding: clamp(48px, 8vw, 96px) 0 0; border-top: 1px solid var(--rule); }
+.lesson-grid { display: grid; gap: 32px; margin-top: 12px; }
+.steps { list-style: none; counter-reset: step; display: grid; gap: 26px; }
+.steps li { counter-increment: step; display: grid; grid-template-columns: 2.4rem 1fr; gap: 4px 14px; }
+.steps li::before {
+  content: counter(step);
+  grid-row: span 2;
+  font: 700 2.6rem/0.9 var(--display); color: var(--court);
+}
+.steps p { color: var(--ink-2); }
+.steps em { font-style: normal; font-weight: 600; color: var(--ink); }
+.phone { justify-self: center; width: min(100%, 360px); }
+.phone img { width: 100%; height: auto; border: 6px solid var(--ink); border-radius: 22px; background: var(--ink); }
+.desk { margin-top: clamp(32px, 6vw, 56px); }
+.desk img { width: 100%; height: auto; border: 1px solid var(--ink); border-radius: 4px; }
+
+/* Balls */
+.section-lede { color: var(--ink-2); margin-bottom: 24px; }
+.ball-list { list-style: none; display: grid; grid-template-columns: 1fr; border-top: 2px solid var(--ink); }
+.ball { display: grid; grid-template-columns: 1fr; gap: 6px; padding: 18px 0 20px; border-bottom: 1px solid var(--rule); }
+.ball-path { width: 100%; height: 44px; overflow: visible; }
+.bp-ground { stroke: var(--rule); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.bp-net { stroke: var(--ink); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.bp-flight { fill: none; stroke: var(--court); stroke-width: 2.2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.ball-name { font-size: 1.6rem; }
+.ball-blurb { color: var(--ink-2); }
+.ball-nums { display: grid; gap: 2px; font-size: 0.95rem; margin-top: 4px; }
+.ball-nums div { display: flex; flex-wrap: wrap; gap: 0 8px; }
+.ball-nums dt { color: var(--ink-3); min-width: 8.5em; }
+.ball-nums dd { font-variant-numeric: tabular-nums; font-weight: 500; }
+
+/* Physics */
+.physics-grid { display: grid; gap: 24px 40px; margin-top: 12px; }
+.physics-grid p { color: var(--ink-2); margin-top: 6px; }
+.physics-link { margin-top: 28px; }
+.physics-link a { font-weight: 600; text-underline-offset: 3px; text-decoration-thickness: 1.5px; }
+
+/* Final call to action: a strip of court */
+.final {
+  margin-top: clamp(56px, 9vw, 110px);
+  background:
+    linear-gradient(#fff, #fff) left 50% top 0 / 2px 100% no-repeat,
+    var(--court);
+  color: #fff;
+  padding: clamp(48px, 9vw, 96px) var(--gutter);
+  display: flex; flex-direction: column; align-items: center; gap: 24px; text-align: center;
+}
+.final h2 { max-width: none; margin: 0; font-size: clamp(2.4rem, 8vw, 4.4rem); background: var(--court); padding: 0 12px; }
+
+.foot {
+  width: var(--wrap); margin: 0 auto;
+  display: flex; flex-wrap: wrap; gap: 6px 20px;
+  padding: 22px 0 calc(22px + env(safe-area-inset-bottom, 0px));
+  font-size: 0.92rem; color: var(--ink-3);
+}
+.foot a { color: var(--ink-2); padding: 10px 0; margin: -10px 0; }
+
+@media (min-width: 720px) {
+  .nav-links { display: flex; }
+  .nav .btn-small { margin-left: 8px; }
+  .lesson-grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); align-items: start; gap: 56px; }
+  .phone { justify-self: end; }
+  .ball-list { grid-template-columns: 1fr 1fr; column-gap: 48px; }
+  .physics-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (min-width: 1000px) {
+  .hero { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .hero h1 { max-width: 15ch; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover { background: var(--court-2); }
+  .btn-light:hover { background: #e6f75e; }
+  .nav-links a:hover { color: var(--ink); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .btn:active { transform: none; }
+}
+
+/* Hero key: the readable version of the diagram labels (the in-figure labels only show when there is room) */
+.hero-key { list-style: none; display: grid; gap: 6px; margin-top: 14px; font-size: 0.98rem; }
+.hero-key li { display: flex; gap: 10px; align-items: baseline; }
+.hero-key li::before { content: ""; flex: none; width: 22px; height: 0; border-top: 3px solid; transform: translateY(-4px); }
+.key-good::before { border-color: var(--court) !important; border-top-width: 4px !important; }
+.key-bad::before { border-color: var(--fault) !important; }
+.hero-key strong { font-variant-numeric: tabular-nums; min-width: 3.4em; }
+@media (max-width: 719px) {
+  .cs-labels { display: none; }
+  .court-side { margin: 0 calc(-1 * var(--gutter) + 6px); width: calc(100% + 2 * var(--gutter) - 12px); max-width: none; }
+}
+@media (min-width: 720px) { .hero-key { display: none; } }
+@media (min-width: 1000px) {
+  .hero { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); column-gap: 56px; align-items: end; padding-top: 48px; }
+  .hero-copy { display: contents; }
+  .hero h1 { grid-column: 1; grid-row: 1 / span 2; max-width: 15ch; font-size: clamp(3.4rem, 5.6vw, 4.8rem); }
+  .lede { grid-column: 2; grid-row: 1; margin-top: 0; align-self: end; }
+  .hero-cta { grid-column: 2; grid-row: 2; margin-top: 24px; }
+  .hero-figure { grid-column: 1 / -1; grid-row: 3; margin-top: 36px; }
+}

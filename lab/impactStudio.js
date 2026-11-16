@@ -10,8 +10,8 @@
  * contract as the small diagram: 'racket' for inputs, 'hud' for a launch target that the
  * app back-solves into a swing.
  */
-import { RacketDiagram } from './racketDiagram.js?v=59';
-import { LessonMap } from './lessonMap.js?v=59';
+import { RacketDiagram } from './racketDiagram.js?v=60';
+import { LessonMap } from './lessonMap.js?v=60';
 
 const NS = 'http://www.w3.org/2000/svg';
 

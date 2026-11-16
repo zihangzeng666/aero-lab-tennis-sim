@@ -1,5 +1,6 @@
 /**
- * Main application controller for AERO-LAB, a tennis ball-flight teaching simulator.
+ * Main application controller for Rackets Lab, a tennis ball-flight teaching simulator.
+ * 0. Coach view (default): incoming-ball presets, racket-face dial, live result + compare
  * 1. Two-way coupling between racket sliders and launch HUD (3x3 Jacobian inverse solver)
  * 2. Turn-based two-player rallies with automatic post-bounce hand-off
  * 3. Illustrative (hand-tuned) player presets and rally scripts, plus a CSV / JSON importer
@@ -14,8 +15,11 @@ import {
   samplePointAtTime,
   airDensityFromConditions,
   chainRallyTurns,
-  handoffFromPoint
-} from './physics.js?v=59';
+  handoffFromPoint,
+  resolveIncomingBall,
+  describeShotOutcome,
+  solveFaceAngleForDepth
+} from './physics.js?v=60';
 import {
   SHOT_PRESETS,
   INCOMING_PRESETS,
@@ -23,12 +27,14 @@ import {
   TACTICAL_LESSONS,
   evaluateTacticalAttempt,
   describeTacticalGoal
-} from './presets.js?v=59';
-import { TennisScene3D } from './scene3d.js?v=59';
-import { RacketDiagram } from './racketDiagram.js?v=59';
-import { LessonMap } from './lessonMap.js?v=59';
-import { TacticsBoard } from './tacticsBoard.js?v=59';
-import { ImpactStudio } from './impactStudio.js?v=59';
+} from './presets.js?v=60';
+import { TennisScene3D } from './scene3d.js?v=60';
+import { RacketDiagram } from './racketDiagram.js?v=60';
+import { LessonMap } from './lessonMap.js?v=60';
+import { TacticsBoard } from './tacticsBoard.js?v=60';
+import { ImpactStudio } from './impactStudio.js?v=60';
+import { CoachPanel } from './coach.js?v=60';
+import { buildCoachFeedback } from './coachFeedback.js?v=60';
 
 const WINDUP_START_TIME = -0.35;
 const KG_TO_LBS = 2.20462262;
@@ -56,6 +62,30 @@ const I18N = {
     loadSubtext:
       '调节挥拍与来球参数，看球速、旋转和落点如何变化。气动力采用 Štěpánek (1988) 拟合式，拍球与落地碰撞采用 Cross 刚体模型；球员预设为手调示例，并非实测数据。',
     soloSectionTitle: '模式与球员预设',
+    modeBtnCoach: '教学',
+    ariaHome: 'Rackets Lab 首页',
+    ariaMode: '模式',
+    ariaTheme: '主题',
+    ariaCoach: '教学',
+    ariaPreset: '预设',
+    ariaRally: '回合',
+    ariaLessons: '课程',
+    ariaResult: '结果',
+    ariaTelemetry: '实时数据',
+    ariaLaunchSpeed: '出球速度',
+    ariaSpin: '旋转',
+    ariaLaunchAngle: '出球角度',
+    ariaClose: '关闭',
+    ariaStudio: '击球台',
+    ariaFullscreen: '全屏查看球场',
+    ariaPlayPause: '播放或暂停',
+    ariaExitFullscreen: '退出全屏',
+    ariaCamera: '视角',
+    ariaLegend: '图例',
+    ariaPlaybackSpeed: '播放速度',
+    ariaTimeline: '时间轴',
+    ariaSheetHandle: '展开或收起参数面板',
+    ariaLang: '语言',
     modeBtnSolo: '单人球速',
     modeBtnRally: '双人回合',
     modeBtnTactics: '战术教学',
@@ -207,6 +237,30 @@ const I18N = {
     loadSubtext:
       'Change the swing and the incoming ball and watch speed, spin and landing point respond. Aerodynamics use the Štěpánek (1988) fits; racket and court impacts use Cross-style rigid-body models. Player presets are hand-tuned examples, not measured data.',
     soloSectionTitle: 'Stroke and preset',
+    modeBtnCoach: 'Coach',
+    ariaHome: 'Rackets Lab home',
+    ariaMode: 'Mode',
+    ariaTheme: 'Theme',
+    ariaCoach: 'Coach',
+    ariaPreset: 'Preset',
+    ariaRally: 'Rally',
+    ariaLessons: 'Lessons',
+    ariaResult: 'Result',
+    ariaTelemetry: 'Telemetry',
+    ariaLaunchSpeed: 'Launch speed',
+    ariaSpin: 'Spin',
+    ariaLaunchAngle: 'Launch angle',
+    ariaClose: 'Close',
+    ariaStudio: 'Impact studio',
+    ariaFullscreen: 'Show the court full screen',
+    ariaPlayPause: 'Play or pause',
+    ariaExitFullscreen: 'Exit full screen',
+    ariaCamera: 'Camera',
+    ariaLegend: 'Legend',
+    ariaPlaybackSpeed: 'Playback speed',
+    ariaTimeline: 'Timeline',
+    ariaSheetHandle: 'Expand or collapse the control panel',
+    ariaLang: 'Language',
     modeBtnSolo: 'Solo Lab',
     modeBtnRally: '2P Rally',
     modeBtnTactics: 'Tactics',
@@ -367,7 +421,7 @@ document.querySelector('#racketVizDetails > summary')?.addEventListener('click',
 
 class TennisSimApp {
   constructor() {
-    this.lang = 'zh';
+    this.lang = TennisSimApp.initialLang();
     this.speedUnit = 'kmh';
     this.tensionUnit = 'lbs';
     this.appMode = 'solo'; // Default mode: Solo Ball Speed & Biomechanics Lab!
@@ -415,24 +469,37 @@ class TennisSimApp {
       crossWindKmh: 0
     };
 
+    // Coach view
+    this.coachOn = false;
+    this.coachBallKey = 'fast_flat';
+    this.coachPinned = false;
+    this.coachCompare = null; // sim shown as the dashed ghost (previous path, or the pinned one)
+    this._coachCache = {}; // surface -> { key: resolveIncomingBall result }
+    this._coachSuggest = null; // { key, result } of solveFaceAngleForDepth for the current swing
+
     this.lastImpactInfo = null;
     this.isPlaying = false;
     this.playbackSpeed = 0.4;
-    this.currentTime = WINDUP_START_TIME;
+    this.currentTime = this._startTime();
     this.simResult = null;
     this.ghostSimResult = null;
     this.lastFrameTs = performance.now();
     this.hudBallPhase = 0;
 
     this._init3D();
+    this._initCoach();
     this._populatePresetSelects();
     this._bindControls();
     this._initMobileShell();
     this._initLoadingScreen();
+    document.querySelectorAll('#langSwitchGroup [data-lang]').forEach((b) =>
+      b.classList.toggle('active', b.getAttribute('data-lang') === this.lang)
+    );
     this._applyLanguageUI();
-    // Initialize in Default Mode: Solo Ball Speed & Biomechanics Lab
+    // The solo preset sets a full swing; the coach view (the default) then loads its first ball
     this.setAppMode('solo');
     this.applyPreset('alcaraz_fh');
+    this.setAppMode('coach');
     this.setTheme(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
     this._startPlaybackLoop();
   }
@@ -450,7 +517,7 @@ class TennisSimApp {
       if (phase !== 'move' || !this._dragBase) return;
       const sign = this.state.side === 'B' ? -1 : 1; // player B hits in the mirrored frame
       const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-      this.state.hitX = Math.round(clamp(this._dragBase.hitX + sign * dWorldX, -14.5, -1.0) * 20) / 20;
+      this.state.hitX = Math.round(clamp(this._dragBase.hitX + sign * dWorldX, -16, -1.0) * 20) / 20;
       this.state.hitY = Math.round(clamp(this._dragBase.hitY + sign * dWorldY, -5.4, 5.4) * 20) / 20;
       this.recomputeSimulation({ source: 'racket' });
     };
@@ -559,7 +626,9 @@ class TennisSimApp {
     const settingsRow = document.createElement('div');
     settingsRow.className = 'm-settings-row';
     const moves = [
+      [document.getElementById('coachResult'), peek],
       [document.querySelector('.scrubber-bar'), peek],
+      [document.getElementById('coachProfile'), document.getElementById('coachPanel')],
       [document.getElementById('interactiveHudLeft'), body],
       [document.getElementById('tacticalHudBanner'), body],
       [document.querySelector('.view-toolbar'), body],
@@ -585,7 +654,7 @@ class TennisSimApp {
       const top = topbar.offsetHeight;
       if (name === 'peek') return handle.offsetHeight + peek.offsetHeight + safeBottom() + 1;
       if (name === 'full') return Math.round(vh - top);
-      return Math.round(vh * 0.52);
+      return Math.round(vh * (document.body.classList.contains('coach-on') ? 0.6 : 0.52));
     };
     const setSheetHeight = (px) => {
       root.style.setProperty('--sheet-h', `${Math.round(px)}px`);
@@ -596,6 +665,11 @@ class TennisSimApp {
       setSheetHeight(snapPx(name));
     };
     const syncTop = () => root.style.setProperty('--m-top', `${topbar.offsetHeight}px`);
+    // Coach view: the controls are the point, so open the sheet to half height
+    this._mobileSheetSnapFor = (coach) => {
+      if (mq.matches && coach) this._setSheetSnap('half');
+      else if (mq.matches) this._setSheetSnap(this._sheetSnap || 'half');
+    };
 
     const enter = () => {
       moves.forEach(([node, target]) => {
@@ -725,6 +799,7 @@ class TennisSimApp {
     if (this.scene3d) {
       this.scene3d.setTheme(t);
       if (this.simResult) this.scene3d.updateTrajectory(this.simResult, this.ghostSimResult);
+      this.scene3d.setCompareTrajectory(this.coachOn ? this.coachCompare : null);
     }
     if (this.racket3d && this.racket3d.setTheme) this.racket3d.setTheme(t);
     this.updateScrubberFrame?.();
@@ -744,7 +819,12 @@ class TennisSimApp {
         el.innerHTML = dict[key];
       }
     });
+    document.querySelectorAll('[data-i18n-aria]').forEach((el) => {
+      const key = el.getAttribute('data-i18n-aria');
+      if (dict[key]) el.setAttribute('aria-label', dict[key]);
+    });
     document.documentElement.lang = this.lang === 'zh' ? 'zh-CN' : 'en';
+    this.coach?.setLang(this.lang);
     this._populatePresetSelects();
     this._updatePlayButtonUI();
     this._renderTurnChainUI();
@@ -973,7 +1053,7 @@ class TennisSimApp {
     } else {
       this.isPlayingFullRally = true;
       this.selectTurn(0, true);
-      this.currentTime = WINDUP_START_TIME;
+      this.currentTime = this._startTime();
       this.isPlaying = true;
       this._updatePlayButtonUI();
     }
@@ -1264,6 +1344,18 @@ class TennisSimApp {
    * - 'tactics': Grand Slam interactive tactical masterclass
    */
   setAppMode(mode = 'solo') {
+    const coach = mode === 'coach';
+    if (coach) mode = 'solo';
+    const wasCoach = this.coachOn;
+    this.coachOn = coach;
+    document.body.classList.toggle('coach-on', coach);
+    if (this.scene3d) {
+      // the no-spin ghost would compete with the compare ghost in the coach view
+      this.scene3d.showGhostNoSpin = coach ? false : document.getElementById('toggleGhost')?.checked !== false;
+      if (!coach) this.scene3d.setCompareTrajectory(null);
+    }
+    if (coach && this.courtView !== '3d') this.setCourtView('3d');
+    if (coach !== wasCoach && this._mobileSheetSnapFor) this._mobileSheetSnapFor(coach);
     this.appMode = mode;
     const boardBtn = document.querySelector('#viewSwitch [data-view="board"]');
     if (boardBtn) boardBtn.hidden = mode === 'solo';
@@ -1279,7 +1371,8 @@ class TennisSimApp {
 
     // Sync top-level mode buttons
     document.querySelectorAll('#appModeSwitchGroup [data-app-mode]').forEach((btn) => {
-      btn.classList.toggle('active', btn.getAttribute('data-app-mode') === mode);
+      const m = btn.getAttribute('data-app-mode');
+      btn.classList.toggle('active', coach ? m === 'coach' : m === mode);
     });
 
     const soloBox = document.getElementById('soloModeContainer');
@@ -1319,9 +1412,15 @@ class TennisSimApp {
       }
 
       this.scene3d.setTargetZone(this.state.courtMode, 'A');
-      this.recomputeSimulation({ source: 'racket', skipChain: true });
+      if (coach) {
+        this.applyCoachBall(this.coachBallKey || 'fast_flat', { first: !wasCoach && !this._coachStarted });
+        this.scene3d.setCameraPreset('coach', this.simResult, this.state, { animate: wasCoach === false && this._coachStarted && !this._reducedMotion() });
+        this._coachStarted = true;
+      } else {
+        this.recomputeSimulation({ source: 'racket', skipChain: true });
+      }
       this._updateTacticalUI();
-      this.currentTime = WINDUP_START_TIME;
+      this.currentTime = this._startTime();
       this.isPlaying = true;
       this._updatePlayButtonUI();
     } else if (mode === 'rally') {
@@ -1413,7 +1512,7 @@ class TennisSimApp {
       if (courtSelect) courtSelect.value = this.state.courtMode;
       this.scene3d.setTargetZone(this.state.courtMode, this.state.side);
       this.recomputeSimulation({ source: 'racket', skipChain: true });
-      this.currentTime = WINDUP_START_TIME;
+      this.currentTime = this._startTime();
       this.isPlaying = true;
       this._updatePlayButtonUI();
     }
@@ -1666,6 +1765,11 @@ class TennisSimApp {
     document.querySelectorAll('#langSwitchGroup [data-lang]').forEach((btn) => {
       btn.addEventListener('click', () => {
         this.lang = btn.getAttribute('data-lang');
+        try {
+          localStorage.setItem('rackets-lang', this.lang);
+        } catch (err) {
+          /* storage unavailable: the choice still applies for this visit */
+        }
         document.querySelectorAll('#langSwitchGroup .seg-btn').forEach((b) =>
           b.classList.toggle('active', b === btn)
         );
@@ -1803,9 +1907,15 @@ class TennisSimApp {
     document.getElementById('incomingPresetSelect')?.addEventListener('change', (e) => {
       const inc = INCOMING_PRESETS[e.target.value];
       if (!inc) return;
-      this.state.incomingSpeedKmh = inc.incomingSpeedKmh;
-      this.state.incomingAngleDeg = inc.incomingAngleDeg;
-      this.state.incomingSpinRpm = inc.incomingSpinRpm;
+      // physics presets: the incoming ball (and where it is met) comes from the simulated opponent shot
+      const r = inc.manual ? inc : this._coachBalls()[e.target.value] || inc;
+      this.state.incomingSpeedKmh = r.incomingSpeedKmh;
+      this.state.incomingAngleDeg = r.incomingAngleDeg;
+      this.state.incomingSpinRpm = r.incomingSpinRpm;
+      if (!inc.manual && r.hitX !== undefined && this.appMode === 'solo') {
+        Object.assign(this.state, { hitX: r.hitX, hitY: r.hitY, hitZ: r.hitZ });
+        this.coachBallKey = e.target.value;
+      }
       this.recomputeSimulation({ source: 'racket' });
     });
 
@@ -1819,7 +1929,10 @@ class TennisSimApp {
     document.getElementById('surfaceSelect')?.addEventListener('change', (e) => {
       this.state.surfaceKey = e.target.value;
       this.scene3d.setCourtSurface(this.state.surfaceKey);
-      this.recomputeSimulation({ source: 'racket' });
+      // incoming balls bounce differently on each surface
+      this.coach?.setResolvedBalls(this._coachBalls());
+      if (this.coachOn && this.coachBallKey) this.applyCoachBall(this.coachBallKey, { keepGhost: true });
+      else this.recomputeSimulation({ source: 'racket' });
     });
 
     // 7. Sidebar Sliders (Forward Racket & Position Physics)
@@ -1978,7 +2091,7 @@ class TennisSimApp {
     document.getElementById('btnPlayPause')?.addEventListener('click', () => {
       if (!this.simResult) return;
       if (this.currentTime >= this.simResult.totalDuration - 0.01) {
-        this.currentTime = WINDUP_START_TIME;
+        this.currentTime = this._startTime();
       }
       this.isPlaying = !this.isPlaying;
       if (!this.isPlaying) this.isPlayingFullRally = false;
@@ -1989,7 +2102,7 @@ class TennisSimApp {
     document.getElementById('btnPlayFullRally')?.addEventListener('click', () => {
       this.isPlayingFullRally = true;
       this.selectTurn(0, true);
-      this.currentTime = WINDUP_START_TIME;
+      this.currentTime = this._startTime();
       this.isPlaying = true;
       this._updatePlayButtonUI();
       this._renderTurnChainUI();
@@ -1997,7 +2110,7 @@ class TennisSimApp {
 
     document.getElementById('btnRestart')?.addEventListener('click', () => {
       this.isPlayingFullRally = false;
-      this.currentTime = WINDUP_START_TIME;
+      this.currentTime = this._startTime();
       this.isPlaying = true;
       this._updatePlayButtonUI();
       this._renderTurnChainUI();
@@ -2202,7 +2315,7 @@ class TennisSimApp {
 
     this.scene3d.setTargetZone(this.state.courtMode, this.state.side);
     this.recomputeSimulation({ source: 'racket' });
-    this.currentTime = WINDUP_START_TIME;
+    this.currentTime = this._startTime();
     this.isPlaying = true;
     this._updatePlayButtonUI();
   }
@@ -2213,7 +2326,7 @@ class TennisSimApp {
    *   so the Racket sliders & 3D swing biomechanics match the user's desired Launch Speed / Spin / Angle!
    * - If `source === 'racket'`, runs `computeRacketBallImpact()` forward to compute `speedKmh`, `launchAngleDeg`, `topspinRpm`.
    */
-  recomputeSimulation({ source = 'racket', skipChain = false } = {}) {
+  recomputeSimulation({ source = 'racket', skipChain = false, live = false } = {}) {
     if (source === 'hud') {
       const solved = solveRacketFromTargetLaunch({
         targetSpeedKmh: this.state.speedKmh,
@@ -2272,15 +2385,23 @@ class TennisSimApp {
       stopAtIntercept,
       receive
     });
-    this.ghostSimResult = simulateTrajectory({
-      ...this.state,
-      topspinRpm: 0,
-      sidespinRpm: 0,
-      stopAtIntercept,
-      receive
-    });
+    // The no-spin ghost is not shown in the coach view; skip it there (it is the main cost of a drag frame)
+    this.ghostSimResult = this.coachOn
+      ? null
+      : simulateTrajectory({
+          ...this.state,
+          topspinRpm: 0,
+          sidespinRpm: 0,
+          stopAtIntercept,
+          receive
+        });
 
-    this._updateSoloSpeedCard(impact, this.simResult);
+    // Coach view: draw the whole simulated incoming flight instead of the short visual preview
+    const coachBall = this.coachOn ? this._coachBallActive() : null;
+    this._coachIncomingPath = coachBall ? coachBall.path : null;
+    if (coachBall) this.simResult.incomingPreviewPoints = coachBall.path;
+
+    if (!this.coachOn) this._updateSoloSpeedCard(impact, this.simResult);
 
     // Save current turn state & chain to subsequent rally turns if edited in Rally/Tactics Mode
     if (this.appMode !== 'solo' && this.rallyTurns[this.currentTurnIndex]) {
@@ -2312,18 +2433,225 @@ class TennisSimApp {
     }
 
     this.scene3d.updateTrajectory(this.simResult, this.ghostSimResult);
-    this.timelineSlider.min = WINDUP_START_TIME.toFixed(3);
+    if (this.coachOn) this.scene3d.setCompareTrajectory(this.coachCompare);
+    this.timelineSlider.min = this._startTime().toFixed(3);
     this.timelineSlider.max = this.simResult.totalDuration.toFixed(3);
     if (this.currentTime > this.simResult.totalDuration) {
       this.currentTime = this.simResult.totalDuration;
     }
 
-    this._updateRacketImpact3D();
-    this._updateTopLeftInteractiveHUD();
+    if (this.coachOn) {
+      // hidden panels are skipped in the coach view so a drag frame stays cheap
+      if (this.courtView === 'studio') this._updateRacketImpact3D();
+      this._updateCoach(impact);
+    } else {
+      this._updateRacketImpact3D();
+      this._updateTopLeftInteractiveHUD();
+    }
     this._updateTacticalUI();
     this._renderBoard();
     this.updateScrubberFrame();
-    paintAllRanges();
+    if (!live) paintAllRanges();
+  }
+
+  /* ----------------------------------------------------------------------- */
+  /* Coach view                                                               */
+  /* ----------------------------------------------------------------------- */
+
+  /** Stored choice, else the browser's language (Chinese browsers get Chinese, everyone else English). */
+  static initialLang() {
+    try {
+      const saved = localStorage.getItem('rackets-lang');
+      if (saved === 'zh' || saved === 'en') return saved;
+    } catch (e) {
+      /* storage unavailable */
+    }
+    const nav = (navigator.languages && navigator.languages[0]) || navigator.language || 'en';
+    return /^zh\b/i.test(nav) ? 'zh' : 'en';
+  }
+
+  _reducedMotion() {
+    return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
+  /** Where playback starts: at the opponent's contact (up to 0.9 s back) when a coach ball is shown. */
+  _startTime() {
+    const ball = this.coachOn && this.appMode === 'solo' ? this._coachBallActive() : null;
+    return ball ? -Math.min(0.9, ball.flightTime) : WINDUP_START_TIME;
+  }
+
+  /** Incoming-ball presets flown on the current surface (cached per surface). */
+  _coachBalls() {
+    const surf = this.state.surfaceKey || 'hard';
+    if (!this._coachCache[surf]) {
+      const map = {};
+      for (const [k, p] of Object.entries(INCOMING_PRESETS)) {
+        if (p.manual) continue;
+        const r = resolveIncomingBall(p, { surfaceKey: surf });
+        if (r) map[k] = r;
+      }
+      this._coachCache[surf] = map;
+    }
+    return this._coachCache[surf];
+  }
+
+  /** The coach ball whose contact state matches the current state (null once the user moves away from it). */
+  _coachBallActive() {
+    const r = this.coachBallKey ? this._coachBalls()[this.coachBallKey] : null;
+    if (!r || this.state.side !== 'A') return null;
+    const s = this.state;
+    const near = (a, b, tol) => Math.abs(a - b) <= tol;
+    return near(s.incomingSpeedKmh, r.incomingSpeedKmh, 0.6) &&
+      near(s.incomingAngleDeg, r.incomingAngleDeg, 0.6) &&
+      near(s.incomingSpinRpm, r.incomingSpinRpm, 60) &&
+      near(s.hitX, r.hitX, 0.06) &&
+      near(s.hitY, r.hitY, 0.06) &&
+      near(s.hitZ, r.hitZ, 0.04)
+      ? r
+      : null;
+  }
+
+  _initCoach() {
+    const panelEl = document.getElementById('coachPanel');
+    const resultEl = document.getElementById('coachResult');
+    const profileEl = document.getElementById('coachProfile');
+    if (!panelEl || !resultEl || !profileEl) return;
+    this.coach = new CoachPanel(panelEl, resultEl, profileEl, INCOMING_PRESETS);
+    this.coach.setLang(this.lang);
+    this.coach.setResolvedBalls(this._coachBalls());
+
+    this.coach.onInteractStart = () => {
+      // the path before this change becomes the dashed ghost (unless one is pinned)
+      if (!this.coachPinned && this.simResult) this.coachCompare = this.simResult;
+    };
+    this.coach.onChange = (updates, { live }) => {
+      Object.assign(this.state, updates);
+      this.recomputeSimulation({ source: 'racket', live });
+      if (!live) this._scheduleCoachSuggestion();
+    };
+    this.coach.onPickBall = (key) => this.applyCoachBall(key);
+    this.coach.onPin = () => {
+      this.coachPinned = !this.coachPinned;
+      if (this.coachPinned) this.coachCompare = this.simResult;
+      this.scene3d.setCompareTrajectory(this.coachCompare);
+      this._updateCoach(this.lastImpactInfo);
+    };
+    this.coach.onSuggest = () => {
+      const sug = this._coachSuggestion(true);
+      if (!sug) return;
+      if (!this.coachPinned) this.coachCompare = this.simResult;
+      this.state.faceAngleDeg = sug.faceAngleDeg;
+      this.recomputeSimulation({ source: 'racket' });
+      this.currentTime = this._startTime();
+      this.isPlaying = true;
+      this._updatePlayButtonUI();
+    };
+    this.coach.onReplay = () => {
+      this.isPlayingFullRally = false;
+      this.currentTime = this._startTime();
+      this.isPlaying = true;
+      this._updatePlayButtonUI();
+      this.updateScrubberFrame();
+    };
+  }
+
+  /**
+   * Puts the hitter where the chosen incoming ball is met and loads that ball. The swing (speed,
+   * path, face) is kept on purpose: the same swing against a different ball is the lesson. On the
+   * very first load the face is set to the suggested angle so the first shot lands deep.
+   */
+  applyCoachBall(key, { first = false, keepGhost = false } = {}) {
+    const preset = INCOMING_PRESETS[key];
+    const r = this._coachBalls()[key];
+    if (!preset || !r) return;
+    if (!keepGhost && !this.coachPinned && this.simResult && this.coachBallKey !== key) this.coachCompare = this.simResult;
+    if (this.state.side === 'B') {
+      this.scene3d.fadeOutRig('B');
+      this._handoffStack = [];
+    }
+    this.coachBallKey = key;
+    Object.assign(this.state, {
+      side: 'A',
+      courtMode: 'singles',
+      hitX: r.hitX,
+      hitY: r.hitY,
+      hitZ: r.hitZ,
+      incomingSpeedKmh: r.incomingSpeedKmh,
+      incomingAngleDeg: r.incomingAngleDeg,
+      incomingSpinRpm: r.incomingSpinRpm,
+      aimAngleDeg: preset.hitterAimDeg ?? this.state.aimAngleDeg,
+      sidespinRpm: 0
+    });
+    if (first) {
+      this.state.racketSpeedKmh = 100;
+      this.state.swingPathDeg = 25;
+      const sug = solveFaceAngleForDepth(this.state);
+      this.state.faceAngleDeg = sug.faceAngleDeg;
+      this.coachCompare = null;
+    }
+    this.setStrokeType(preset.strokeType || 'fh', true);
+    const courtSelect = document.getElementById('courtModeSelect');
+    if (courtSelect) courtSelect.value = 'singles';
+    const incSelect = document.getElementById('incomingPresetSelect');
+    if (incSelect) incSelect.value = key;
+    this.scene3d.setTargetZone('singles', 'A');
+    this.recomputeSimulation({ source: 'racket', skipChain: true });
+    this.currentTime = this._startTime();
+    this.isPlaying = true;
+    this._updatePlayButtonUI();
+    this._scheduleCoachSuggestion();
+  }
+
+  /** Key of everything the suggested face angle depends on (everything but the face itself). */
+  _coachSuggestKey() {
+    const s = this.state;
+    return [s.racketSpeedKmh, s.swingPathDeg, s.aimAngleDeg, s.incomingSpeedKmh, s.incomingAngleDeg, s.incomingSpinRpm, s.hitX, s.hitY, s.hitZ, s.stringTensionKg, s.surfaceKey, s.temperatureC, s.altitudeM, s.windSpeedKmh, s.crossWindKmh].join('|');
+  }
+
+  /** Cached face-angle suggestion for the current swing; computes it when `compute` is set. */
+  _coachSuggestion(compute = false) {
+    const key = this._coachSuggestKey();
+    if (this._coachSuggest && this._coachSuggest.key === key) return this._coachSuggest.result;
+    if (!compute) return null;
+    const result = solveFaceAngleForDepth({ ...this.state, sidespinRpm: this.state.sidespinRpm });
+    this._coachSuggest = { key, result };
+    return result;
+  }
+
+  /** The suggestion costs ~10–20 ms, so it runs once a drag settles, not on every frame. */
+  _scheduleCoachSuggestion() {
+    clearTimeout(this._coachSuggestT);
+    if (!this.coachOn) return;
+    this._coachSuggestT = setTimeout(() => {
+      if (!this.coachOn || this.coach?.dragging) return;
+      const had = this._coachSuggestion(false);
+      this._coachSuggestion(true);
+      if (!had) this._updateCoach(this.lastImpactInfo);
+    }, 140);
+  }
+
+  _updateCoach(impact) {
+    if (!this.coach || !this.simResult || !impact) return;
+    const feedback = buildCoachFeedback({
+      state: this.state,
+      impact,
+      sim: this.simResult,
+      suggestion: this._coachSuggestion(false),
+      compareSim: this.coachCompare,
+      lang: this.lang
+    });
+    this.coach.update({
+      state: this.state,
+      impact,
+      sim: this.simResult,
+      compareSim: this.coachCompare,
+      pinned: this.coachPinned,
+      ballKey: this._coachBallActive() ? this.coachBallKey : null,
+      incomingPath: this._coachIncomingPath,
+      feedback,
+      compareOutcome: this.coachCompare ? describeShotOutcome(this.coachCompare) : null,
+      formatSpeed: (v, d) => this.formatSpeed(v, d)
+    });
   }
 
   /**
@@ -2398,7 +2726,7 @@ class TennisSimApp {
     if (!this.simResult || !this.simResult.points.length) return;
 
     const pts = this.simResult.points;
-    const t = Math.max(WINDUP_START_TIME, Math.min(this.simResult.totalDuration, this.currentTime));
+    const t = Math.max(this._startTime(), Math.min(this.simResult.totalDuration, this.currentTime));
 
     this.scene3d.updatePlayerAndRacket(
       this.appMode === 'solo'
@@ -2437,7 +2765,8 @@ class TennisSimApp {
         hitZ: this.state.hitZ,
         incomingSpeedKmh: this.state.incomingSpeedKmh,
         incomingAngleDeg: this.state.incomingAngleDeg,
-        incomingSpinRpm: this.state.incomingSpinRpm
+        incomingSpinRpm: this.state.incomingSpinRpm,
+        incomingPath: this._coachIncomingPath || null
       });
 
       if (document.activeElement !== this.timelineSlider) {
@@ -2589,7 +2918,7 @@ class TennisSimApp {
     if (fromSide !== toSide) this.scene3d.fadeOutRig(fromSide);
     this.scene3d.setTargetZone(this.state.courtMode, toSide);
     this.recomputeSimulation({ source: 'racket' });
-    this.currentTime = WINDUP_START_TIME;
+    this.currentTime = this._startTime();
     this.isPlaying = true;
     this._updatePlayButtonUI();
     this.updateScrubberFrame();

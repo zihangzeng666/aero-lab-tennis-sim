@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <script>
+    // Served as /lab (no slash) every relative path would point at the site root: add the slash.
+    if (!/\/$/.test(location.pathname) && !/\.html$/.test(location.pathname)) {
+      location.replace(location.pathname + '/' + location.search + location.hash);
+    }
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+  <title>Rackets Lab · Coach view: incoming balls and racket face</title>
+  <meta name="description" content="Rackets Lab: pick an incoming ball, tilt the racket face, change the swing path and watch the simulated ball path change. A 3D tennis ball-flight simulator for coaches, built on published aerodynamics and impact models." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Rackets Lab" />
+  <meta property="og:title" content="Rackets Lab · the coach view" />
+  <meta property="og:description" content="Show students how to meet different incoming balls and how the racket face changes the ball path. Simulated, not guessed." />
+  <meta property="og:url" content="https://rackets-lab.vercel.app/lab/" />
+  <meta property="og:image" content="https://rackets-lab.vercel.app/assets/og-rackets-lab.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://rackets-lab.vercel.app/assets/og-rackets-lab.jpg" />
+  <link rel="canonical" href="https://rackets-lab.vercel.app/lab/" />
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+  <meta name="theme-color" content="#fbfaf7" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+  <script>
+    // Light is the default (it matches the landing page); a stored "dark" choice is respected
+    document.documentElement.dataset.theme = 'light';
+    try {
+      if (localStorage.getItem('aerolab-theme') === 'dark') document.documentElement.dataset.theme = 'dark';
+    } catch (e) {}
+  </script>
+  <link rel="stylesheet" href="./styles.css?v=60" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/build/three.module.min.js",
+        "three/addons/": "./vendor/three/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <!-- ===================== Welcome / mode launch screen ===================== -->
+  <div class="aero-loading-overlay is-hidden" id="aeroLoadingOverlay">
+    <div class="loading-shell">
+      <div class="loading-top-bar">
+        <div class="loading-brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span class="loading-brand-name">Rackets Lab</span>
+          <span class="loading-author-pill">Jason Zeng</span>
+        </div>
+        <span class="loading-spec-code">RK4 · Δt 2 ms · Štěpánek aero</span>
+      </div>
+
+      <div class="loading-hero-grid">
+        <div class="loading-hero-left">
+          <div class="loading-kicker" data-i18n="loadKicker">交互式物理教学模拟</div>
+          <h1 class="loading-headline" data-i18n-html="loadHeadline">
+            3D 网球<span>弹道与击球教学模拟器</span>
+          </h1>
+          <p class="loading-subtext" data-i18n="loadSubtext">
+            调节挥拍与来球参数，看球速、旋转和落点如何变化。气动力采用 Štěpánek (1988) 拟合式，拍球与落地碰撞采用 Cross 刚体模型；球员预设为手调示例，并非实测数据。
+          </p>
+
+          <div class="loading-mode-cards">
+            <div class="loading-mode-card active" data-launch-mode="solo" role="button" tabindex="0">
+              <div class="lmc-top">
+                <span class="lmc-badge lmc-badge-primary" data-i18n="loadModeSoloTag">默认</span>
+                <span class="lmc-check" aria-hidden="true"></span>
+              </div>
+              <div class="lmc-title" data-i18n="loadModeSoloTitle">单人球速实验室</div>
+              <div class="lmc-desc" data-i18n="loadModeSoloDesc">正反手挥拍 · 球速合成分解</div>
+            </div>
+            <div class="loading-mode-card" data-launch-mode="rally" role="button" tabindex="0">
+              <div class="lmc-top">
+                <span class="lmc-badge" data-i18n="loadModeRallyTag">回合</span>
+                <span class="lmc-check" aria-hidden="true"></span>
+              </div>
+              <div class="lmc-title" data-i18n="loadModeRallyTitle">双人多拍回合</div>
+              <div class="lmc-desc" data-i18n="loadModeRallyDesc">跑动截击 · 连续对拉回放</div>
+            </div>
+            <div class="loading-mode-card" data-launch-mode="tactics" role="button" tabindex="0">
+              <div class="lmc-top">
+                <span class="lmc-badge lmc-badge-gold" data-i18n="loadModeTacticsTag">战术</span>
+                <span class="lmc-check" aria-hidden="true"></span>
+              </div>
+              <div class="lmc-title" data-i18n="loadModeTacticsTitle">战术教学</div>
+              <div class="lmc-desc" data-i18n="loadModeTacticsDesc">战术示例 · 靶区挑战</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="loading-blueprint-card" aria-hidden="true">
+          <div class="lbp-header">
+            <span>Ball speed synthesis</span>
+            <span>v_out = (1+e_A)·v_r + e_A·v_in</span>
+          </div>
+          <svg class="lbp-svg" viewBox="0 0 360 175" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <line x1="20" y1="145" x2="340" y2="145" stroke="#c9c1b0" stroke-width="1.5"/>
+            <line x1="180" y1="112" x2="180" y2="145" stroke="#1b1a17" stroke-width="2.5"/>
+            <path d="M 36 108 Q 148 24 275 144" stroke="#1f5b3f" stroke-width="3" stroke-linecap="round"/>
+            <path d="M 275 144 Q 308 102 336 132" stroke="#2a6fc4" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M 36 108 Q 165 48 310 144" stroke="#a39b8b" stroke-width="1.3" stroke-dasharray="4 4"/>
+            <circle cx="36" cy="108" r="5" fill="#b44a1a"/>
+            <circle cx="275" cy="144" r="4.5" fill="#1f5b3f"/>
+            <circle cx="180" cy="74" r="3.5" fill="#2a6fc4"/>
+            <text x="28" y="94" fill="#b44a1a" font-family="JetBrains Mono" font-size="9" font-weight="700">IMPACT</text>
+            <text x="154" y="62" fill="#2a6fc4" font-family="JetBrains Mono" font-size="9" font-weight="700">NET +68cm</text>
+            <text x="252" y="162" fill="#1f5b3f" font-family="JetBrains Mono" font-size="9" font-weight="700">BOUNCE IN</text>
+          </svg>
+          <div class="lbp-formula-grid">
+            <div class="lbp-item">
+              <span>积分</span>
+              <strong>RK4 · 精确落地事件定位</strong>
+            </div>
+            <div class="lbp-item">
+              <span>动作</span>
+              <strong>FH · 2H · 1H · Serve</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="loading-footer-bar">
+        <span class="loading-spacer"></span>
+        <a class="loading-doc-link" href="./validation.html" data-i18n="linkValidation">模型说明与验证 →</a>
+        <button class="loading-enter-btn" id="btnEnterLab" data-i18n="btnEnterLab">进入实验室 →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-layout">
+    <!-- ===================== Top app bar ===================== -->
+    <header class="topbar">
+      <a class="topbar-brand" href="../" aria-label="Rackets Lab home" data-i18n-aria="ariaHome">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-name">Rackets Lab</span>
+        <span class="brand-sub" data-i18n="brandSub">网球弹道教学模拟器</span>
+      </a>
+
+      <nav class="mode-switch-bar" id="appModeSwitchGroup" aria-label="Mode" data-i18n-aria="ariaMode">
+        <button class="mode-switch-btn mode-switch-coach active" data-app-mode="coach" data-i18n="modeBtnCoach">教学</button>
+        <button class="mode-switch-btn" data-app-mode="solo" data-i18n="modeBtnSolo">单人模拟</button>
+        <button class="mode-switch-btn" data-app-mode="rally" data-i18n="modeBtnRally">双人回合</button>
+        <button class="mode-switch-btn mode-switch-gold" data-app-mode="tactics" data-i18n="modeBtnTactics">战术教学</button>
+      </nav>
+
+      <div class="topbar-actions header-right-controls">
+        <a class="ghost-btn" href="./validation.html" data-i18n="btnValidation">验证</a>
+        <button class="ghost-btn" id="btnReopenWelcome" data-i18n="btnWelcomePage">启动页</button>
+        <div class="seg-control" id="themeSwitchGroup" role="group" aria-label="Theme" data-i18n-aria="ariaTheme">
+          <button class="seg-btn active" data-theme-choice="light" data-i18n="themeLight">浅色</button>
+          <button class="seg-btn" data-theme-choice="dark" data-i18n="themeDark">深色</button>
+        </div>
+        <div class="seg-control" id="langSwitchGroup" role="group" aria-label="Language" data-i18n-aria="ariaLang">
+          <button class="seg-btn active" data-lang="zh">中</button>
+          <button class="seg-btn" data-lang="en">EN</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- ===================== Left control panel ===================== -->
+    <aside class="sidebar">
+      <!-- Coach view (filled by coach.js): incoming balls, racket face dial, swing sliders -->
+      <section class="coach-panel" id="coachPanel" aria-label="Coach" data-i18n-aria="ariaCoach"></section>
+      <section class="panel-section panel-mode">
+        <div class="section-header">
+          <span class="section-tag" id="coreModeSectionTitle" data-i18n="soloSectionTitle">模式与球员预设</span>
+          <div class="rally-actions">
+            <button class="mini-action-btn" id="btnResetRally" data-i18n="btnReset">重置</button>
+            <button class="mini-action-btn" id="btnOpenImportModal" data-i18n="btnImportAtp">导入</button>
+          </div>
+        </div>
+
+        <!-- Solo mode -->
+        <div id="soloModeContainer">
+          <div class="stroke-btn-group" id="strokeTypeGroup">
+            <button class="stroke-btn active" data-stroke="fh" data-i18n="strokeFH">正手 FH</button>
+            <button class="stroke-btn" data-stroke="bh2" data-i18n="strokeBH2">双反 2H</button>
+            <button class="stroke-btn" data-stroke="bh1" data-i18n="strokeBH1">单反 1H</button>
+            <button class="stroke-btn" data-stroke="serve" data-i18n="strokeServe">发球</button>
+          </div>
+          <select id="presetSelect" aria-label="Preset" data-i18n-aria="ariaPreset"></select>
+        </div>
+
+        <!-- Rally / tactics mode -->
+        <div id="rallyModeContainer" style="display: none;">
+          <select id="rallyPresetSelect" aria-label="Rally" data-i18n-aria="ariaRally"></select>
+          <div class="rally-turn-box">
+            <div class="rally-turn-header">
+              <span class="rally-matchup" id="rallyMatchupLabel">C. Alcaraz (A) vs N. Djokovic (B)</span>
+              <button class="mini-action-btn active-accent" id="btnNextTurn" data-i18n="btnNextTurn">+ 下一拍</button>
+            </div>
+            <div class="turn-chain" id="turnChainContainer"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Ball speed breakdown -->
+      <section class="panel-section">
+        <div class="solo-speed-card" id="soloSpeedBreakdownCard">
+          <div class="ssc-header">
+            <span class="ssc-title" data-i18n="sscTitle">球速合成剖析</span>
+            <span class="ssc-total" id="sscTotalSpeed">138.2 km/h</span>
+          </div>
+          <div class="ssc-bar-wrap">
+            <div class="ssc-bar-active" id="sscBarActive" style="width: 82%;"></div>
+            <div class="ssc-bar-borrow" id="sscBarBorrow" style="width: 18%;"></div>
+          </div>
+          <div class="ssc-legend-row">
+            <span class="ssc-leg-item">
+              <i class="ssc-dot ssc-dot-active"></i>
+              <span data-i18n="sscActiveLbl">主动发力</span>
+              <strong id="sscActiveVal">113.4 km/h (82%)</strong>
+            </span>
+            <span class="ssc-leg-item">
+              <i class="ssc-dot ssc-dot-borrow"></i>
+              <span data-i18n="sscBorrowLbl">来球借力</span>
+              <strong id="sscBorrowVal">+24.8 km/h (18%)</strong>
+            </span>
+          </div>
+          <div class="ssc-metrics-grid">
+            <div class="ssc-cell">
+              <span data-i18n="sscCorLbl">拍面 e_A</span>
+              <strong id="sscCorVal">0.418</strong>
+            </div>
+            <div class="ssc-cell">
+              <span data-i18n="sscDwellLbl">驻留/形变 (估算)</span>
+              <strong id="sscDwellVal">≈5.0 ms · 13 mm</strong>
+            </div>
+            <div class="ssc-cell">
+              <span data-i18n="sscSecondBounceLbl">二跳深度</span>
+              <strong id="sscSecondBounceVal">X 18.7m</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Parameter tabs -->
+      <nav class="nav-tabs" id="sidebarNavTabs">
+        <button class="nav-tab active" data-tab="tab-racket" data-i18n="tabRacket">挥拍</button>
+        <button class="nav-tab" data-tab="tab-incoming" data-i18n="tabIncoming">来球</button>
+        <button class="nav-tab" data-tab="tab-position" data-i18n="tabPosition">场地</button>
+        <button class="nav-tab nav-tab-gold" data-tab="tab-tactics" data-i18n="tabTactics">战术</button>
+      </nav>
+
+      <div class="tab-panels">
+        <!-- Swing -->
+        <div class="tab-panel active" id="tab-racket">
+          <div class="slider-group">
+            <div class="slider-header">
+              <span class="slider-label" data-i18n="lblRacketSpeed">挥拍速度</span>
+              <span class="slider-val" id="racketSpeedKmhVal">94 km/h</span>
+            </div>
+            <input type="range" id="racketSpeedKmh" min="20" max="175" step="0.5" value="94" />
+          </div>
+          <div class="slider-group">
+            <div class="slider-header">
+              <span class="slider-label" data-i18n="lblSwingPath">挥拍仰角</span>
+              <span class="slider-val" id="swingPathDegVal">+28.5°</span>
+            </div>
+            <input type="range" id="swingPathDeg" min="-30" max="45" step="0.5" value="28.5" />
+          </div>
+          <div class="slider-group">
+            <div class="slider-header">
+              <span class="slider-label" data-i18n="lblFaceAngle">拍面倾角</span>
+              <span class="slider-val" id="faceAngleDegVal">-2.2°</span>
+            </div>
+            <input type="range" id="faceAngleDeg" min="-18" max="32" step="0.2" value="-2.2" />
+          </div>
+          <div class="slider-group">
+            <div class="slider-header">
+              <span class="slider-label" data-i18n="lblAimAngle">水平方向</span>
+              <span class="slider-val" id="aimAngleDegVal">左 +8.2°</span>
+            </div>
+            <input type="range" id="aimAngleDeg" min="-28" max="28" step="0.2" value="8.2" />
+          </div>
+          <div class="slider-group">
+            <div class="slider-header">
+              <span class="slider-label" data-i18n="lblStringTension">穿线张力</span>
+              <span class="slider-val" id="stringTensionKgVal">50.7 lbs</span>
+            </div>
+            <input type="range" id="stringTensionKg" min="18" max="28" step="0.2" value="23" />
+          </div>
+        </div>
+
+        <!-- Incoming ball -->
+        <div class="tab-panel" id="tab-incoming">
+          <div class="slider-group">
+            <label class="mini-lbl" for="incomingPresetSelect" data-i18n="lblIncomingPreset">来球预设</label>
+            <select id="incomingPresetSelect"></select>
+          </div>
+          <div class="slider-group">
+            <div class="slider-header">
+              <span class="slider-label" data-i18n="lblIncomingSpeed">来球速度</span>
+              <span class="slider-val" id="incomingSpeedKmhVal">56 km/h</span>
+            </div>
+            <input type="range" id="incomingSpeedKmh" min="0" max="200" step="1" value="56" />
+          </div>
+          <div class="slider-group">
+            <div class="slider-header">
+              <span class="slider-label" data-i18n="lblIncomingAngle">入射仰角</span>
+              <span class="slider-val" id="incomingAngleDegVal">-11.0°</span>
+            </div>
+            <input type="range" id="incomingAngleDeg" min="-40" max="35" step="0.5" value="-11" />
+          </div>
+          <div class="slider-group">
+            <div class="slider-header">
+              <span class="slider-label" data-i18n="lblIncomingSpin">来球旋转</span>
+              <span class="slider-val" id="incomingSpinRpmVal">+1950 RPM</span>
+            </div>
+            <input type="range" id="incomingSpinRpm" min="-4500" max="5000" step="50" value="1950" />
+          </div>
+          <div class="incoming-effect-box">
+            <div class="effect-title" data-i18n="incomingEffectTitle">借力增量 (对比定点球)</div>
+            <div class="effect-grid">
+              <div class="effect-cell">
+                <span class="effect-lbl" data-i18n="effBorrowSpeed">借力球速</span>
+                <strong id="effDeltaSpeed">+14.2 km/h</strong>
+              </div>
+              <div class="effect-cell">
+                <span class="effect-lbl" data-i18n="effLaunchAngle">仰角偏移</span>
+                <strong id="effDeltaAngle">+2.1°</strong>
+              </div>
+              <div class="effect-cell">
+                <span class="effect-lbl" data-i18n="effSpinChange">转速变化</span>
+                <strong id="effDeltaSpin">-420 RPM</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Court, position & environment -->
+        <div class="tab-panel" id="tab-position">
+          <div class="select-row">
+            <div>
+              <label class="mini-lbl" for="courtModeSelect" data-i18n="lblCourtMode">判罚界线</label>
+              <select id="courtModeSelect">
+                <option value="singles" data-i18n="optSingles">单打</option>
+                <option value="doubles" data-i18n="optDoubles">双打</option>
+                <option value="serve_deuce" data-i18n="optServeDeuce">平分发球区</option>
+                <option value="serve_ad" data-i18n="optServeAd">占先发球区</option>
+              </select>
+            </div>
+            <div>
+              <label class="mini-lbl" for="surfaceSelect" data-i18n="lblSurface">场地材质</label>
+              <select id="surfaceSelect">
+                <option value="hard" data-i18n="optHard">硬地</option>
+                <option value="clay" data-i18n="optClay">红土</option>
+                <option value="grass" data-i18n="optGrass">草地</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="group-title" data-i18n="grpPosition">击球位置</div>
+          <div class="slider-group">
+            <div class="slider-header">
+              <span class="slider-label" data-i18n="lblHitX">前后站位 X</span>
+              <span class="slider-val" id="hitXVal">-11.75 m</span>
+            </div>
+            <input type="range" id="hitX" min="-16" max="-1.0" step="0.05" value="-11.75" />
+          </div>
+          <div class="slider-group">
+            <div class="slider-header">
+              <span class="slider-label" data-i18n="lblHitY">左右站位 Y</span>
+              <span class="slider-val" id="hitYVal">-1.85 m</span>
+            </div>
+            <input type="range" id="hitY" min="-5.4" max="5.4" step="0.05" value="-1.85" />
+          </div>
+          <div class="slider-group">
+            <div class="slider-header">
+              <span class="slider-label" data-i18n="lblHitZ">击球高度 Z</span>
+              <span class="slider-val" id="hitZVal">1.08 m</span>
+            </div>
+            <input type="range" id="hitZ" min="0.30" max="3.10" step="0.02" value="1.08" />
+          </div>
+          <div class="slider-group">
+            <div class="slider-header">
+              <span class="slider-label" data-i18n="lblSidespin">侧旋转速</span>
+              <span class="slider-val" id="sidespinRpmVal">+280 RPM</span>
+            </div>
+            <input type="range" id="sidespinRpm" min="-2500" max="2500" step="25" value="280" />
+          </div>
+
+          <div class="group-title" data-i18n="grpEnvironment">环境</div>
+          <div class="slider-group">
+            <div class="slider-header">
+              <span class="slider-label" data-i18n="lblWind">纵向风</span>
+              <span class="slider-val" id="windSpeedKmhVal">0 km/h</span>
+            </div>
+            <input type="range" id="windSpeedKmh" min="-30" max="30" step="1" value="0" />
+          </div>
+          <div class="slider-group">
+            <div class="slider-header">
+              <span class="slider-label" data-i18n="lblCrossWind">横向风</span>
+              <span class="slider-val" id="crossWindKmhVal">0 km/h</span>
+            </div>
+            <input type="range" id="crossWindKmh" min="-30" max="30" step="1" value="0" />
+          </div>
+          <div class="slider-group">
+            <div class="slider-header">
+              <span class="slider-label" data-i18n="lblTemperature">气温</span>
+              <span class="slider-val" id="temperatureCVal">20 °C</span>
+            </div>
+            <input type="range" id="temperatureC" min="0" max="45" step="1" value="20" />
+          </div>
+          <div class="slider-group">
+            <div class="slider-header">
+              <span class="slider-label" data-i18n="lblAltitude">海拔</span>
+              <span class="slider-val" id="altitudeMVal">0 m</span>
+            </div>
+            <input type="range" id="altitudeM" min="0" max="2500" step="50" value="0" />
+          </div>
+        </div>
+
+        <!-- Tactics -->
+        <div class="tab-panel" id="tab-tactics">
+          <div class="tactical-lab-card">
+            <div class="lesson-list" id="tacticalLessonList" role="listbox" aria-label="Lessons" data-i18n-aria="ariaLessons"></div>
+
+            <div class="lesson-detail">
+              <div class="lesson-head">
+                <div class="lesson-head-text">
+                  <h3 class="lesson-name" id="tacticalLessonName"></h3>
+                  <p class="lesson-insp" id="tacticalBadgeText"></p>
+                </div>
+                <button class="mini-action-btn" id="btnExitTactics" data-i18n="btnExitTactics">退出</button>
+              </div>
+              <p class="lesson-idea" id="tacticalPrincipleText"></p>
+              <ul class="lesson-keys" id="tacticalKeyPoints"></ul>
+
+              <ol class="lesson-rally" id="tacticalRally"></ol>
+
+              <div class="tactical-mode-row">
+                <button class="tactical-mode-btn active" id="btnTacticDemo" data-i18n="btnTacticDemo">看示范</button>
+                <button class="tactical-mode-btn challenge-accent" id="btnTacticChallenge" data-i18n="btnTacticChallenge">自己打</button>
+              </div>
+
+              <div class="lesson-goal" id="tacticalChallengeBox">
+                <div class="lesson-goal-head">
+                  <p class="lesson-goal-text" id="tacticalHintText"></p>
+                  <span class="tactical-score-pill" id="tacticalScoreBadge"></span>
+                </div>
+                <div class="lesson-map" id="tacticalMap"></div>
+                <ul class="lesson-checks" id="tacticalChecks"></ul>
+                <div class="lesson-tips" id="tacticalCoachFeedback"></div>
+                <p class="lesson-howto" data-i18n="tacticalHowTo">用挥拍滑块或示意图里的旋钮调这一拍；长按 3D 里的球员可以换站位。</p>
+                <div class="lesson-actions">
+                  <span class="lesson-best" id="tacticalBest"></span>
+                  <button class="mini-action-btn" id="btnTacticReset" data-i18n="btnTacticReset">重来</button>
+                  <button class="mini-action-btn" id="btnTacticAnswer" data-i18n="btnTacticAnswer">看答案</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Racket impact view (collapsible) -->
+      <details class="panel-section viz-section" id="racketVizDetails" open>
+        <summary class="section-header">
+          <span class="section-tag" data-i18n="racketVizTitle">拍面触球示意</span>
+          <div class="seg-control mini-seg" id="racket3DViewGroup">
+            <button class="seg-btn active" data-racket-view="side" data-i18n="rViewSide">侧视</button>
+            <button class="seg-btn" data-racket-view="top" data-i18n="rViewTop">俯视</button>
+          </div>
+        </summary>
+        <div class="racket-3d-wrap">
+          <div id="racketImpactCanvas" class="racket-diagram"></div>
+        </div>
+        <div class="racket-metrics-bar">
+          <div class="rm-cell">
+            <span class="rm-lbl" data-i18n="rmFace">拍面</span>
+            <strong id="rmFaceVal">-2.1°</strong>
+          </div>
+          <div class="rm-cell">
+            <span class="rm-lbl" data-i18n="rmSwing">轨迹</span>
+            <strong id="rmSwingVal">+25.5°</strong>
+          </div>
+          <div class="rm-cell">
+            <span class="rm-lbl" data-i18n="rmAttack">攻角</span>
+            <strong id="attackAngleBadge">+27.6°</strong>
+          </div>
+          <div class="rm-cell">
+            <span class="rm-lbl" data-i18n="rmAim">方向</span>
+            <strong id="rmAimVal">左 +7.2°</strong>
+          </div>
+        </div>
+      </details>
+
+      <!-- Display units -->
+      <footer class="sidebar-footer unit-bar">
+        <div class="unit-item">
+          <span class="unit-lbl" data-i18n="unitSpeedLabel">速度单位</span>
+          <div class="seg-control" id="speedUnitGroup">
+            <button class="seg-btn active" data-speed-unit="kmh">km/h</button>
+            <button class="seg-btn" data-speed-unit="mph">mph</button>
+            <button class="seg-btn" data-speed-unit="ms">m/s</button>
+          </div>
+        </div>
+        <div class="unit-item">
+          <span class="unit-lbl" data-i18n="unitTensionLabel">张力单位</span>
+          <div class="seg-control" id="tensionUnitGroup">
+            <button class="seg-btn active" data-tension-unit="lbs">lbs</button>
+            <button class="seg-btn" data-tension-unit="kg">kg</button>
+          </div>
+        </div>
+      </footer>
+    </aside>
+
+    <!-- ===================== 3D viewport ===================== -->
+    <main class="main-area">
+      <!-- Coach view: verdict, readouts and coaching lines, plus the to-scale side view -->
+      <div class="coach-top" id="coachTop">
+        <section class="coach-result" id="coachResult" aria-label="Result" data-i18n-aria="ariaResult"></section>
+        <figure class="coach-profile" id="coachProfile"></figure>
+      </div>
+      <!-- Live telemetry (docked panel) -->
+      <section class="telemetry-module" id="interactiveHudLeft" aria-label="Telemetry" data-i18n-aria="ariaTelemetry">
+        <div class="tel-cell tel-cell-call" id="hudCardBounce">
+          <div class="tel-cell-top">
+            <span class="tel-label" id="hudTurnBadge" data-i18n="hudTitleCall">落点判罚</span>
+            <button class="tel-action-btn" id="btnJumpBounce" data-i18n="btnJumpBounce">定位</button>
+          </div>
+          <div class="tel-verdict-row">
+            <span class="call-tag call-in" id="hawkeyeCallBadge">IN</span>
+            <span class="tel-sub-mono" id="statLandingCoord">X 8.72 / Y 0.79m</span>
+          </div>
+          <div class="tel-meta" id="hawkeyeCallDetail">余量 79 cm</div>
+          <div class="tel-meta-mono" id="statBounceSpeed">92 → 68 km/h</div>
+        </div>
+
+        <div class="tel-cell">
+          <div class="tel-cell-top">
+            <span class="tel-label" data-i18n="hudTitleSpeed">出球速度</span>
+            <button class="tel-action-btn" id="btnCycleSpeedUnit">km/h</button>
+          </div>
+          <div class="tel-main-row">
+            <span class="tel-big-mono" id="hudSpeedBig">138.2 km/h</span>
+            <span class="tel-badge-mono" id="hudApexBadge">apex 2.15 m</span>
+          </div>
+          <input type="range" class="tel-inline-slider" id="hudSpeedSlider" min="40" max="230" step="0.5" value="138.2" aria-label="Launch speed" data-i18n-aria="ariaLaunchSpeed" />
+        </div>
+
+        <div class="tel-cell">
+          <div class="tel-cell-top">
+            <span class="tel-label" data-i18n="hudTitleSpin">旋转转速</span>
+            <span class="tel-badge-mono" id="hudSpinTypePill">上旋</span>
+          </div>
+          <div class="tel-media-row">
+            <canvas id="hudSpinBallCanvas" width="68" height="68"></canvas>
+            <div class="tel-media-col">
+              <span class="tel-big-mono" id="hudSpinBig">+3420 RPM</span>
+              <span class="tel-meta" id="hudMagnusInfo">侧旋 +280</span>
+            </div>
+          </div>
+          <input type="range" class="tel-inline-slider" id="hudSpinSlider" min="-3200" max="4800" step="25" value="3420" aria-label="Spin" data-i18n-aria="ariaSpin" />
+        </div>
+
+        <div class="tel-cell">
+          <div class="tel-cell-top">
+            <span class="tel-label" data-i18n="hudTitleNet">过网净空</span>
+            <button class="tel-action-btn" id="btnJumpNet" data-i18n="btnJumpNet">过网</button>
+          </div>
+          <div class="tel-media-row">
+            <canvas id="hudNetGaugeCanvas" width="68" height="60"></canvas>
+            <div class="tel-media-col">
+              <span class="tel-big-mono" id="statNetClearance">+68.4 cm</span>
+              <span class="tel-meta" id="hudLaunchAngleInfo">仰角 +8.4°</span>
+            </div>
+          </div>
+          <input type="range" class="tel-inline-slider" id="hudAngleSlider" min="-10" max="32" step="0.2" value="8.4" aria-label="Launch angle" data-i18n-aria="ariaLaunchAngle" />
+        </div>
+      </section>
+
+      <!-- Tactics lesson status (docked; shown by the app during lessons) -->
+      <div class="tactical-hud-banner" id="tacticalHudBanner" style="display: none;">
+        <div class="thb-top">
+          <span class="thb-badge" id="thbTitle">Lesson 01</span>
+          <div class="thb-actions">
+            <span class="tactical-score-pill" id="thbScorePill">100 / 100</span>
+            <button class="mini-action-btn" id="thbBtnDemo" data-i18n="btnShortDemo">示范</button>
+            <button class="mini-action-btn active-accent" id="thbBtnChallenge" data-i18n="btnShortChallenge">自己打</button>
+            <button class="mini-action-btn icon-btn" id="thbBtnClose" aria-label="Close" data-i18n-aria="ariaClose"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5"/></svg></button>
+          </div>
+        </div>
+        <div class="thb-feedback" id="thbFeedback"></div>
+      </div>
+
+      <!-- 3D wind-tunnel viewport -->
+      <div class="viewport-wrapper">
+        <div id="viewport3d"></div>
+        <div class="tactics-board" id="tacticsBoard" hidden></div>
+        <section class="impact-studio" id="impactStudio" hidden aria-label="Impact studio" data-i18n-aria="ariaStudio"></section>
+        <div class="seg-control view-switch" id="viewSwitch">
+          <button class="seg-btn active" data-view="3d">3D</button>
+          <button class="seg-btn" data-view="studio" data-i18n="viewStudio">击球台</button>
+          <button class="seg-btn" data-view="board" data-i18n="viewBoard" hidden>平面图</button>
+        </div>
+        <span class="viewport-corner viewport-corner-tl" aria-hidden="true"></span>
+        <span class="viewport-corner viewport-corner-tr" aria-hidden="true"></span>
+        <span class="viewport-corner viewport-corner-bl" aria-hidden="true"></span>
+        <span class="viewport-corner viewport-corner-br" aria-hidden="true"></span>
+        <!-- Phone only: fullscreen court -->
+        <button class="m-fab m-fab-enter" id="btnImmersive" aria-label="Show the court full screen" data-i18n-aria="ariaFullscreen"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M2 7V2h5M11 2h5v5M16 11v5h-5M7 16H2v-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+        <div class="m-immersive-bar">
+          <button class="m-fab" id="btnImmersivePlay" aria-label="Play or pause" data-i18n-aria="ariaPlayPause"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M5 3l10 6-10 6z" fill="currentColor"/></svg></button>
+          <button class="m-fab" id="btnImmersiveExit" aria-label="Exit full screen" data-i18n-aria="ariaExitFullscreen"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M7 2v5H2M16 7h-5V2M11 16v-5h5M2 11h5v5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+        </div>
+      </div>
+
+      <!-- View toolbar: cameras, layers, legend -->
+      <div class="view-toolbar">
+        <div class="cam-strip" role="group" aria-label="Camera" data-i18n-aria="ariaCamera">
+          <button class="cam-btn" data-cam="player_closeup" data-i18n="camCloseup">特写</button>
+          <button class="cam-btn" data-cam="broadcast" data-i18n="camBroadcast">全景</button>
+          <button class="cam-btn" data-cam="side" data-i18n="camSide">侧面</button>
+          <button class="cam-btn" data-cam="player_pov" data-i18n="camPov">主视角</button>
+          <button class="cam-btn" data-cam="hawkeye" data-i18n="camHawkeye">判线</button>
+          <button class="cam-btn" data-cam="top" data-i18n="camTop">俯视</button>
+        </div>
+        <div class="layer-strip">
+          <label class="toggle-label">
+            <input type="checkbox" id="toggleVectors" checked />
+            <span data-i18n="chkVectors">物理矢量</span>
+          </label>
+          <label class="toggle-label">
+            <input type="checkbox" id="toggleGhost" checked />
+            <span data-i18n="chkGhost">无旋对比</span>
+          </label>
+          <label class="toggle-label">
+            <input type="checkbox" id="toggleTrueScale" />
+            <span data-i18n="chkTrueScale">真实球径</span>
+          </label>
+          <label class="toggle-label">
+            <input type="checkbox" id="toggleStands" checked />
+            <span data-i18n="chkStands">观众席</span>
+          </label>
+          <button class="mobile-sheet-toggle" id="btnMobileExpand3D" data-i18n="btnMobileExpand3D">全屏球场</button>
+          <span class="toolbar-hint" data-i18n="hintDragPlayer">长按球员可拖动站位</span>
+        </div>
+        <div class="legend-strip" aria-label="Legend" data-i18n-aria="ariaLegend">
+          <div class="legend-item"><span class="legend-swatch legend-swatch-in"></span><span data-i18n="legIncoming">来球</span></div>
+          <div class="legend-item"><span class="legend-swatch legend-swatch-pre"></span><span data-i18n="legPreBounce">飞行</span></div>
+          <div class="legend-item"><span class="legend-swatch legend-swatch-post"></span><span data-i18n="legPostBounce">反弹</span></div>
+          <div class="legend-item"><span class="legend-swatch legend-swatch-magnus"></span><span data-i18n="legMagnus">马格努斯力</span></div>
+          <div class="legend-item"><span class="legend-swatch legend-swatch-dash"></span><span data-i18n="legNoSpin">无旋基准</span></div>
+        </div>
+      </div>
+
+      <!-- Playback bar -->
+      <footer class="scrubber-bar">
+        <div class="scrubber-controls">
+          <button class="play-btn" id="btnPlayPause">暂停</button>
+          <button class="secondary-btn active-rally-btn" id="btnPlayFullRally" data-i18n="btnPlayFullRally">连播回合</button>
+          <button class="secondary-btn" id="btnRestart" data-i18n="btnRestart">重播</button>
+          <button class="secondary-btn" id="btnSnapImpact" data-i18n="btnSnapImpact">触球 t=0</button>
+          <button class="secondary-btn active-accent" id="btnHandoff" data-i18n="btnHandoff" hidden>从这一刻接球</button>
+          <button class="secondary-btn" id="btnHandoffBack" data-i18n="btnHandoffBack" hidden>上一拍</button>
+          <button class="secondary-btn" id="btnResetAll" data-i18n="btnReset">重置</button>
+          <select id="speedSelect" aria-label="Playback speed" data-i18n-aria="ariaPlaybackSpeed">
+            <option value="0.15" data-i18n="spd015">0.15x</option>
+            <option value="0.25" data-i18n="spd025">0.25x</option>
+            <option value="0.4" selected data-i18n="spd040">0.40x</option>
+            <option value="1.0" data-i18n="spd100">1.00x</option>
+          </select>
+          <div class="timeline-slider-wrap">
+            <input type="range" id="timelineSlider" class="ruler-range" min="-0.35" max="1.8" step="0.002" value="-0.35" aria-label="Timeline" data-i18n-aria="ariaTimeline" />
+            <span class="time-readout" id="timeDisplay">0.00s / 1.40s</span>
+          </div>
+        </div>
+        <div class="instant-telemetry">
+          <span><span data-i18n="telTurn">球员</span> <strong id="instActivePlayer">C. Alcaraz</strong></span>
+          <span><span data-i18n="telSpeed">球速</span> <strong id="instSpeed">--</strong></span>
+          <span><span data-i18n="telHeight">高度</span> <strong id="instHeight">--</strong></span>
+          <span><span data-i18n="telPos">坐标</span> <strong id="instPos">--</strong></span>
+          <span><span data-i18n="telSpin">转速</span> <strong id="instSpin">--</strong></span>
+          <span><span data-i18n="telAero">气动</span> <strong id="instAero">--</strong></span>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <!-- Phone only: bottom sheet. The app moves the playback bar, telemetry, view toolbar and
+       control panel in here below 768px and puts them back on wider screens. -->
+  <div class="m-sheet" id="mobileSheet" hidden>
+    <div class="m-sheet-handle" id="mobileSheetHandle" role="button" tabindex="0" aria-label="Expand or collapse the control panel" data-i18n-aria="ariaSheetHandle"><span></span></div>
+    <div class="m-sheet-peek" id="mobileSheetPeek"></div>
+    <div class="m-sheet-body" id="mobileSheetBody"></div>
+  </div>
+
+  <!-- CSV / JSON launch-data import modal -->
+  <div class="modal-backdrop" id="importModalBackdrop" style="display: none;">
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="importModalTitle">
+      <div class="modal-header">
+        <span class="modal-title" id="importModalTitle" data-i18n="modalImportTitle">导入出球参数 (CSV / JSON)</span>
+        <button class="mini-action-btn" id="btnCloseImportModal" aria-label="Close" data-i18n-aria="ariaClose"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc" data-i18n="modalImportDesc">每行输入一拍：出球速度km/h, 转速RPM, 出球仰角°, 水平角°, X, Y, Z</p>
+        <textarea id="atpImportTextarea" rows="6" spellcheck="false">194, 1850, -4.4, 7.2, -11.88, -0.90, 2.74
+134, 2750, 7.0, 4.5, -11.60, -2.10, 1.05
+142, 3350, 6.8, 7.5, -11.40, -1.50, 1.08
+104, -1650, 4.2, 5.5, -11.80, -2.40, 0.98
+148, 3250, 5.8, -3.5, -11.00, 0.50, 1.08</textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="secondary-btn" id="btnCancelImport" data-i18n="btnCancel">取消</button>
+        <button class="play-btn" id="btnConfirmImport" data-i18n="btnApplyImport">导入生成</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./app.js?v=60"></script>
+</body>
+</html>
