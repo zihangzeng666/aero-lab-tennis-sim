@@ -104,8 +104,11 @@ export class RacketDiagram {
     this.svg.setAttribute('role', 'img');
     this.el.appendChild(this.svg);
     this.onChange = null;
+    // A tap on the drawing (not on a knob) asks for the 3D contact close-up; null = no tap action
+    this.onTap = null;
     this._drag = null;
     this._bindDials();
+    this._bindTap();
   }
 
   // Pointer position -> polar (math angle in deg, radius in SVG units) around the contact point
@@ -140,6 +143,30 @@ export class RacketDiagram {
     for (const [k, v] of Object.entries(updates)) clean[k] = clampStep(k, v);
     const changed = Object.entries(clean).some(([k, v]) => Math.abs((this.state[k] ?? 0) - v) > 1e-9);
     if (changed && typeof this.onChange === 'function') this.onChange(clean, source);
+  }
+
+  _bindTap() {
+    let tap = null;
+    this.svg.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('[data-dial]') || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      tap = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now() };
+    });
+    this.svg.addEventListener('pointermove', (e) => {
+      if (tap && e.pointerId === tap.id && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 8) tap = null;
+    });
+    this.svg.addEventListener('pointerup', (e) => {
+      const t = tap;
+      tap = null;
+      if (!t || e.pointerId !== t.id || this._drag || performance.now() - t.t > 600) return;
+      if (typeof this.onTap === 'function') this.onTap();
+    });
+    this.svg.addEventListener('pointercancel', () => (tap = null));
+  }
+
+  /** Show the tap affordance (cursor + hint class) when a tap action is wired. */
+  setTapAction(fn) {
+    this.onTap = fn;
+    this.el.classList.toggle('has-tap', !!fn);
   }
 
   _bindDials() {

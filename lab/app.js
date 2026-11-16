@@ -19,7 +19,7 @@ import {
   resolveIncomingBall,
   describeShotOutcome,
   solveFaceAngleForDepth
-} from './physics.js?v=60';
+} from './physics.js?v=61';
 import {
   SHOT_PRESETS,
   INCOMING_PRESETS,
@@ -27,16 +27,23 @@ import {
   TACTICAL_LESSONS,
   evaluateTacticalAttempt,
   describeTacticalGoal
-} from './presets.js?v=60';
-import { TennisScene3D } from './scene3d.js?v=60';
-import { RacketDiagram } from './racketDiagram.js?v=60';
-import { LessonMap } from './lessonMap.js?v=60';
-import { TacticsBoard } from './tacticsBoard.js?v=60';
-import { ImpactStudio } from './impactStudio.js?v=60';
-import { CoachPanel } from './coach.js?v=60';
-import { buildCoachFeedback } from './coachFeedback.js?v=60';
+} from './presets.js?v=61';
+import { TennisScene3D } from './scene3d.js?v=61';
+import { RacketDiagram } from './racketDiagram.js?v=61';
+import { LessonMap } from './lessonMap.js?v=61';
+import { TacticsBoard } from './tacticsBoard.js?v=61';
+import { ImpactStudio } from './impactStudio.js?v=61';
+import { CoachPanel } from './coach.js?v=61';
+import { buildCoachFeedback } from './coachFeedback.js?v=61';
+import { ContactCloseup } from './contactCloseup.js?v=61';
 
 const WINDUP_START_TIME = -0.35;
+// What the contact close-up may set, per entry point: the coach panel's own slider ranges in the
+// coach view, the full lab ranges (sidebar sliders, impact studio fields) everywhere else.
+const CONTACT_RANGES = {
+  coach: { face: [-18, 32], aim: [-28, 28], path: [-20, 40], speed: [40, 150] },
+  lab: { face: [-18, 32], aim: [-28, 28], path: [-30, 45], speed: [20, 175] }
+};
 const KG_TO_LBS = 2.20462262;
 
 const I18N = {
@@ -121,6 +128,9 @@ const I18N = {
     lblRacketSpeed: '挥拍速度',
     lblSwingPath: '挥拍仰角',
     lblFaceAngle: '拍面倾角',
+    btnContact3d: '3D 触球调整',
+    btnContact3dSub: '在击球瞬间拖动拍面、旋转和挥速',
+    ariaContact3d: '在 3D 触球瞬间调整拍面、旋转和挥速',
     lblAimAngle: '水平方向',
     lblStringTension: '穿线张力',
     lblIncomingPreset: '来球预设',
@@ -296,6 +306,9 @@ const I18N = {
     lblRacketSpeed: 'Swing Speed',
     lblSwingPath: 'Swing Path',
     lblFaceAngle: 'Face Tilt',
+    btnContact3d: 'Adjust at contact · 3D',
+    btnContact3dSub: 'Drag the face, spin and swing speed at the hit',
+    ariaContact3d: 'Adjust face, spin and swing speed in 3D at contact',
     lblAimAngle: 'Horiz Aim',
     lblStringTension: 'Tension',
     lblIncomingPreset: 'Incoming Preset',
@@ -522,9 +535,14 @@ class TennisSimApp {
       this.recomputeSimulation({ source: 'racket' });
     };
 
+    // One 3D contact close-up for every entry point (coach dial, solo diagram, impact studio)
+    const stageEl = viewportEl.closest('.viewport-wrapper') || viewportEl.parentElement;
+    this.closeup = new ContactCloseup(this.scene3d, stageEl);
+
     const racketCanvasEl = document.getElementById('racketImpactCanvas');
     if (racketCanvasEl) {
       this.racket3d = new RacketDiagram(racketCanvasEl);
+      this.racket3d.setTapAction(() => this.openContactCloseup());
       // Dragging a dial in the diagram behaves exactly like moving the matching slider
       // Diagram knobs: { key: value } updates; 'hud' = a launch target to back-solve
       this.racket3d.onChange = (updates, source = 'racket') => {
@@ -539,7 +557,89 @@ class TennisSimApp {
         Object.assign(this.state, updates);
         this.recomputeSimulation({ source });
       };
+      this.studio.onOpenContact = () => this.openContactCloseup();
     }
+    document.getElementById('btnContact3d')?.addEventListener('click', () => this.openContactCloseup());
+  }
+
+  /* ----------------------------------------------------------------------- */
+  /* 3D contact close-up                                                      */
+  /* ----------------------------------------------------------------------- */
+
+  /**
+   * Freeze the shot at contact and fly the camera into the 3D close-up of the hand and racket.
+   * Same component from the coach dial, the solo diagram / button and the impact studio; each
+   * change goes through the same path as that mode's own controls, so every output (coach
+   * result and ghost, solo speed card, studio panels, trajectory) keeps updating underneath.
+   */
+  openContactCloseup() {
+    const cc = this.closeup;
+    if (!cc || cc.isOpen || !this.simResult || !this.lastImpactInfo) return false;
+    const coach = this.coachOn;
+    const fromView = this.courtView || '3d';
+    // the close-up flies out of the court, so the court has to be on screen
+    if (fromView !== '3d') this.setCourtView('3d');
+    // phones: the close-up gets the whole screen (sized before the camera pose is computed)
+    const small = typeof matchMedia === 'function' && matchMedia('(max-width: 767px), (max-height: 520px)').matches;
+    if (small) {
+      document.body.classList.add('cc-stage');
+      this.scene3d._onResize();
+    }
+    // time stops at contact: the player is posed at the hit while the camera travels in
+    const wasPlaying = this.isPlaying;
+    this.isPlaying = false;
+    this.isPlayingFullRally = false;
+    this.currentTime = 0;
+    this._updatePlayButtonUI();
+    this.updateScrubberFrame();
+
+    const opened = cc.open({
+      state: { ...this.state },
+      sim: this.simResult,
+      impact: this.lastImpactInfo,
+      ranges: CONTACT_RANGES[coach ? 'coach' : 'lab'],
+      reducedMotion: this._reducedMotion(),
+      formatSpeed: (v, d) => this.formatSpeed(v, d),
+      onInteractStart: () => {
+        // coach view: the path before this gesture becomes the dashed ghost (unless one is pinned)
+        if (this.coachOn && !this.coachPinned && this.simResult) this.coachCompare = this.simResult;
+      },
+      onChange: (updates, { live }) => {
+        Object.assign(this.state, updates);
+        this.recomputeSimulation({ source: 'racket', live });
+        if (!live && this.coachOn) this._scheduleCoachSuggestion();
+      },
+      onClosed: () => {
+        if (small) {
+          document.body.classList.remove('cc-stage');
+          this.scene3d._onResize();
+        }
+        if (fromView !== '3d' && this.courtView === '3d') this.setCourtView(fromView);
+        // replay the adjusted shot from the start
+        this.currentTime = this._startTime();
+        this.isPlaying = true;
+        this._updatePlayButtonUI();
+        this.updateScrubberFrame();
+      }
+    });
+    if (!opened) {
+      if (small) {
+        document.body.classList.remove('cc-stage');
+        this.scene3d._onResize();
+      }
+      if (fromView !== '3d') this.setCourtView(fromView);
+      this.isPlaying = wasPlaying;
+      this._updatePlayButtonUI();
+    }
+    return opened;
+  }
+
+  /** Leave the close-up at once (mode switch, preset load): no fly-back. */
+  _abortContactCloseup() {
+    if (!this.closeup?.isOpen) return;
+    this.closeup.abort();
+    document.body.classList.remove('cc-stage');
+    this.scene3d._onResize();
   }
 
   formatSpeed(kmhVal, decimals = 1) {
@@ -802,6 +902,7 @@ class TennisSimApp {
       this.scene3d.setCompareTrajectory(this.coachOn ? this.coachCompare : null);
     }
     if (this.racket3d && this.racket3d.setTheme) this.racket3d.setTheme(t);
+    this.closeup?.setTheme(t);
     this.updateScrubberFrame?.();
   }
 
@@ -825,6 +926,7 @@ class TennisSimApp {
     });
     document.documentElement.lang = this.lang === 'zh' ? 'zh-CN' : 'en';
     this.coach?.setLang(this.lang);
+    this.closeup?.setLang(this.lang);
     this._populatePresetSelects();
     this._updatePlayButtonUI();
     this._renderTurnChainUI();
@@ -1344,6 +1446,7 @@ class TennisSimApp {
    * - 'tactics': Grand Slam interactive tactical masterclass
    */
   setAppMode(mode = 'solo') {
+    this._abortContactCloseup();
     const coach = mode === 'coach';
     if (coach) mode = 'solo';
     const wasCoach = this.coachOn;
@@ -2451,6 +2554,7 @@ class TennisSimApp {
     this._updateTacticalUI();
     this._renderBoard();
     this.updateScrubberFrame();
+    if (this.closeup?.isOpen) this.closeup.update({ state: this.state, sim: this.simResult, impact });
     if (!live) paintAllRanges();
   }
 
@@ -2530,6 +2634,7 @@ class TennisSimApp {
       if (!live) this._scheduleCoachSuggestion();
     };
     this.coach.onPickBall = (key) => this.applyCoachBall(key);
+    this.coach.onOpenContact = () => this.openContactCloseup();
     this.coach.onPin = () => {
       this.coachPinned = !this.coachPinned;
       if (this.coachPinned) this.coachCompare = this.simResult;

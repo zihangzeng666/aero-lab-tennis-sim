@@ -6,7 +6,7 @@
  * racket impact model run with and without the incoming spin. Nothing here is a canned guess:
  * when the numbers do not support a sentence, the sentence is not shown.
  */
-import { computeRacketBallImpact, describeShotOutcome } from './physics.js?v=60';
+import { computeRacketBallImpact, describeShotOutcome } from './physics.js?v=61';
 
 const fmt1 = (v) => (Math.round(v * 10) / 10).toFixed(1);
 const abs1 = (v) => fmt1(Math.abs(v));

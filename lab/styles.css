@@ -1373,7 +1373,7 @@ body.coach-on .telemetry-module { display: none; }
 .coach-range-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); margin-top: 2px; }
 
 /* Actions */
-.coach-actions { display: grid; grid-template-columns: 1.4fr 1fr 0.8fr; gap: 6px; padding: 12px 16px; border-bottom: 1px solid var(--rule); }
+.coach-actions { display: grid; grid-template-columns: 1.3fr 1fr 0.85fr 0.95fr; gap: 6px; padding: 12px 16px; border-bottom: 1px solid var(--rule); }
 .coach-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   min-height: 44px; padding: 0 10px;
@@ -1573,4 +1573,316 @@ body.coach-on .telemetry-module { display: none; }
   .ball-detail { margin-top: 6px; }
   .coach-sec { padding: 8px 12px; }
   .m-sheet-peek .coach-result { padding-bottom: 6px; }
+}
+
+/* ======================================================================== */
+/* 3D contact close-up (contactCloseup.js)                                   */
+/* ======================================================================== */
+
+/* Entry points */
+.coach-contact { border-color: var(--ink); }
+.coach-contact svg { color: var(--accent); }
+.contact3d-btn {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  min-height: 52px; margin: 0 0 14px; padding: 8px 12px;
+  border: 1px solid var(--ink); border-radius: var(--r-ctl);
+  background: var(--panel); color: var(--ink); text-align: left;
+  transition: background-color 120ms var(--ease), transform 100ms var(--ease);
+}
+.contact3d-btn svg { flex: none; color: var(--accent); }
+.contact3d-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.contact3d-txt strong { font-size: 13px; font-weight: 650; }
+.contact3d-txt span { font-size: 11.5px; color: var(--ink-3); }
+.contact3d-go { flex: none; font-size: 16px; color: var(--accent); transition: transform 160ms var(--ease); }
+.contact3d-btn:active { transform: scale(0.985); }
+.is-contact {
+  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  height: 34px; padding: 0 12px;
+  border: 1px solid var(--ink); border-radius: var(--r-ctl);
+  background: var(--panel); color: var(--ink);
+  font-size: 12.5px; font-weight: 600; white-space: nowrap;
+  transition: background-color 120ms var(--ease), transform 100ms var(--ease);
+}
+.is-contact svg { color: var(--accent); }
+.is-contact:active { transform: scale(0.97); }
+.is-contact:focus-visible, .contact3d-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.racket-diagram.has-tap { cursor: zoom-in; }
+.racket-diagram.has-tap.dialing { cursor: grabbing; }
+@media (hover: hover) and (pointer: fine) {
+  .contact3d-btn:hover, .is-contact:hover { background: var(--panel-2); }
+  .contact3d-btn:hover .contact3d-go { transform: translateX(3px); }
+}
+@media (pointer: coarse) { .is-contact { height: 44px; } }
+
+/* While the close-up is open the rest of the page steps back (desktop and tablet) */
+.sidebar, .topbar, .coach-top, .view-toolbar, .scrubber-bar, .telemetry-module { transition: opacity 480ms var(--ease); }
+body.cc-on .sidebar, body.cc-on .topbar, body.cc-on .coach-top,
+body.cc-on .view-toolbar, body.cc-on .scrubber-bar, body.cc-on .telemetry-module { opacity: 0.32; pointer-events: none; }
+body.cc-on .view-switch, body.cc-on .viewport-corner, body.cc-on .m-fab-enter,
+body.cc-on .tactics-board, body.cc-on .impact-studio { visibility: hidden; }
+
+/* Phones: the close-up takes the whole screen (set before the zoom so the lens is right) */
+body.cc-stage .viewport-wrapper {
+  position: fixed; inset: 0; top: 0; bottom: 0; z-index: 90;
+}
+
+.cc-layer {
+  --cc-pad: 16px;
+  --cc-bar: clamp(28px, 8vh, 72px);
+  --cc-black: #0c0c0b;
+  position: absolute; inset: 0; z-index: 20;
+  pointer-events: none;
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.cc-layer[hidden] { display: none; }
+
+/* soft lens vignette: the eye goes to the hand and the ball */
+.cc-vignette {
+  position: absolute; inset: 0;
+  background: radial-gradient(120% 95% at 50% 48%, transparent 52%, rgba(27, 22, 12, 0.16) 82%, rgba(27, 22, 12, 0.34) 100%);
+  opacity: 0;
+  transition: opacity 900ms var(--ease);
+}
+:root[data-theme="dark"] .cc-vignette { background: radial-gradient(120% 95% at 50% 48%, transparent 50%, rgba(0, 0, 0, 0.35) 82%, rgba(0, 0, 0, 0.6) 100%); }
+.cc-layer.is-cine .cc-vignette, .cc-layer.is-open .cc-vignette { opacity: 1; }
+.cc-layer.is-exiting .cc-vignette { opacity: 0; transition-duration: 700ms; }
+
+/* film letterbox: in for the flight, up again once the camera lands */
+.cc-bar {
+  position: absolute; left: 0; right: 0; height: var(--cc-bar);
+  background: var(--cc-black);
+  transform: scaleY(0);
+  will-change: transform;
+}
+.cc-bar-top { top: 0; transform-origin: 50% 0; }
+.cc-bar-bottom { bottom: 0; transform-origin: 50% 100%; }
+.cc-layer.is-cine .cc-bar { transform: scaleY(1); transition: transform 620ms cubic-bezier(0.65, 0, 0.35, 1); }
+.cc-layer.is-cine.is-open .cc-bar { transform: scaleY(0); transition: transform 760ms cubic-bezier(0.22, 1, 0.36, 1) 120ms; }
+.cc-layer.is-exiting .cc-bar { animation: cc-bars-exit 1350ms cubic-bezier(0.65, 0, 0.35, 1) both; }
+@keyframes cc-bars-exit {
+  0% { transform: scaleY(0); }
+  28%, 64% { transform: scaleY(1); }
+  100% { transform: scaleY(0); }
+}
+
+/* reduced motion: a short dissolve through the court colour, driven by --cc-curtain */
+.cc-curtain { position: absolute; inset: 0; background: var(--canvas); opacity: 0; }
+.cc-layer.is-reduced .cc-curtain { opacity: var(--cc-curtain, 0); }
+.cc-layer.is-reduced .cc-bar { display: none; }
+
+/* everything interactive fades in once the camera has landed */
+.cc-head, .cc-hint, .cc-knob, .cc-hud, .cc-leaders {
+  opacity: 0;
+  transition: opacity 260ms ease, visibility 0s linear 260ms;
+  visibility: hidden;
+}
+.cc-layer.is-open .cc-head, .cc-layer.is-open .cc-hint, .cc-layer.is-open .cc-knob,
+.cc-layer.is-open .cc-hud, .cc-layer.is-open .cc-leaders {
+  opacity: 1; visibility: visible;
+  transition: opacity 520ms var(--ease), visibility 0s;
+}
+.cc-layer.is-open .cc-head { transition-delay: 140ms; }
+.cc-layer.is-open .cc-knob[data-k="face"] { transition-delay: 220ms; }
+.cc-layer.is-open .cc-knob[data-k="spin"] { transition-delay: 290ms; }
+.cc-layer.is-open .cc-knob[data-k="speed"] { transition-delay: 360ms; }
+.cc-layer.is-open .cc-leaders { transition-delay: 300ms; }
+.cc-layer.is-open .cc-hud { transition-delay: 380ms; }
+.cc-layer.is-open .cc-hint { transition-delay: 600ms; }
+
+/* header: what this is, and the way out */
+.cc-head {
+  position: absolute; top: 0; left: 0; right: 0;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: calc(var(--cc-pad) + env(safe-area-inset-top, 0px)) calc(var(--cc-pad) + env(safe-area-inset-right, 0px)) 0 calc(var(--cc-pad) + env(safe-area-inset-left, 0px));
+}
+.cc-titles {
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+  padding: 7px 12px 8px;
+  background: color-mix(in srgb, var(--panel) 86%, transparent);
+  border: 1px solid color-mix(in srgb, var(--edge) 45%, transparent);
+  border-radius: var(--r-ctl);
+}
+.cc-kicker { font: 600 10.5px/1.2 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.cc-title { font-size: 16px; font-weight: 650; letter-spacing: -0.01em; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-actions { display: flex; gap: 8px; flex: none; pointer-events: auto; }
+.cc-btn {
+  min-width: 44px; min-height: 44px; padding: 0 18px;
+  border: 1px solid var(--edge); border-radius: var(--r-ctl);
+  background: color-mix(in srgb, var(--panel) 92%, transparent); color: var(--ink);
+  font-size: 13.5px; font-weight: 650;
+  touch-action: manipulation;
+  transition: background-color 120ms var(--ease), transform 100ms var(--ease), box-shadow 160ms var(--ease);
+}
+.cc-done { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); box-shadow: 0 6px 18px -8px rgba(31, 91, 63, 0.7); }
+.cc-btn:active { transform: scale(0.96); }
+.cc-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cc-done:focus-visible { outline-color: var(--ink); }
+@media (hover: hover) and (pointer: fine) {
+  .cc-reset:hover { background: var(--panel); border-color: var(--ink); }
+  .cc-done:hover { background: var(--accent-press); border-color: var(--accent-press); }
+  .cc-titles, .cc-hud, .cc-knob-text { -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+}
+
+/* one-line instruction, gone after the first gesture */
+.cc-hint {
+  position: absolute; left: 50%; top: calc(var(--cc-pad) + 64px + env(safe-area-inset-top, 0px));
+  transform: translateX(-50%);
+  max-width: min(560px, calc(100% - 2 * var(--cc-pad)));
+  padding: 7px 12px;
+  background: color-mix(in srgb, var(--ink) 84%, transparent); color: var(--panel);
+  border-radius: var(--r-ctl);
+  font-size: 12.5px; line-height: 1.45; text-align: center;
+}
+.cc-layer.is-open.hint-done .cc-hint { opacity: 0; visibility: hidden; transition: opacity 420ms ease, visibility 0s linear 420ms; transition-delay: 0s; }
+
+/* leader lines from the scene to each knob */
+.cc-leaders { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.cc-leaders line { stroke: var(--ink); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.5; }
+.cc-layer.is-dragging .cc-leaders line { opacity: 0.25; }
+
+/* knobs anchored to the racket head, the ball and the swing arrow (JS sets the transform) */
+.cc-knob {
+  position: absolute; top: 0; left: 0;
+  display: flex; align-items: center; gap: 8px;
+  pointer-events: auto; touch-action: none;
+  cursor: ns-resize;
+  will-change: transform;
+  outline: none;
+}
+.cc-knob[data-k="speed"] { cursor: grab; }
+.cc-knob[data-side="left"] { flex-direction: row-reverse; }
+.cc-knob[data-side="left"] .cc-knob-text { align-items: flex-end; text-align: right; }
+/* only the 44 px handle takes the finger: the caption must never shadow the racket */
+.cc-knob { pointer-events: none; }
+.cc-knob-dot { pointer-events: auto; }
+.cc-knob-dot {
+  position: relative; flex: none;
+  display: grid; place-items: center;
+  width: 44px; height: 44px; border-radius: 50%;
+  --k: var(--ink);
+  background: var(--panel); color: var(--k);
+  border: 2px solid var(--k);
+  box-shadow: 0 6px 16px -8px rgba(27, 26, 23, 0.55);
+  transition: transform 160ms var(--ease), box-shadow 160ms var(--ease), background-color 160ms var(--ease), color 160ms var(--ease);
+}
+.cc-knob-dot svg { width: 22px; height: 22px; }
+/* a soft halo that breathes until the first gesture, so the knobs read as handles */
+.cc-knob-dot::after {
+  content: ""; position: absolute; inset: -6px; border-radius: 50%;
+  border: 1.5px solid var(--k); opacity: 0;
+}
+.cc-layer.is-open:not(.hint-done) .cc-knob-dot::after { animation: cc-halo 2.2s cubic-bezier(0.22, 1, 0.36, 1) 900ms infinite; }
+@keyframes cc-halo { 0% { transform: scale(0.85); opacity: 0.55; } 70%, 100% { transform: scale(1.25); opacity: 0; } }
+.cc-knob[data-k="face"] .cc-knob-dot { --k: #a77c08; }
+.cc-knob[data-k="spin"] .cc-knob-dot { --k: #c2410c; }
+.cc-knob[data-k="spin"][data-kind="back"] .cc-knob-dot { --k: var(--blue); }
+.cc-knob[data-k="spin"][data-kind="flat"] .cc-knob-dot { --k: var(--ink-3); }
+.cc-knob[data-k="speed"] .cc-knob-dot { --k: var(--ink-2); }
+:root[data-theme="dark"] .cc-knob[data-k="face"] .cc-knob-dot { --k: #e7c35a; }
+:root[data-theme="dark"] .cc-knob[data-k="spin"] .cc-knob-dot { --k: #f08a5d; }
+.cc-knob.is-active .cc-knob-dot,
+.cc-layer.drag-face .cc-knob[data-k="face"] .cc-knob-dot,
+.cc-layer.drag-aim .cc-knob[data-k="face"] .cc-knob-dot {
+  transform: scale(1.12); background: var(--k); color: var(--panel);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--k) 22%, transparent), 0 8px 18px -8px rgba(27, 26, 23, 0.6);
+}
+.cc-knob:focus-visible .cc-knob-dot { box-shadow: 0 0 0 3px var(--panel), 0 0 0 5px var(--accent); }
+.cc-knob-text {
+  display: flex; flex-direction: column; gap: 0;
+  padding: 4px 9px 5px;
+  background: color-mix(in srgb, var(--panel) 86%, transparent);
+  border-radius: var(--r-ctl);
+  white-space: nowrap;
+  transition: opacity 160ms ease;
+}
+.cc-knob-lab { font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+.cc-knob-val { font: 700 15px/1.25 var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink); }
+.cc-knob-sub { font-size: 11px; color: var(--ink-2); }
+.cc-knob-sub:empty { display: none; }
+/* while one control moves, the others step back */
+.cc-layer.is-dragging .cc-knob:not(.is-active) { opacity: 0.5; }
+.cc-layer.drag-face .cc-knob[data-k="face"], .cc-layer.drag-aim .cc-knob[data-k="face"] { opacity: 1; }
+
+/* result card: verdict, numbers and the flight seen from the side */
+.cc-hud {
+  position: absolute; left: 50%; bottom: calc(var(--cc-pad) + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: min(780px, calc(100% - 2 * var(--cc-pad)));
+  display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(170px, 34%); align-items: center; gap: 14px;
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  border: 1px solid color-mix(in srgb, var(--edge) 45%, transparent);
+  border-radius: var(--r-ctl);
+  box-shadow: 0 16px 36px -22px rgba(27, 26, 23, 0.55);
+}
+.cc-verdict {
+  display: grid; place-items: center; min-width: 72px; min-height: 44px; padding: 0 10px;
+  font-size: 16px; font-weight: 750; letter-spacing: 0.01em;
+  border: 1.5px solid currentColor; border-radius: var(--r-ctl);
+  transition: color 200ms ease;
+}
+.cc-verdict[data-verdict="IN"] { color: var(--in); }
+.cc-verdict[data-verdict="LONG"], .cc-verdict[data-verdict="WIDE"], .cc-verdict[data-verdict="NET"] { color: var(--out); }
+.cc-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); min-width: 0; }
+.cc-stats > div { display: flex; flex-direction: column; gap: 1px; padding: 0 10px; border-left: 1px solid var(--rule-soft); min-width: 0; }
+.cc-stats dt { font-size: 11px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-stats dd { font: 600 15px/1.3 var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-prof { margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.cc-prof-svg { display: block; width: 100%; height: 64px; overflow: hidden; }
+.cc-prof-cap { font-size: 10.5px; color: var(--ink-3); }
+.ccp-court { fill: var(--panel-2); }
+.ccp-base { stroke: var(--ink-2); stroke-width: 0.12; }
+.ccp-net { stroke: var(--ink); stroke-width: 0.18; }
+.ccp-ghost { fill: none; stroke: var(--traj-ghost); stroke-width: 0.14; stroke-dasharray: 0.5 0.35; }
+.ccp-path { fill: none; stroke: var(--accent); stroke-width: 0.2; stroke-linejoin: round; stroke-linecap: round; }
+.ccp-bounce { fill: var(--in); stroke: var(--panel); stroke-width: 0.1; }
+.ccp-bounce.is-out { fill: var(--out); }
+.ccp-contact { fill: var(--ball); stroke: var(--ink); stroke-width: 0.1; }
+
+/* Phones: compact header, card in two rows, knobs keep their 44 px handles */
+@media (max-width: 767px) {
+  .cc-layer { --cc-pad: 10px; --cc-bar: clamp(24px, 7vh, 56px); }
+  .cc-titles { padding: 5px 9px 6px; }
+  .cc-kicker { font-size: 9.5px; }
+  .cc-title { font-size: 14.5px; }
+  .cc-actions { gap: 6px; }
+  .cc-btn { padding: 0 14px; font-size: 13px; }
+  .cc-hint { top: calc(var(--cc-pad) + 58px + env(safe-area-inset-top, 0px)); font-size: 12px; }
+  .cc-knob { gap: 6px; }
+  .cc-knob-text { padding: 3px 7px 4px; }
+  .cc-knob-val { font-size: 13.5px; }
+  .cc-knob-sub { font-size: 10px; }
+  .cc-hud { grid-template-columns: auto minmax(0, 1fr); gap: 6px 10px; padding: 8px 10px; }
+  .cc-prof { grid-column: 1 / -1; }
+  .cc-prof-svg { height: 52px; }
+  .cc-verdict { min-width: 56px; font-size: 14.5px; }
+  .cc-stats > div { padding: 0 6px; }
+  .cc-stats dt { font-size: 10px; }
+  .cc-stats dd { font-size: 13px; }
+}
+/* very narrow phones: the knob captions keep the value, drop the second line */
+@media (max-width: 400px) {
+  .cc-knob-sub { display: none; }
+  .cc-stats .cc-st-ball { display: none; }
+  .cc-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+/* phone landscape: little height, so the card drops the profile and the bars stay thin */
+@media (max-height: 520px) and (orientation: landscape) {
+  .cc-layer { --cc-pad: 8px; --cc-bar: 22px; }
+  .cc-hint { display: none; }
+  .cc-hud { grid-template-columns: auto minmax(0, 1fr); width: min(560px, calc(100% - 2 * var(--cc-pad))); padding: 6px 10px; }
+  .cc-prof { display: none; }
+  .cc-knob-sub { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cc-bar { display: none; }
+  .cc-layer.is-open:not(.hint-done) .cc-knob-dot::after { animation: none; }
+  .cc-head, .cc-hint, .cc-knob, .cc-hud, .cc-leaders, .cc-vignette { transition-duration: 1ms !important; transition-delay: 0s !important; }
+  .cc-knob-dot, .cc-btn, .contact3d-btn, .is-contact, .contact3d-go { transition: none; }
+  .cc-btn:active, .contact3d-btn:active, .is-contact:active { transform: none; }
 }

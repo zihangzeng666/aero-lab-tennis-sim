@@ -21,7 +21,9 @@ const T = {
     ballsHint: 'Tap the ball your student has to handle',
     racket: 'Racket face & swing',
     faceLabel: 'Racket face angle',
-    dialHint: 'Drag the racket to tilt the face',
+    dialHint: 'Drag the racket to tilt the face · tap for 3D',
+    contact3d: '3D contact',
+    contact3dAria: 'Adjust the racket face in 3D at contact',
     closed: 'Closed',
     open: 'Open',
     square: 'Square',
@@ -60,7 +62,9 @@ const T = {
     ballsHint: '点选学生要处理的来球',
     racket: '拍面与挥拍',
     faceLabel: '拍面角度',
-    dialHint: '拖动球拍改变拍面角度',
+    dialHint: '拖动球拍改变拍面角度 · 轻点进入 3D',
+    contact3d: '3D 触球',
+    contact3dAria: '在 3D 触球瞬间调整拍面',
     closed: '关',
     open: '开',
     square: '垂直',
@@ -145,6 +149,7 @@ export class CoachPanel {
     this.onSuggest = null; // () => void
     this.onReplay = null; // () => void
     this.onInteractStart = null; // () => void   (snapshot the ghost before a change)
+    this.onOpenContact = null; // () => void   (open the 3D contact close-up)
 
     this._build();
   }
@@ -209,6 +214,11 @@ export class CoachPanel {
     this.replayBtn.innerHTML =
       '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8a5 5 0 1 0 1.6-3.7M3 2.5v3h3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span></span>';
     this.replayBtn.addEventListener('click', () => this.onReplay?.());
+    this.contactBtn = h('button', 'coach-btn coach-contact', act);
+    this.contactBtn.type = 'button';
+    this.contactBtn.innerHTML =
+      '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6l5.6 3.2v6.4L8 14.4l-5.6-3.2V4.8z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M2.4 4.8L8 8l5.6-3.2M8 8v6.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><span></span>';
+    this.contactBtn.addEventListener('click', () => this.onOpenContact?.());
 
     // Result strip
     const r = this.resultEl;
@@ -305,7 +315,9 @@ export class CoachPanel {
     wrap.addEventListener('pointerdown', (e) => {
       if (drag || (e.pointerType === 'mouse' && e.button !== 0)) return; // one finger only
       const { a } = angleAt(e);
-      drag = { id: e.pointerId, a0: a, f0: this.face, last: a, acc: 0 };
+      // the ghost is snapshotted on the first real movement, so a tap (which opens the 3D
+      // close-up) leaves the compare path alone
+      drag = { id: e.pointerId, a0: a, f0: this.face, last: a, acc: 0, x0: e.clientX, y0: e.clientY, t0: performance.now(), moved: false };
       try {
         wrap.setPointerCapture(e.pointerId);
       } catch (err) {
@@ -313,12 +325,19 @@ export class CoachPanel {
       }
       wrap.classList.add('is-dragging');
       this.dragging = true;
-      this.onInteractStart?.();
       e.preventDefault();
     });
     wrap.addEventListener('pointermove', (e) => {
       if (!drag || e.pointerId !== drag.id) return;
       const { a, d } = angleAt(e);
+      if (!drag.moved) {
+        if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 4) {
+          drag.last = a;
+          return;
+        }
+        drag.moved = true;
+        this.onInteractStart?.();
+      }
       if (d < 10) return; // too close to the pivot: the angle is noise
       let step = a - drag.last;
       if (step > 180) step -= 360;
@@ -333,15 +352,23 @@ export class CoachPanel {
     });
     const end = (e) => {
       if (!drag || e.pointerId !== drag.id) return;
+      const tap = !drag.moved && e.type === 'pointerup' && performance.now() - drag.t0 < 600;
+      const moved = drag.moved;
       drag = null;
       wrap.classList.remove('is-dragging');
       this.dragging = false;
       this._flush();
-      this.onChange?.({ faceAngleDeg: this.face }, { live: false });
+      if (moved) this.onChange?.({ faceAngleDeg: this.face }, { live: false });
+      if (tap) this.onOpenContact?.();
     };
     wrap.addEventListener('pointerup', end);
     wrap.addEventListener('pointercancel', end);
     wrap.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        this.onOpenContact?.();
+        return;
+      }
       const big = e.shiftKey ? 2 : 0.5;
       let f = this.face;
       if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') f += big;
@@ -453,6 +480,9 @@ export class CoachPanel {
     this.speedCtl.hi.textContent = '150 km/h';
     this.suggestBtn.querySelector('span').textContent = L.suggest;
     this.replayBtn.querySelector('span').textContent = L.replay;
+    this.contactBtn.querySelector('span').textContent = L.contact3d;
+    this.contactBtn.setAttribute('aria-label', L.contact3dAria);
+    this.contactBtn.title = L.contact3dAria;
     this.stat.net.dt.textContent = L.net;
     this.stat.spin.dt.textContent = L.spin;
     this.stat.speed.dt.textContent = L.speed_;

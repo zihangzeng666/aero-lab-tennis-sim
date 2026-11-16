@@ -8,6 +8,9 @@ Serves the repository root with `python3 -m http.server` on a free port, then ch
   - picking an incoming ball moves the hitter to where that ball is met
   - a real touch drag on the racket-face dial changes the face, re-simulates the shot and does
     not scroll the page; pin keeps the compare path; Suggest face lands the ball deep
+  - the 3D contact close-up: opens from the coach dial, a touch drag on the 3D racket changes
+    the face and re-simulates, Done flies back; from the impact studio it opens over the court
+    and gives the studio back on close
 and saves screenshots to the --shots folder.
 """
 import argparse
@@ -88,6 +91,23 @@ def touch_drag(page, x0, y0, x1, y1, steps=14):
         page.wait_for_timeout(16)
     cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []})
     page.wait_for_timeout(400)
+
+
+def open_closeup(page):
+    page.wait_for_selector('.cc-layer.is-open', timeout=10000)
+    page.wait_for_timeout(700)  # knobs and card fade in
+
+
+def racket_on_screen(page):
+    """Where the 3D racket's strings are on screen (CSS px), from the close-up's own projection."""
+    return page.evaluate("""() => { const cc = tennisApp.closeup; const r = cc.layer.getBoundingClientRect();
+        const p = cc._project(cc.rig.position); return [r.left + p.x, r.top + p.y]; }""")
+
+
+def close_closeup(page):
+    page.click('.cc-done')
+    page.wait_for_function("document.querySelector('.cc-layer').hidden", timeout=10000)
+    page.wait_for_timeout(300)
 
 
 def main():
@@ -188,6 +208,31 @@ def main():
             page.evaluate("const b = document.querySelector('.m-sheet-body'); b.scrollTop = document.querySelector('.coach-racket-sec').getBoundingClientRect().top - b.getBoundingClientRect().top + b.scrollTop")
             page.wait_for_timeout(300)
             page.screenshot(path=shot('rackets_face_compare_390.png'))
+
+            # 3D contact close-up from the coach view: a tap on the dial opens it
+            page.locator('.face-dial').tap()
+            open_closeup(page)
+            c.ok(page.evaluate("tennisApp.closeup.phase") == 'open', 'tapping the face dial opens the 3D contact close-up')
+            c.ok(page.evaluate("document.body.classList.contains('cc-stage')"), 'phone: the close-up takes the whole screen')
+            knobs = page.evaluate("""() => [...document.querySelectorAll('.cc-knob-dot, .cc-done, .cc-reset')]
+                .map(e => e.getBoundingClientRect()).every(r => r.width >= 43.5 && r.height >= 43.5 && r.top >= 0 && r.bottom <= innerHeight)""")
+            c.ok(knobs, 'close-up: knobs, Done and Reset are on screen and at least 44x44')
+            page.screenshot(path=shot('rackets_closeup_390.png'))
+            face0 = page.evaluate('tennisApp.state.faceAngleDeg')
+            sim0 = page.evaluate('tennisApp.simResult.firstBounce && tennisApp.simResult.firstBounce.x')
+            x, y = racket_on_screen(page)
+            touch_drag(page, x, y, x, y + 70)  # drag the racket down: closes the face
+            face1 = page.evaluate('tennisApp.state.faceAngleDeg')
+            sim1 = page.evaluate('tennisApp.simResult.firstBounce && tennisApp.simResult.firstBounce.x')
+            c.ok(face1 < face0 - 5, f'touch drag on the 3D racket closes the face ({face0} -> {face1})')
+            c.ok(sim1 != sim0, f'the shot re-simulates from the close-up (bounce x {sim0} -> {sim1})')
+            c.ok(page.inner_text('.cc-verdict') == page.inner_text('.cr-verdict'), 'close-up card and coach result agree')
+            c.ok(page.evaluate("Math.abs(tennisApp.coach.face - tennisApp.state.faceAngleDeg) < 1e-6"),
+                 'the 2D face dial follows the close-up')
+            page.screenshot(path=shot('rackets_closeup_dragged_390.png'))
+            close_closeup(page)
+            c.ok(not page.evaluate("document.body.classList.contains('cc-on') || document.body.classList.contains('cc-stage')"),
+                 'Done flies back and restores the page')
             ctx.close()
 
             # ---------------- Lab, phone landscape ----------------
@@ -237,6 +282,27 @@ def main():
                 page.click(f'.mode-switch-btn[data-app-mode="{mode}"]')
                 page.wait_for_timeout(700)
             c.ok(page.evaluate("document.body.classList.contains('coach-on')"), 'switching through Lab, Rally, Tactics and back to Coach works')
+
+            # 3D contact close-up from the impact studio: flies in from the court, gives the studio back
+            page.click('.mode-switch-btn[data-app-mode="solo"]')
+            page.wait_for_timeout(600)
+            page.click('#viewSwitch [data-view="studio"]')
+            page.wait_for_timeout(400)
+            page.click('.is-contact')
+            c.ok(page.evaluate("tennisApp.courtView") == '3d', 'impact studio: the court comes back for the zoom')
+            open_closeup(page)
+            speed0 = page.evaluate('tennisApp.state.racketSpeedKmh')
+            page.focus('.cc-knob[data-k="speed"]')
+            for _ in range(6):
+                page.keyboard.press('ArrowUp')
+            page.wait_for_timeout(500)
+            speed1 = page.evaluate('tennisApp.state.racketSpeedKmh')
+            c.ok(speed1 > speed0 + 4, f'close-up swing knob (keyboard) raises the racket speed ({speed0} -> {speed1})')
+            c.ok(page.input_value('#racketSpeedKmh') == str(speed1) or abs(float(page.input_value('#racketSpeedKmh')) - speed1) < 1e-6,
+                 'the solo slider follows the close-up')
+            page.screenshot(path=shot('rackets_closeup_desktop.png'))
+            close_closeup(page)
+            c.ok(page.evaluate("tennisApp.courtView") == 'studio', 'closing the close-up gives the impact studio back')
             ctx.close()
 
             # ---------------- Validation page ----------------
