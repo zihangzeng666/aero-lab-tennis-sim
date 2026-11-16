@@ -177,18 +177,21 @@ export class TennisScene3D {
       if (cw === 0 || ch === 0) return;
       const aspect = cw / ch;
       this.camera.aspect = aspect;
+      // while the contact close-up owns the camera, only remember the court view's lens
+      const own = !this.cameraOverride;
       if (cw < 760) {
-        this.camera.fov = aspect < 1.0 ? 50 : 44;
-        if (!this._mobileCamAdjusted) {
+        this.baseFov = aspect < 1.0 ? 50 : 44;
+        if (!this._mobileCamAdjusted && own) {
           this._mobileCamAdjusted = true;
           this.camera.position.set(-21.0, 8.2, 2.2);
           this.controls.target.set(-1.8, -0.2, 0);
           this.controls.update();
         }
       } else {
-        this.camera.fov = 39;
+        this.baseFov = 39;
         this._mobileCamAdjusted = false;
       }
+      if (own) this.camera.fov = this.baseFov;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(cw, ch);
     };
@@ -1679,6 +1682,50 @@ export class TennisScene3D {
     this._fades.push({ rig, swaps, t0: performance.now(), ms });
   }
 
+  /**
+   * Reversible fade of a whole player (the contact close-up dims the body while the camera is
+   * at the hand). Materials are cloned while dimmed and the originals put back at alpha 1.
+   */
+  setRigOpacity(rig, alpha) {
+    if (!rig || !rig.root) return;
+    const a = THREE.MathUtils.clamp(alpha, 0, 1);
+    if (a >= 0.999) {
+      if (rig._dim) {
+        for (const sw of rig._dim.swaps) {
+          sw.o.material = sw.orig;
+          sw.o.castShadow = sw.castShadow;
+          [].concat(sw.clone).forEach((m) => m.dispose());
+        }
+        rig._dim = null;
+        rig.root.visible = true;
+        this.markActive();
+      }
+      return;
+    }
+    if (this._isFading(rig)) this._cancelFade(rig);
+    if (!rig._dim) {
+      const swaps = [];
+      rig.root.traverse((o) => {
+        if (!o.material) return;
+        const orig = o.material;
+        const clone = Array.isArray(orig) ? orig.map((m) => m.clone()) : orig.clone();
+        for (const m of [].concat(clone)) {
+          m.transparent = true;
+          m.depthWrite = false;
+          m.userData.baseOpacity = m.opacity ?? 1;
+        }
+        swaps.push({ o, orig, clone, castShadow: o.castShadow });
+        o.material = clone;
+        o.castShadow = false;
+      });
+      rig._dim = { swaps, alpha: 1 };
+    }
+    rig._dim.alpha = a;
+    for (const sw of rig._dim.swaps) for (const m of [].concat(sw.clone)) m.opacity = m.userData.baseOpacity * a;
+    rig.root.visible = a > 0.002;
+    this.markActive();
+  }
+
   _isFading(rig) {
     return !!(this._fades && this._fades.some((f) => f.rig === rig));
   }
@@ -2048,7 +2095,7 @@ export class TennisScene3D {
     };
     const hitsPlayer = (e) => {
       const rig = this.dragTargetRig;
-      if (!rig || !rig.root.visible) return false;
+      if (!rig || !rig.root.visible || this.cameraOverride) return false;
       aim(e);
       return ray.intersectObject(rig.root, true).length > 0;
     };
@@ -2850,7 +2897,7 @@ export class TennisScene3D {
       const rig = side === 'B' ? this.playerB : this.playerA;
       const other = side === 'B' ? this.playerA : this.playerB;
       if (this._isFading(rig)) this._cancelFade(rig);
-      rig.root.visible = true;
+      rig.root.visible = !(rig._dim && rig._dim.alpha <= 0.002);
       other.root.visible = this._isFading(other);
       this.dragTargetRig = rig;
       const soloTau = THREE.MathUtils.clamp(currentTime, -0.35, 0.42);
@@ -3360,7 +3407,8 @@ export class TennisScene3D {
     requestAnimationFrame(() => this._animateLoop());
     const now = performance.now();
     this._stepAnimations(now);
-    if (this._camTween || (this._fades && this._fades.length)) this.markActive();
+    if (this.onFrame) this.onFrame(now);
+    if (this._camTween || (this._fades && this._fades.length) || this.keepRendering) this.markActive();
     this.controls.update();
     // Idle (nothing moved for 1.5 s): skip the frame. Saves the GPU and battery on phones while a
     // coach is talking; one frame per second still goes out as a safety net.
