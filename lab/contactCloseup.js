@@ -680,10 +680,17 @@ export class ContactCloseup {
     if (kind === 'serve') off = F.n.clone().multiplyScalar(0.55).addScaledVector(F.left, -0.7).addScaledVector(F.up, -0.1);
     else off = F.n.clone().multiplyScalar(0.5).addScaledVector(F.a, 0.62).addScaledVector(F.up, 0.42);
     off.normalize();
-    // distance that fits ~0.8 m of racket and arm across and ~0.55 m up
+    // distance that fits ~0.8 m of racket and arm across and ~0.55 m up (a portrait phone
+    // frames the racket head and the hand tighter, the forearm runs off the edge)
     const vfov = (fov * Math.PI) / 180;
     const hfov = 2 * Math.atan(Math.tan(vfov / 2) * aspect);
-    const dist = clamp(Math.max(0.82 / (2 * Math.tan(hfov / 2)), 0.6 / (2 * Math.tan(vfov / 2))), 0.75, 2.6);
+    const across = aspect < 0.9 ? 0.64 : 0.82;
+    const dist = clamp(Math.max(across / (2 * Math.tan(hfov / 2)), 0.6 / (2 * Math.tan(vfov / 2))), 0.6, 2.6);
+    // pan the frame down a little so the racket sits in the space between the header and the
+    // result card (the card is taller than the header)
+    const viewH = 2 * dist * Math.tan(vfov / 2);
+    const camUp = new THREE.Vector3(0, 1, 0).addScaledVector(off, -off.y).normalize();
+    target.addScaledVector(camUp, -viewH * (aspect < 0.9 ? 0.05 : 0.08));
     const pos = target.clone().addScaledVector(off, dist);
     if (pos.y < 0.12) pos.y = 0.12;
     return { pos, target, fov };
@@ -922,6 +929,7 @@ export class ContactCloseup {
     ctl.update();
     s3.setRigOpacity(this.rigPlayer, 1);
     this._hideMainBall(false);
+    this._courtFlight(true);
     this.root.visible = false;
     s3.cameraOverride = false;
     s3.keepRendering = false;
@@ -971,8 +979,19 @@ export class ContactCloseup {
     return out.set(p[0], p[1], p[2]);
   }
 
+  /**
+   * The court's flight tubes are as thick as the ball: seen from a few centimetres they would
+   * fill the frame, so they hand over to the launch arrow and the side profile in the card.
+   */
+  _courtFlight(show) {
+    const s3 = this.s3;
+    if (s3.trajGroup) s3.trajGroup.visible = show;
+    if (s3._compareLine) s3._compareLine.visible = show;
+  }
+
   _setCloseupOpacity(a) {
     this._closeAlpha = a;
+    this._courtFlight(a < 0.5);
     for (const m of this.mats) {
       const base = m.userData.baseOpacity ?? 1;
       const fading = a < 0.999;
@@ -1006,6 +1025,7 @@ export class ContactCloseup {
       this.vis.rpm = lerp(this.vis.rpm, this.impact?.topspinRpm ?? 0, k);
     }
     this._applyPose(dt);
+    this._courtFlight(this._closeAlpha < 0.5);
 
     if (this.phase === 'entering' || this.phase === 'exiting') {
       const k = clamp((now - this._t0) / this._dur, 0, 1);
@@ -1116,9 +1136,12 @@ export class ContactCloseup {
       spin: F.C.clone().addScaledVector(F.up, BALL_R * 2.1),
       speed: this._swingTail.clone()
     };
-    const headerH = 64;
+    const head = this.layer.querySelector('.cc-head');
     const hud = this.layer.querySelector('.cc-hud');
-    const hudTop = hud ? hud.offsetTop : centre.h - 120;
+    const top = (head ? head.offsetTop + head.offsetHeight : 64) + 30;
+    const bottom = (hud ? hud.offsetTop : centre.h - 120) - 30;
+    const pad = 8;
+    const D = 22; // half the 44 px handle
     const placed = [];
     const away = { face: 64, spin: 70, speed: 62 };
     for (const k of ['face', 'spin', 'speed']) {
@@ -1134,15 +1157,38 @@ export class ContactCloseup {
       let y = p.y + (dy / l) * away[k];
       const knob = this.el.knobs[k];
       const kw = knob.offsetWidth || 150;
-      // keep inside the overlay, clear of the header and the result card
-      x = clamp(x, 30, p.w - kw + 18);
-      y = clamp(y, headerH + 26, hudTop - 30);
-      for (const q of placed) {
-        if (Math.abs(q.x - x) < kw * 0.9 && Math.abs(q.y - y) < 54) y = q.y + (y >= q.y ? 54 : -54);
+      const kh = Math.max(44, knob.offsetHeight || 44);
+      // the caption goes on the side away from the racket, so it never covers what you drag
+      let left = k !== 'spin' && x < centre.x;
+      if (left && x - kw + D < pad) left = false;
+      else if (!left && x - D + kw > p.w - pad && x - kw + D >= pad) left = true;
+      x = left ? clamp(x, kw - D + pad, p.w - D - pad) : clamp(x, D + pad, p.w - kw + D - pad);
+      const box = (yy) => ({ l: left ? x - kw + D : x - D, r: left ? x + D : x - D + kw, t: yy - kh / 2, b: yy + kh / 2 });
+      const hit = (yy) => {
+        const a = box(yy);
+        return placed.some((q) => a.l < q.r + 4 && a.r > q.l - 4 && a.t < q.b + 4 && a.b > q.t - 4);
+      };
+      const lo = top;
+      const hi = Math.max(top, bottom);
+      y = clamp(y, lo, hi);
+      if (hit(y)) {
+        // nearest free spot above or below, inside the band between header and card
+        let best = null;
+        for (let step = 1; step <= 8 && best === null; step++) {
+          for (const sgn1 of [1, -1]) {
+            const yy = y + sgn1 * step * (kh * 0.5 + 6);
+            if (yy >= lo && yy <= hi && !hit(yy)) {
+              best = yy;
+              break;
+            }
+          }
+        }
+        if (best !== null) y = best;
       }
-      y = clamp(y, headerH + 26, hudTop - 30);
-      placed.push({ x, y });
-      knob.style.transform = `translate3d(${(x - 22).toFixed(1)}px, ${(y - 22).toFixed(1)}px, 0)`;
+      placed.push(box(y));
+      knob.dataset.side = left ? 'left' : 'right';
+      const tx = left ? x - kw + D : x - D;
+      knob.style.transform = `translate3d(${tx.toFixed(1)}px, ${(y - kh / 2).toFixed(1)}px, 0)`;
       const ln = this.el.leaders[k];
       ln.setAttribute('x1', p.x.toFixed(1));
       ln.setAttribute('y1', p.y.toFixed(1));
@@ -1442,7 +1488,7 @@ export class ContactCloseup {
     this.el.verdict.dataset.verdict = o.verdict;
     this.el.dd.net.textContent = o.netClearanceM === null ? '—' : `${sgn(o.netClearanceM * 100, 0)} cm`;
     const d = o.verdict === 'NET' ? null : o.depthM;
-    this.el.dt.depth.textContent = d !== null && d < 0 ? L.depthLong : L.depthIn;
+    this.el.dt.depth.textContent = o.verdict !== 'NET' && (d === null || d < 0) ? L.depthLong : L.depthIn;
     this.el.dd.depth.textContent = o.verdict === 'NET' ? '—' : d === null ? '> 9 m' : `${Math.abs(d).toFixed(1)} m`;
     this.el.dd.launch.textContent = `${sgn(imp.launchAngleDeg ?? 0)}°`;
     this.el.dd.ball.textContent = fmt(imp.launchSpeedKmh ?? 0, 0);
